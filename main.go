@@ -17,6 +17,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
+// TODO: Read GitHub/GitLab access token from environment or flag
 // TODO: Properly handle errors
 // TODO: Add a --rules flag that takes a JSON file defining release rule
 // TODO: Add a --verbose flag to enable verbose output
