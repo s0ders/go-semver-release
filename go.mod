@@ -24,3 +24,7 @@ require (
 	golang.org/x/sys v0.2.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
+
+replace github.com/s0ders/go-semver-release/semver => ./semver
+
+replace github.com/s0ders/go-semver-release/commitanalyzer => ./commitanalyzer

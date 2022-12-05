@@ -1,13 +1,8 @@
 package main
 
 import (
-	"errors"
 	"flag"
-	"fmt"
 	"log"
-	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/s0ders/go-semver-release/commitanalyzer"
 
