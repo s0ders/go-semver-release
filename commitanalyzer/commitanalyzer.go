@@ -10,7 +10,7 @@ import (
 )
 
 // Regular expression to match valid semantic version number
-var semverRegex = regexp.MustCompile("v[0-9]+.[0-9]+.[0-9]+")
+var semverRegex = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
 
 // Regular expression to match valid conventional commit
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)`)
@@ -26,7 +26,6 @@ type CommitAnalyzer struct {
 func NewCommitAnalyzer(l *log.Logger) CommitAnalyzer {
 	return CommitAnalyzer{l}
 }
-
 
 func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	// Stores all tags matching a semver
@@ -113,7 +112,6 @@ func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latest
 	
 	return semver
 }
-
 
 
 func failOnError(e error) {
