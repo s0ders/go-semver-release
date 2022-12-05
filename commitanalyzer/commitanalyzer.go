@@ -19,8 +19,16 @@ var commitTypeRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|re
 var breakingChangeRegex = regexp.MustCompile("BREAKING CHANGE")
 var breakingChangeScopeRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?!:`)
 
+type CommitAnalyzer struct {
+	logger *log.Logger
+}
 
-func FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
+func NewCommitAnalyzer(l *log.Logger) CommitAnalyzer {
+	return CommitAnalyzer{l}
+}
+
+
+func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	// Stores all tags matching a semver
 	semverTags := make([]*object.Tag, 0)
 
@@ -36,7 +44,7 @@ func FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 
 	if len(semverTags) < 1 {
 		// TODO: create and push annotated tag v0.0.0
-		log.Fatalf("No tags on repository")
+		c.logger.Fatalf("No tags on repository")
 	} else if len(semverTags) < 2 {
 		latestSemverTag = semverTags[0]
 	} else {
@@ -59,34 +67,43 @@ func FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 		}
 	}
 
+	c.logger.Printf("Latest semver tag: %s\n", latestSemverTag.Name)
+
 	return latestSemverTag
 }
 
-func ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag, releaseRules *string) *semver.Semver {
+func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag, releaseRules *string) *semver.Semver {
 
 	semver, err := semver.NewSemver(latestSemverTag)
 	failOnError(err)
 
-	
-	err = history.ForEach(func(c *object.Commit) error {
+	err = history.ForEach(func(commit *object.Commit) error {
+
+		c.logger.Printf("New commit since last tag: %s\n", commit.Message)
 		
-		if !conventionalCommitRegex.MatchString(c.Message) {
+		if !conventionalCommitRegex.MatchString(commit.Message) {
+			c.logger.Printf("Commit did not match CC spec: %s\n", commit.Message)
 			return nil
 		}
 
-		breakingChange := breakingChangeRegex.MatchString(c.Message) || breakingChangeScopeRegex.MatchString(c.Message)
+		breakingChange := breakingChangeRegex.MatchString(commit.Message) || breakingChangeScopeRegex.MatchString(commit.Message)
 
 		if breakingChange {
+			c.logger.Printf("Detected breaking change")
 			semver.IncrMajor()
 			return nil
 		}
 
-		commitType := conventionalCommitRegex.FindString(c.Message)
+		commitType := commitTypeRegex.FindString(commit.Message)
+
+		c.logger.Printf("Commit type: %s\n", commitType)
 
 		switch commitType {
 		case "feat":
+			c.logger.Printf("Detected minor change")
 			semver.IncrMinor()
 		case "fix":
+			c.logger.Printf("Detected patch change")
 			semver.IncrPatch()
 		}
 
