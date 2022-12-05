@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestCompare(t *testing.T) {
+func TestCompareSemver(t *testing.T) {
 
 	type test struct {
 		s1, s2 Semver
@@ -28,4 +28,13 @@ func TestCompare(t *testing.T) {
 		}
 	}
 
+}
+
+func BenchmarkCompareSemver(b *testing.B) {
+	s1 := Semver{1, 0, 2}
+	s2 := Semver{1, 0, 3}
+
+	for i := 0; i < b.N; i++ {
+		CompareSemver(s1, s2)
+	}
 }
