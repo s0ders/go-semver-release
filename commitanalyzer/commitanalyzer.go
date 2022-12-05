@@ -1,7 +1,6 @@
 package commitanalyzer
 
 import (
-	"fmt"
 	"log"
 	"regexp"
 
@@ -12,6 +11,14 @@ import (
 
 // Regular expression to match valid semantic version number
 var semverRegex = regexp.MustCompile("v[0-9]+.[0-9]+.[0-9]+")
+
+// Regular expression to match valid conventional commit
+var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)`)
+var commitTypeRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}`)
+
+var breakingChangeRegex = regexp.MustCompile("BREAKING CHANGE")
+var breakingChangeScopeRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?!:`)
+
 
 func FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	// Stores all tags matching a semver
@@ -55,15 +62,42 @@ func FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	return latestSemverTag
 }
 
-func ComputeNewSemverNumber(history object.CommitIter) {
-		// ... just iterates over the commits, printing it
-		err := history.ForEach(func(c *object.Commit) error {
-			fmt.Println(c.Message)
-			return nil
-		})
+func ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag, releaseRules *string) *semver.Semver {
 
-		failOnError(err)
+	semver, err := semver.NewSemver(latestSemverTag)
+	failOnError(err)
+
+	
+	err = history.ForEach(func(c *object.Commit) error {
+		
+		if !conventionalCommitRegex.MatchString(c.Message) {
+			return nil
+		}
+
+		breakingChange := breakingChangeRegex.MatchString(c.Message) || breakingChangeScopeRegex.MatchString(c.Message)
+
+		if breakingChange {
+			semver.IncrMajor()
+			return nil
+		}
+
+		commitType := conventionalCommitRegex.FindString(c.Message)
+
+		switch commitType {
+		case "feat":
+			semver.IncrMinor()
+		case "fix":
+			semver.IncrPatch()
+		}
+
+		return nil
+	})
+	failOnError(err) 
+	
+	return semver
 }
+
+
 
 func failOnError(e error) {
 	if e != nil {
