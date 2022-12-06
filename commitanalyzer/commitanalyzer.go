@@ -1,39 +1,81 @@
 package commitanalyzer
 
 import (
+	"encoding/json"
 	"log"
+	"os"
 	"regexp"
+	"strings"
 
 	"github.com/s0ders/go-semver-release/semver"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	"github.com/go-playground/validator/v10"
 )
 
-// Regular expression to match valid semantic version number
-var semverRegex = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
+var ( 
+	semverRegex = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
+ 	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
+	defaultReleaseRules = ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"},	{"fix", "patch"}}}
+)
 
-// Regular expression to match valid conventional commit
-var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)`)
-var commitTypeRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}`)
-
-var breakingChangeRegex = regexp.MustCompile("BREAKING CHANGE")
-var breakingChangeScopeRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?!:`)
-
-type CommitAnalyzer struct {
-	logger *log.Logger
+type ReleaseRule struct {
+	CommitType  string `json:"type" validate:"required,oneof=build chore ci docs feat fix perf refactor revert style test"`
+	ReleaseType string `json:"release" validate:"required,oneof=major minor patch"`
 }
 
-func NewCommitAnalyzer(l *log.Logger) CommitAnalyzer {
-	return CommitAnalyzer{l}
+type ReleaseRules struct {
+	Rules []ReleaseRule `json:"releaseRules" validate:"required"`
+}
+
+type CommitAnalyzer struct {
+	logger       *log.Logger
+	releaseRules ReleaseRules
+}
+
+func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) CommitAnalyzer {
+
+	if *releaseRulesPath != "" {
+		log.Printf("Using custom release rules")
+		releaseRules := ParseReleaseRules(releaseRulesPath)
+		log.Printf("%+v", releaseRules)
+		return CommitAnalyzer{l, releaseRules}
+	}
+
+	log.Printf("Using default release rules")
+
+	return CommitAnalyzer{l, defaultReleaseRules}
+}
+
+func ParseReleaseRules(path *string) ReleaseRules {
+	jsonFile, err := os.Open(*path)
+	failOnError(err)
+
+	var releaseRules ReleaseRules
+
+	decoder := json.NewDecoder(jsonFile)
+
+	decoder.Decode(&releaseRules)
+
+	validate := validator.New()
+
+	err = validate.Struct(releaseRules)
+	failOnError(err)
+
+	for _, rule := range releaseRules.Rules {
+		err := validate.Struct(rule)
+		failOnError(err)
+	}
+
+	return releaseRules
 }
 
 func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
-	// Stores all tags matching a semver
 	semverTags := make([]*object.Tag, 0)
 
 	var latestSemverTag *object.Tag
 
-	// Fetch all tags matching a semver
 	tags.ForEach(func(tag *object.Tag) error {
 		if semverRegex.MatchString(string(tag.Name)) {
 			semverTags = append(semverTags, tag)
@@ -42,27 +84,27 @@ func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	})
 
 	if len(semverTags) < 1 {
-		// TODO: create and push annotated tag v0.0.0
-		c.logger.Fatalf("No tags on repository")
+		// TODO: Handle case where the repo has not semver tag (craft one ?)
+		panic("No tags yet!")
 	} else if len(semverTags) < 2 {
-		latestSemverTag = semverTags[0]
-	} else {
-		for i := 0; i < len(semverTags)-1; i++ {
-			v1, err := semver.NewSemver(semverTags[i])
-			failOnError(err)
-			v2, err := semver.NewSemver(semverTags[i+1])
-			failOnError(err)
+		return semverTags[0]
+	}
+	
+	for i := 0; i < len(semverTags)-1; i++ {
+		v1, err := semver.NewSemver(semverTags[i])
+		failOnError(err)
+		v2, err := semver.NewSemver(semverTags[i+1])
+		failOnError(err)
 
-			comparison := semver.CompareSemver(*v1, *v2)
+		comparison := semver.CompareSemver(*v1, *v2)
 
-			switch comparison {
-			case 1:
-				latestSemverTag = semverTags[i]
-			case -1:
-				latestSemverTag = semverTags[i+1]
-			default:
-				latestSemverTag = semverTags[i]
-			}
+		switch comparison {
+		case 1:
+			latestSemverTag = semverTags[i]
+		case -1:
+			latestSemverTag = semverTags[i+1]
+		default:
+			latestSemverTag = semverTags[i]
 		}
 	}
 
@@ -71,7 +113,7 @@ func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	return latestSemverTag
 }
 
-func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag, releaseRules *string) *semver.Semver {
+func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) *semver.Semver {
 
 	semver, err := semver.NewSemver(latestSemverTag)
 	failOnError(err)
@@ -79,13 +121,15 @@ func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latest
 	err = history.ForEach(func(commit *object.Commit) error {
 
 		c.logger.Printf("New commit since last tag: %s\n", commit.Message)
-		
+
 		if !conventionalCommitRegex.MatchString(commit.Message) {
 			c.logger.Printf("Commit did not match CC spec: %s\n", commit.Message)
 			return nil
 		}
 
-		breakingChange := breakingChangeRegex.MatchString(commit.Message) || breakingChangeScopeRegex.MatchString(commit.Message)
+		submatch := conventionalCommitRegex.FindStringSubmatch(commit.Message)
+		commitType := submatch[1]		
+		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
 
 		if breakingChange {
 			c.logger.Printf("Detected breaking change")
@@ -93,26 +137,34 @@ func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latest
 			return nil
 		}
 
-		commitType := commitTypeRegex.FindString(commit.Message)
-
 		c.logger.Printf("Commit type: %s\n", commitType)
 
-		switch commitType {
-		case "feat":
-			c.logger.Printf("Detected minor change")
-			semver.IncrMinor()
-		case "fix":
-			c.logger.Printf("Detected patch change")
-			semver.IncrPatch()
+		for _, rule := range c.releaseRules.Rules {
+			if commitType != rule.CommitType {
+				break
+			}
+
+			switch rule.ReleaseType {
+			case "major":
+				c.logger.Printf("Applying major release rule")
+				semver.IncrMajor()
+			case "minor":
+				c.logger.Printf("Applying minor release rule")
+				semver.IncrMinor()
+			case "patch":
+				c.logger.Printf("Applying patch release rule")
+				semver.IncrPatch()
+			default:
+				c.logger.Printf("No release rule to apply")
+			}
 		}
 
 		return nil
 	})
-	failOnError(err) 
-	
+	failOnError(err)
+
 	return semver
 }
-
 
 func failOnError(e error) {
 	if e != nil {
