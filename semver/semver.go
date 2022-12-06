@@ -28,7 +28,7 @@ func (s *Semver) IncrMinor() {
 func (s *Semver) IncrMajor() {
 	s.Patch = 0
 	s.Minor = 0
-	s.Patch++
+	s.Major++
 }
 
 func (s Semver) String() string {
