@@ -48,6 +48,16 @@ Custom release rules are passed to the program using the `--rules` flag:
 $ go-semver-release --url ... --token ... --rules PATH_TO_RULES
 ```
 
+Custom prefix can be added to the tag name pushed to the remote, by default the tag name correspond to the SemVer (e.g. `1.2.3`) but you might want to use some prefix like `v` using the `--tag-prefix` flag:
+
+```bash
+$ go-semver-release --url ... --token ... --tag-prefix v
+```
+
+
+
+One important thing to note with the `--tag-prefix` flag is that you can change your tag prefix during the lifetime of your repository (e.g. going from `v` to `version-`) and this will **not** affect the way `go-semver-release` will fetch your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes.
+
 
 
 ## Release Rules
