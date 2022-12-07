@@ -62,7 +62,7 @@ func NewSemverFromTag(tag *object.Tag) (*Semver, error) {
 	patch, err := strconv.Atoi(components[2])
 	failOnError(err)
 
-	return &Semver{major, minor, patch}, nil
+	return NewSemver(major, minor, patch)
 }
 
 // compareSemver returns an integer representing
