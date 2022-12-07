@@ -41,7 +41,7 @@ func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) (*CommitAnalyzer
 	if *releaseRulesPath == "" {
 		return &CommitAnalyzer{l, defaultReleaseRules}, nil
 	}
-
+	
 	releaseRules, err := ParseReleaseRules(releaseRulesPath)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func ParseReleaseRules(path *string) (*ReleaseRules, error) {
 	decoder.Decode(&releaseRules)
 
 	validate := validator.New()
-
+	
 	if err = validate.Struct(releaseRules); err != nil {
 		return nil, err
 	}
@@ -98,19 +98,12 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 
 	if len(semverTags) < 1 {
 		head, err := r.Head()
-
 		if err != nil {
 			return nil, err
 		}
+		version := semver.Semver{Major: 0, Minor: 0, Patch: 0,}
+		return tagger.NewTag(version, head.Hash())
 
-		ref := head.Hash()
-		semver := semver.Semver{
-			Major: 0,
-			Minor: 0,
-			Patch: 0,
-		}
-
-		return tagger.NewTag(semver, ref)
 	} else if len(semverTags) < 2 {
 		return semverTags[0], nil
 	}
@@ -146,10 +139,10 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, lates
 
 	err = history.ForEach(func(commit *object.Commit) error {
 
-		c.logger.Printf("New commit since last tag: %s\n", commit.Message)
+		// c.logger.Printf("New commit since last tag: %s\n", commit.Message)
 
 		if !conventionalCommitRegex.MatchString(commit.Message) {
-			c.logger.Printf("Commit did not match CC spec: %s\n", commit.Message)
+			// c.logger.Printf("Commit did not match CC spec: %s\n", commit.Message)
 			return nil
 		}
 
@@ -163,8 +156,6 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, lates
 			return nil
 		}
 
-		c.logger.Printf("Commit type: %s\n", commitType)
-
 		for _, rule := range c.releaseRules.Rules {
 			if commitType != rule.CommitType {
 				break
@@ -172,16 +163,16 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, lates
 
 			switch rule.ReleaseType {
 			case "major":
-				c.logger.Printf("Applying major release rule")
+				c.logger.Printf("%s : Applying major release", rule.CommitType)
 				semver.IncrMajor()
 			case "minor":
-				c.logger.Printf("Applying minor release rule")
+				c.logger.Printf("%s : Applying minor release", rule.CommitType)
 				semver.IncrMinor()
 			case "patch":
-				c.logger.Printf("Applying patch release rule")
+				c.logger.Printf("%s : Applying patch release", rule.CommitType)
 				semver.IncrPatch()
 			default:
-				c.logger.Printf("No release rule to apply")
+				c.logger.Printf("No release to apply")
 			}
 		}
 
