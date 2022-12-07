@@ -45,3 +45,5 @@ jobs:
         context: .
         push: true
         tags: soders/go-semver-release:latest
+  
+  # TODO: Add a job to handle creating and pushing a GitHub Action
