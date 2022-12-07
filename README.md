@@ -22,6 +22,28 @@ $ docker run --rm soders/go-semver-release --help
 
 
 
+## GitHub Actions
+
+The `go-release-semver` program can easily be used inside GitHub Actions as an action. It takes the same parameters as those describe in the usage section bellow except for `--dry-run` (yet).
+
+Bellow is an example usage inside a GitHub Actions pipeline:
+
+```yaml
+  go-semver-release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Semver Release
+      uses: ./
+      with:
+        repository-url: 'https://github.com/path/to/your/repo.git'
+        tag-prefix: 'v'
+        token: ${{ secrets.GIT_TOKEN }}
+```
+
+
+
 ## Usage
 
 You must pass the Git URL of the repository to target using the `--url` flag:
@@ -94,6 +116,4 @@ The following `release` types are supported for release rules: `major`, `minor`,
 
 ## Work in progress
 
-- [ ] Publish a Docker container GitHub Action via the CI/CD
-- [ ] Add an asciinema demonstration to the docs
-
+- [ ] Add support for `--dry-run` inside GitHub Actions
