@@ -27,5 +27,5 @@ jobs:
     - name: Go Test
       run: go test -v ./...
 
-    # - name: Docker Build
-    #   run: docker build -t s0ders/go-semver-release .
+    - name: Docker Build
+      run: docker build . --file Dockerfile --tag soders/go-semver-release:$(date +%s)
