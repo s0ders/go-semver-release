@@ -14,10 +14,10 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-var ( 
-	semverRegex = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
- 	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
-	defaultReleaseRules = ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"},	{"fix", "patch"}}}
+var (
+	semverRegex             = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
+	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
+	defaultReleaseRules     = ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}}}
 )
 
 type ReleaseRule struct {
@@ -89,11 +89,11 @@ func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	} else if len(semverTags) < 2 {
 		return semverTags[0]
 	}
-	
+
 	for i := 0; i < len(semverTags)-1; i++ {
-		v1, err := semver.NewSemver(semverTags[i])
+		v1, err := semver.NewSemverFromTag(semverTags[i])
 		failOnError(err)
-		v2, err := semver.NewSemver(semverTags[i+1])
+		v2, err := semver.NewSemverFromTag(semverTags[i+1])
 		failOnError(err)
 
 		comparison := semver.CompareSemver(*v1, *v2)
@@ -113,9 +113,10 @@ func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	return latestSemverTag
 }
 
-func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) *semver.Semver {
+func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) (*semver.Semver, bool) {
 
-	semver, err := semver.NewSemver(latestSemverTag)
+	ogSemver, err := semver.NewSemverFromTag(latestSemverTag)
+	semver, err := semver.NewSemverFromTag(latestSemverTag)
 	failOnError(err)
 
 	err = history.ForEach(func(commit *object.Commit) error {
@@ -128,7 +129,7 @@ func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latest
 		}
 
 		submatch := conventionalCommitRegex.FindStringSubmatch(commit.Message)
-		commitType := submatch[1]		
+		commitType := submatch[1]
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
 
 		if breakingChange {
@@ -163,7 +164,9 @@ func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latest
 	})
 	failOnError(err)
 
-	return semver
+	noNewVersion := ogSemver.String() == semver.String()
+
+	return semver, noNewVersion
 }
 
 func failOnError(e error) {
