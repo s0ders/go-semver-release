@@ -28,6 +28,7 @@ func main() {
 	gitUrl := flag.String("url", "", "The Git repository to version")
 	releaseRulesPath := flag.String("rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
 	accessToken := flag.String("token", "", "A personnal access token to log in to the Git repository in order to push tags")
+	tagPrefix := flag.String("tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
 	dryrun := flag.Bool("dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 
 	flag.Parse()
@@ -62,10 +63,8 @@ func main() {
 		logger.Fatalf("failed to fetch latest semver tag: %s", err)
 	}
 
-	// TODO: FIX THIS: commit arrive in reverse order (from most recent to oldest), fix that !!!!
 	logOptions := &git.LogOptions{}
 
-	// TODO: fix this mess, handle case where a repo has an existing 0.0.0 tag
 	if latestSemverTag.Name != fmt.Sprintf("0.0.0") {
 		logOptions.Since = &latestSemverTag.Tagger.When
 	}
@@ -102,7 +101,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	t := tagger.NewTagger(log.New(os.Stdout, fmt.Sprintf("%-20s ", "[tagger]"), log.Default().Flags()))
+	t := tagger.NewTagger(log.New(os.Stdout, fmt.Sprintf("%-20s ", "[tagger]"), log.Default().Flags()), tagPrefix)
 	r, err = t.AddTagToRepository(r, semver)
 
 	if err != nil {

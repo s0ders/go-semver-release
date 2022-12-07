@@ -19,7 +19,7 @@ import (
 
 var (
 	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
-	defaultReleaseRules     = &ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}, {"perf", "minor"},}}
+	defaultReleaseRules     = &ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}, {"perf", "minor"}}}
 )
 
 type ReleaseRule struct {
@@ -88,6 +88,7 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 	semverTags := make([]*object.Tag, 0)
 	var latestSemverTag *object.Tag
 
+	// Filter tags who match a semver number (no matter the prefix)
 	tags.ForEach(func(tag *object.Tag) error {
 		if semverRegex.MatchString(tag.Name) {
 			semverTags = append(semverTags, tag)
@@ -95,6 +96,7 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		return nil
 	})
 
+	// If there are no existing semver tag, create one
 	if len(semverTags) == 0 {
 		c.logger.Println("no previous tag, creating one")
 		head, err := r.Head()
@@ -109,10 +111,12 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 
 	}
 
+	// If there is only one semver tags
 	if len(semverTags) == 1 {
 		return semverTags[0], nil
 	}
 
+	// If there are multiple semver tags, they are sorted to find the semver tags who has the precedence
 	for i := 0; i < len(semverTags)-1; i++ {
 		current, err := semver.NewSemverFromGitTag(semverTags[i])
 		if err != nil {
@@ -162,11 +166,11 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history []*object.Commit, latest
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
 		shortHash := commit.Hash.String()[0:7]
 		var shortMessage string
-		
+
 		if len(commit.Message) > 60 {
 			shortMessage = fmt.Sprintf("%s...", commit.Message[0:57])
 		} else {
-			shortMessage = commit.Message[0:len(commit.Message)-1]
+			shortMessage = commit.Message[0 : len(commit.Message)-1]
 		}
 
 		if breakingChange {
