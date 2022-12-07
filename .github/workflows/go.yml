@@ -52,8 +52,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Hello world action step
-      id: hello
+    - name: Semver Release
       uses: ./
       with:
         repository-url: 'https://github.com/s0ders/go-semver-release.git'
