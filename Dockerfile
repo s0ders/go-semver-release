@@ -10,4 +10,5 @@ RUN go build -o /go/bin/go-semver-release
 # Now copy it into our base image.
 FROM gcr.io/distroless/base-debian11
 COPY --from=build /go/bin/go-semver-release /
-CMD ["/go-semver-release", "--help"]
+ENTRYPOINT ["/go-semver-release"]
+CMD ["--help"]
