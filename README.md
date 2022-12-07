@@ -95,6 +95,5 @@ The following `release` types are supported for release rules: `major`, `minor`,
 ## Work in progress
 
 - [ ] Publish a Docker container GitHub Action via the CI/CD
-- [ ] Handle custom Semver prefix (e.g. "v")
 - [ ] Add an asciinema demonstration to the docs
 
