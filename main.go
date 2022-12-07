@@ -61,7 +61,13 @@ func main() {
 		logger.Fatalf("Failed to fetch latest semver tag: %s", err)
 	}
 
-	commitHistory, err := r.Log(&git.LogOptions{Since: &latestSemverTag.Tagger.When})
+	logOptions := &git.LogOptions{}
+
+	if latestSemverTag.Name != "v0.0.0" {
+		logOptions.Since = &latestSemverTag.Tagger.When
+	}
+
+	commitHistory, err := r.Log(logOptions)
 	if err != nil {
 		logger.Fatalf("Failed to fetch commit history: %s", err)
 	}
