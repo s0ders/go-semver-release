@@ -1,16 +1,15 @@
 package semver
 
 import (
-	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-playground/validator/v10"
 )
 
-var SemverRegex = `^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+var SemverRegex = `(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 
 type Semver struct {
 	Major         int    `validate:"gte=0"`
@@ -63,24 +62,25 @@ func NewSemver(major, minor, patch int, metadata string) (*Semver, error) {
 // the Git annotated tag used as an input.
 func NewSemverFromGitTag(tag *object.Tag) (*Semver, error) {
 
-	version := strings.Replace(tag.Name, "v", "", 1)
-	components := strings.Split(version, ".")
+	regex := regexp.MustCompile(SemverRegex)
 
-	if len(components) != 3 {
-		return nil, errors.New("invalid semantic version number")
+	submatch := regex.FindStringSubmatch(tag.Name)
+
+	if len(submatch) < 4 {
+		return nil, fmt.Errorf("NewSemverFromGitTag: tag cannot be converted to a valid semver")
 	}
 
-	major, err := strconv.Atoi(components[0])
+	major, err := strconv.Atoi(submatch[1])
 	if err != nil {
-		return nil, fmt.Errorf("NewSemver: failed to convert major component: %w", err)
+		return nil, fmt.Errorf("NewSemverFromGitTag: failed to convert major component: %w", err)
 	}
-	minor, err := strconv.Atoi(components[1])
+	minor, err := strconv.Atoi(submatch[2])
 	if err != nil {
-		return nil, fmt.Errorf("NewSemver: failed to convert minor component: %w", err)
+		return nil, fmt.Errorf("NewSemverFromGitTag: failed to convert minor component: %w", err)
 	}
-	patch, err := strconv.Atoi(components[2])
+	patch, err := strconv.Atoi(submatch[3])
 	if err != nil {
-		return nil, fmt.Errorf("NewSemver: failed to convert patch component: %w", err)
+		return nil, fmt.Errorf("NewSemverFromGitTag: failed to convert patch component: %w", err)
 	}
 
 	semver, err := NewSemver(major, minor, patch, "")
