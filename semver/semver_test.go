@@ -30,6 +30,26 @@ func TestCompareSemver(t *testing.T) {
 
 }
 
+func TestNegativeSemver(t *testing.T) {
+	_, err := NewSemver(-1, 0, 0)
+
+	if err == nil {
+		t.Fatalf("Error, managed to create negative semver")
+	}
+}
+
+func TestSemverString(t *testing.T) {
+	s, err := NewSemver(1, 2, 3)
+	if err != nil {
+		t.Fatalf("Failed to create semver: %s", err)
+	}
+
+	want := "v1.2.3" 
+	if got := s.String(); got != want {
+		t.Fatalf("Got: %s Want: %s", got, want)
+	}
+}
+
 func BenchmarkCompareSemver(b *testing.B) {
 	s1 := Semver{1, 0, 2}
 	s2 := Semver{1, 0, 3}
