@@ -45,5 +45,14 @@ jobs:
         context: .
         push: true
         tags: soders/go-semver-release:latest
-  
-  # TODO: Add a job to handle creating and pushing a GitHub Action
+
+  go-semver-release:
+    runs-on: ubuntu-latest
+    name: Version the Git repository using the Semver convention
+    steps:
+      - name: Hello world action step
+        id: hello
+        uses: ./
+        with:
+          repository-url: 'https://github.com/s0ders/go-semver-release.git'
+          token: ${{ secrets.GIT_TOKEN }}
