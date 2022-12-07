@@ -13,9 +13,9 @@ import (
 var SemverRegex = `^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 
 type Semver struct {
-	Major         int    // `validate:"required,min=0"`
-	Minor         int    // `validate:"required,min=0"`
-	Patch         int    // `validate:"required,min=0"`
+	Major         int    `validate:"gte=0"`
+	Minor         int    `validate:"gte=0"`
+	Patch         int    `validate:"gte=0"`
 	BuildMetadata string // `validate:"omitempty,alphanum"`
 }
 
@@ -63,8 +63,8 @@ func NewSemver(major, minor, patch int, metadata string) (*Semver, error) {
 // the Git annotated tag used as an input.
 func NewSemverFromGitTag(tag *object.Tag) (*Semver, error) {
 
-	semver := strings.Replace(tag.Name, "v", "", 1)
-	components := strings.Split(semver, ".")
+	version := strings.Replace(tag.Name, "v", "", 1)
+	components := strings.Split(version, ".")
 
 	if len(components) != 3 {
 		return nil, errors.New("invalid semantic version number")
@@ -83,7 +83,13 @@ func NewSemverFromGitTag(tag *object.Tag) (*Semver, error) {
 		return nil, fmt.Errorf("NewSemver: failed to convert patch component: %w", err)
 	}
 
-	return NewSemver(major, minor, patch, "")
+	semver, err := NewSemver(major, minor, patch, "")
+
+	if err != nil {
+		return nil, fmt.Errorf("NewSemverFromGitTag: failed to build SemVer: %w", err)
+	}
+
+	return semver, nil
 }
 
 // Precedence returns an integer representing which of the

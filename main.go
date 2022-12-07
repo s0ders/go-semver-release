@@ -15,6 +15,7 @@ import (
 	"github.com/s0ders/go-semver-release/tagger"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
@@ -24,10 +25,10 @@ import (
 func main() {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[go-semver-release]"), log.Default().Flags())
 
-	gitUrl 				:= flag.String("url", "", "The Git repository to version")
-	releaseRulesPath 	:= flag.String("rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
-	accessToken 		:= flag.String("token", "", "A personnal access token to log in to the Git repository in order to push tags")
-	dryrun	 			:= flag.Bool("dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
+	gitUrl := flag.String("url", "", "The Git repository to version")
+	releaseRulesPath := flag.String("rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
+	accessToken := flag.String("token", "", "A personnal access token to log in to the Git repository in order to push tags")
+	dryrun := flag.Bool("dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 
 	flag.Parse()
 
@@ -55,12 +56,13 @@ func main() {
 		logger.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	// Fetch all semantic versioning tags (i.e. vX.Y.Z) from the repository
+	// Fetch all semantic versioning tags from the repository
 	latestSemverTag, err := commitAnalyzer.FetchLatestSemverTag(r)
 	if err != nil {
 		logger.Fatalf("failed to fetch latest semver tag: %s", err)
 	}
 
+	// TODO: FIX THIS: commit arrive in reverse order (from most recent to oldest), fix that !!!!
 	logOptions := &git.LogOptions{}
 
 	// TODO: fix this mess, handle case where a repo has an existing 0.0.0 tag
@@ -73,8 +75,20 @@ func main() {
 		logger.Fatalf("failed to fetch commit history: %s", err)
 	}
 
+	var history []*object.Commit
+
+	commitHistory.ForEach(func(c *object.Commit) error {
+		history = append(history, c)
+		return nil
+	})
+
+	// Reverse commit history to go from oldest to most recent
+	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
+		history[i], history[j] = history[j], history[i]
+	}
+
 	// Compute the next semantic versioning number
-	semver, noNewVersion, err := commitAnalyzer.ComputeNewSemverNumber(commitHistory, latestSemverTag)
+	semver, noNewVersion, err := commitAnalyzer.ComputeNewSemverNumber(history, latestSemverTag)
 	if err != nil {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
