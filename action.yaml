@@ -14,10 +14,6 @@ inputs:
     description: 'A prefix to append to the semantic version number used to name tag (e.g. "v") and used to match existing tags on remote'
     required: false
     default: ''
-  dry-run:
-    description: 'Enable dry-run which only computes the next semantic version for a repository, no tags are pushed'
-    required: false
-    default: "false"
 runs:
   using: 'docker'
   image: 'soders/go-semver-release'
@@ -28,5 +24,3 @@ runs:
     - ${{ inputs.token }}
     - --tag-prefix
     - ${{ inputs.tag-prefix }}
-    - --dry-run
-    - ${{ inputs.dry-run }}
