@@ -21,7 +21,6 @@ import (
 )
 
 // TODO: Add a --verbose flag to enable verbose output
-// TODO: Add color to console text for verbose mod
 func main() {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[go-semver-release]"), log.Default().Flags())
 
