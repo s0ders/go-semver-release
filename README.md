@@ -6,7 +6,7 @@ To do so, this program fetches a repository commits and tags history and analyze
 
 ## Install
 
-If you [Go](https://go.dev) is installed on your machine, you can directly compile and install this program by using `go install`:
+If [Go](https://go.dev) is installed on your machine, you can directly compile and install this program by using `go install`:
 
 ```bash
 $ go install github.com/s0ders/go-semver-release
