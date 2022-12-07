@@ -3,93 +3,107 @@ package semver
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-playground/validator/v10"
 )
 
-// TODO: Handle prerelease tags
+var SemverRegex = `^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+
 type Semver struct {
-	Major int
-	Minor int
-	Patch int
+	Major         int    // `validate:"required,min=0"`
+	Minor         int    // `validate:"required,min=0"`
+	Patch         int    // `validate:"required,min=0"`
+	BuildMetadata string // `validate:"omitempty,alphanum"`
 }
 
-func (s *Semver) IncrPatch() {
+func (s *Semver) BumpPatch() {
 	s.Patch++
 }
 
-func (s *Semver) IncrMinor() {
+func (s *Semver) BumpMinor() {
 	s.Patch = 0
 	s.Minor++
 }
 
-func (s *Semver) IncrMajor() {
+func (s *Semver) BumpMajor() {
 	s.Patch = 0
 	s.Minor = 0
 	s.Major++
 }
 
-func (s Semver) String() string {
-	return fmt.Sprintf("v%d.%d.%d", s.Major, s.Minor, s.Patch)
+func (s Semver) NormalVersion() string {
+	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
 }
 
-func NewSemver(major, minor, patch int) (*Semver, error) {
-	if major < 0 || minor < 0 || patch < 0 {
-		return nil, errors.New("Semantic version components cannot be negative")
+func (s Semver) String() string {
+	if s.BuildMetadata != "" {
+		return fmt.Sprintf("%d.%d.%d-%s", s.Major, s.Minor, s.Patch, s.BuildMetadata)
 	}
 
-	return &Semver{major, minor, patch}, nil
+	return s.NormalVersion()
 }
 
-// NewSemverFromTag returns a semver struct corresponding to
-// the tag used as an input.
-func NewSemverFromTag(tag *object.Tag) (*Semver, error) {
+// TODO: return a value not a pointer
+func NewSemver(major, minor, patch int, metadata string) (*Semver, error) {
+
+	version := &Semver{major, minor, patch, metadata}
+	validate := validator.New()
+
+	if err := validate.Struct(version); err != nil {
+		return nil, fmt.Errorf("NewSemver: failed to validate struct: %w", err)
+	}
+
+	return version, nil
+}
+
+// NewSemverFromGitTag returns a semver struct corresponding to
+// the Git annotated tag used as an input.
+func NewSemverFromGitTag(tag *object.Tag) (*Semver, error) {
 
 	semver := strings.Replace(tag.Name, "v", "", 1)
 	components := strings.Split(semver, ".")
 
 	if len(components) != 3 {
-		return nil, errors.New("Invalid semantic version number")
+		return nil, errors.New("invalid semantic version number")
 	}
 
 	major, err := strconv.Atoi(components[0])
-	failOnError(err)
+	if err != nil {
+		return nil, fmt.Errorf("NewSemver: failed to convert major component: %w", err)
+	}
 	minor, err := strconv.Atoi(components[1])
-	failOnError(err)
+	if err != nil {
+		return nil, fmt.Errorf("NewSemver: failed to convert minor component: %w", err)
+	}
 	patch, err := strconv.Atoi(components[2])
-	failOnError(err)
+	if err != nil {
+		return nil, fmt.Errorf("NewSemver: failed to convert patch component: %w", err)
+	}
 
-	return NewSemver(major, minor, patch)
+	return NewSemver(major, minor, patch, "")
 }
 
-// compareSemver returns an integer representing
-// which of the two versions v1 or v2 passed is
-// the most recent. 1 meaning v1 is the most recent,
-// -1 that it is v2 and 0 that they are equal.
-func CompareSemver(v1, v2 Semver) int {
+// Precedence returns an integer representing which of the
+// two versions s1 or s2 is the most recent. 1 meaning s1 is
+// the most recent, -1 that it is s2 and 0 that they are equal.
+func (s1 Semver) Precedence(s2 Semver) int {
 	switch {
-	case v1.Major > v2.Major:
+	case s1.Major > s2.Major:
 		return 1
-	case v1.Major < v2.Major:
+	case s1.Major < s2.Major:
 		return -1
-	case v1.Minor > v2.Minor:
+	case s1.Minor > s2.Minor:
 		return 1
-	case v1.Minor < v2.Minor:
+	case s1.Minor < s2.Minor:
 		return -1
-	case v1.Patch > v2.Patch:
+	case s1.Patch > s2.Patch:
 		return 1
-	case v1.Patch < v2.Patch:
+	case s1.Patch < s2.Patch:
 		return -1
 	default:
 		return 0
-	}
-}
-
-func failOnError(e error) {
-	if e != nil {
-		log.Fatalf("Error: %s\n", e)
 	}
 }

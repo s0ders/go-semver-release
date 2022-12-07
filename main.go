@@ -19,15 +19,15 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-// TODO: Properly handle errors
 // TODO: Add a --verbose flag to enable verbose output
 // TODO: Add color to console text for verbose mod
 func main() {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[go-semver-release]"), log.Default().Flags())
-	gitUrl := flag.String("url", "", "The Git repository to work on")
-	releaseRulesPath := flag.String("rules", "", "Path to a JSON file containing the rules for releasing new version based on commit types")
-	accessTokenFlag := flag.String("token", "", "A personnal access token to log in to the Git repository in order to push tags")
-	dryrunFlag := flag.Bool("dry-run", false, "Enable dry-run which will only compute the next semantic version number for a repository and not push any tag")
+
+	gitUrl 				:= flag.String("url", "", "The Git repository to version")
+	releaseRulesPath 	:= flag.String("rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
+	accessToken 		:= flag.String("token", "", "A personnal access token to log in to the Git repository in order to push tags")
+	dryrun	 			:= flag.Bool("dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 
 	flag.Parse()
 
@@ -37,50 +37,54 @@ func main() {
 
 	auth := &http.BasicAuth{
 		Username: "go-semver-release",
-		Password: *accessTokenFlag,
+		Password: *accessToken,
 	}
 
 	r, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
 		Auth:     auth,
 		URL:      *gitUrl,
-		Progress: os.Stdout,
+		Progress: nil,
 	})
 
 	if err != nil {
-		logger.Fatalf("Failed to clone repository: %s", err)
+		logger.Fatalf("failed to clone repository: %s", err)
 	}
 
 	commitAnalyzer, err := commitanalyzer.NewCommitAnalyzer(log.New(os.Stdout, fmt.Sprintf("%-20s ", "[commit-analyzer]"), log.LstdFlags), releaseRulesPath)
 	if err != nil {
-		logger.Fatalf("Failed to create commit analyzer: %s", err)
+		logger.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
 	// Fetch all semantic versioning tags (i.e. vX.Y.Z) from the repository
 	latestSemverTag, err := commitAnalyzer.FetchLatestSemverTag(r)
 	if err != nil {
-		logger.Fatalf("Failed to fetch latest semver tag: %s", err)
+		logger.Fatalf("failed to fetch latest semver tag: %s", err)
 	}
 
 	logOptions := &git.LogOptions{}
 
-	if latestSemverTag.Name != "v0.0.0" {
+	// TODO: fix this mess, handle case where a repo has an existing 0.0.0 tag
+	if latestSemverTag.Name != fmt.Sprintf("0.0.0") {
 		logOptions.Since = &latestSemverTag.Tagger.When
 	}
 
 	commitHistory, err := r.Log(logOptions)
 	if err != nil {
-		logger.Fatalf("Failed to fetch commit history: %s", err)
+		logger.Fatalf("failed to fetch commit history: %s", err)
 	}
 
 	// Compute the next semantic versioning number
-	semver, noNewVersion := commitAnalyzer.ComputeNewSemverNumber(commitHistory, latestSemverTag)
+	semver, noNewVersion, err := commitAnalyzer.ComputeNewSemverNumber(commitHistory, latestSemverTag)
+	if err != nil {
+		fmt.Printf("failed to compute SemVer: %s", err)
+	}
 
 	switch {
 	case noNewVersion:
-		logger.Printf("No new version, still on %s", semver)
+		logger.Printf("no new version, still on %s", semver)
 		os.Exit(0)
-	case *dryrunFlag:
-		logger.Printf("Dry-run enabled, next version will be %s", semver)
+	case *dryrun:
+		logger.Printf("dry-run enabled, next version will be %s", semver)
 		os.Exit(0)
 	}
 
@@ -88,13 +92,13 @@ func main() {
 	r, err = t.AddTagToRepository(r, semver)
 
 	if err != nil {
-		logger.Fatalf("Failed to create new tag: %s", err)
+		logger.Fatalf("failed to create new tag: %s", err)
 	}
 
 	// Push tag to remote
 	if err = t.PushTagToRemote(r, auth); err != nil {
 		logger.Fatalf("Failed to push tag: %s", err)
 	}
-	logger.Printf("Pushed tag %s on repository", semver)
+	logger.Printf("pushed tag %s on repository", semver)
 	os.Exit(0)
 }

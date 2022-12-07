@@ -1,6 +1,7 @@
 package tagger
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -13,27 +14,31 @@ import (
 	"github.com/s0ders/go-semver-release/semver"
 )
 
+var TaggerGitSignature = object.Signature{
+	Name:  "Go Semver Release",
+	Email: "ci@ci.ci",
+	When:  time.Now(),
+}
+
 type Tagger struct {
-	logger *log.Logger
+	logger    *log.Logger
 }
 
-func NewTagger(l *log.Logger) *Tagger {
-	return &Tagger{l}
+func NewTagger(logger *log.Logger) *Tagger {
+	return &Tagger{
+		logger:    logger,
+	}
 }
 
-func NewTag(semver semver.Semver, hash plumbing.Hash) (*object.Tag, error) {
+func NewTag(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 
 	tag := &object.Tag{
-		Hash: hash,
-		Name: semver.String(),
-		Tagger: object.Signature{
-			Name:  "Go Semver Release",
-			Email: "ci@ci.ci",
-			When:  time.Now(),
-		},
+		Hash:   hash,
+		Name:   semver.String(),
+		Tagger: TaggerGitSignature,
 	}
 
-	return tag, nil
+	return tag
 }
 
 // AddTagToRepository create a new annotated tag on the repository
@@ -41,23 +46,21 @@ func NewTag(semver semver.Semver, hash plumbing.Hash) (*object.Tag, error) {
 func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
 	h, err := r.Head()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("AddTagToRepository: failed to fetch head: %w", err)
 	}
 
-	_, err = r.CreateTag(semver.String(), h.Hash(), &git.CreateTagOptions{
+	tag := semver.String()
+
+	_, err = r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 		Message: semver.String(),
-		Tagger: &object.Signature{
-			Name:  "Go Semver Release",
-			Email: "ci@ci.ci",
-			When:  time.Now(),
-		},
+		Tagger:  &TaggerGitSignature,
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("AddTagToRepository: failed to create tag on repository: %w", err)
 	}
 
-	t.logger.Printf("Created new tag %s on repository", semver.String())
+	t.logger.Printf("created new tag %s on repository", semver.String())
 
 	return r, nil
 }
@@ -70,5 +73,9 @@ func (t *Tagger) PushTagToRemote(r *git.Repository, auth transport.AuthMethod) e
 		RemoteName: "origin",
 	}
 
-	return r.Push(po)
+	if err := r.Push(po); err != nil {
+		return fmt.Errorf("PushTagToRemote: failed to push: %w", err)
+	}
+
+	return nil
 }

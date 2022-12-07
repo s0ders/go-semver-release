@@ -12,18 +12,18 @@ func TestCompareSemver(t *testing.T) {
 	}
 
 	matrix := []test{
-		{Semver{1, 0, 2}, Semver{1, 0, 1}, 1},
-		{Semver{1, 0, 2}, Semver{1, 0, 3}, -1},
-		{Semver{1, 0, 2}, Semver{1, 1, 0}, -1},
-		{Semver{0, 0, 1}, Semver{1, 1, 0}, -1},
-		{Semver{2, 0, 0}, Semver{1, 99, 99}, 1},
-		{Semver{99, 0, 0}, Semver{2, 99, 99}, 1},
-		{Semver{1, 0, 0}, Semver{1, 0, 0}, 0},
+		{Semver{1, 0, 2, ""}, Semver{1, 0, 1, ""}, 1},
+		{Semver{1, 0, 2, ""}, Semver{1, 0, 3, ""}, -1},
+		{Semver{1, 0, 2, ""}, Semver{1, 1, 0, ""}, -1},
+		{Semver{0, 0, 1, ""}, Semver{1, 1, 0, ""}, -1},
+		{Semver{2, 0, 0, ""}, Semver{1, 99, 99, ""}, 1},
+		{Semver{99, 0, 0, ""}, Semver{2, 99, 99, ""}, 1},
+		{Semver{1, 0, 0, ""}, Semver{1, 0, 0, ""}, 0},
 	}
 
 	for _, test := range matrix {
 
-		if got := CompareSemver(test.s1, test.s2); got != test.want {
+		if got := test.s1.Precedence(test.s2); got != test.want {
 			t.Fatalf("Got: %d Want: %d\n", got, test.want)
 		}
 	}
@@ -31,7 +31,7 @@ func TestCompareSemver(t *testing.T) {
 }
 
 func TestNegativeSemver(t *testing.T) {
-	_, err := NewSemver(-1, 0, 0)
+	_, err := NewSemver(-1, 0, 0, "")
 
 	if err == nil {
 		t.Fatalf("Error, managed to create negative semver")
@@ -39,22 +39,19 @@ func TestNegativeSemver(t *testing.T) {
 }
 
 func TestSemverString(t *testing.T) {
-	s, err := NewSemver(1, 2, 3)
-	if err != nil {
-		t.Fatalf("Failed to create semver: %s", err)
-	}
+	s, _ := NewSemver(1, 2, 3, "")
 
-	want := "v1.2.3" 
+	want := "1.2.3"
 	if got := s.String(); got != want {
 		t.Fatalf("Got: %s Want: %s", got, want)
 	}
 }
 
 func BenchmarkCompareSemver(b *testing.B) {
-	s1 := Semver{1, 0, 2}
-	s2 := Semver{1, 0, 3}
+	s1, _ := NewSemver(1, 0, 2, "")
+	s2, _ := NewSemver(1, 0, 3, "")
 
 	for i := 0; i < b.N; i++ {
-		CompareSemver(s1, s2)
+		s1.Precedence(*s2)
 	}
 }

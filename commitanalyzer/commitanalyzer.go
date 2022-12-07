@@ -2,6 +2,7 @@ package commitanalyzer
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -17,9 +18,8 @@ import (
 )
 
 var (
-	semverRegex             = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
 	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
-	defaultReleaseRules     = &ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}}}
+	defaultReleaseRules     = &ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"perf", "minor"}, {"fix", "patch"}}}
 )
 
 type ReleaseRule struct {
@@ -41,10 +41,10 @@ func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) (*CommitAnalyzer
 	if *releaseRulesPath == "" {
 		return &CommitAnalyzer{l, defaultReleaseRules}, nil
 	}
-	
+
 	releaseRules, err := ParseReleaseRules(releaseRulesPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewCommitAnalyzer: failed parsing release rules: %w", err)
 	}
 
 	return &CommitAnalyzer{l, releaseRules}, nil
@@ -59,19 +59,17 @@ func ParseReleaseRules(path *string) (*ReleaseRules, error) {
 	var releaseRules *ReleaseRules
 
 	decoder := json.NewDecoder(jsonFile)
-
 	decoder.Decode(&releaseRules)
 
 	validate := validator.New()
-	
 	if err = validate.Struct(releaseRules); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ParseReleaseRules: failed to validate release rules: %w", err)
 	}
 
 	for _, rule := range releaseRules.Rules {
 		err := validate.Struct(rule)
 		if err = validate.Struct(releaseRules); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("ParseReleaseRules: failed to validate release rules: %w", err)
 		}
 	}
 
@@ -80,43 +78,53 @@ func ParseReleaseRules(path *string) (*ReleaseRules, error) {
 
 func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
 
+	semverRegex := regexp.MustCompile(semver.SemverRegex)
+
 	tags, err := r.TagObjects()
 	if err != nil {
 		return nil, err
 	}
 
 	semverTags := make([]*object.Tag, 0)
-
 	var latestSemverTag *object.Tag
 
 	tags.ForEach(func(tag *object.Tag) error {
-		if semverRegex.MatchString(string(tag.Name)) {
+		if semverRegex.MatchString(tag.Name) {
 			semverTags = append(semverTags, tag)
 		}
 		return nil
 	})
 
-	if len(semverTags) < 1 {
+	if len(semverTags) == 0 {
 		head, err := r.Head()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to fetch head: %w", err)
 		}
-		version := semver.Semver{Major: 0, Minor: 0, Patch: 0,}
-		return tagger.NewTag(version, head.Hash())
+		version, err := semver.NewSemver(0, 0, 0, "")
+		if err != nil {
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build new SemVer: %w", err)
+		}
+		return tagger.NewTag(*version, head.Hash()), nil
 
-	} else if len(semverTags) < 2 {
+	}
+
+	if len(semverTags) == 1 {
 		return semverTags[0], nil
 	}
 
 	for i := 0; i < len(semverTags)-1; i++ {
-		v1, err := semver.NewSemverFromTag(semverTags[i])
-		failOnError(err)
-		v2, err := semver.NewSemverFromTag(semverTags[i+1])
-		failOnError(err)
+		current, err := semver.NewSemverFromGitTag(semverTags[i])
+		if err != nil {
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build SemVer from Git tag: %w", err)
+		}
+		next, err := semver.NewSemverFromGitTag(semverTags[i+1])
+		if err != nil {
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build SemVer from Git tag: %w", err)
+		}
 
-		comparison := semver.CompareSemver(*v1, *v2)
+		precedence := current.Precedence(*next)
 
-		switch comparison {
+		switch precedence {
 		case 1:
 			latestSemverTag = semverTags[i]
 		case -1:
@@ -126,16 +134,21 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		}
 	}
 
-	c.logger.Printf("Latest semver tag: %s\n", latestSemverTag.Name)
+	c.logger.Printf("latest semver tag: %s\n", latestSemverTag.Name)
 
 	return latestSemverTag, nil
 }
 
-func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) (*semver.Semver, bool) {
+func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) (*semver.Semver, bool, error) {
 
-	ogSemver, err := semver.NewSemverFromTag(latestSemverTag)
-	semver, err := semver.NewSemverFromTag(latestSemverTag)
-	failOnError(err)
+	ogSemver, err := semver.NewSemverFromGitTag(latestSemverTag)
+	if err != nil {
+		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to build SemVer from Git tag: %w", err)
+	}
+	semver, err := semver.NewSemverFromGitTag(latestSemverTag)
+	if err != nil {
+		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to build SemVer from Git tag: %w", err)
+	}
 
 	err = history.ForEach(func(commit *object.Commit) error {
 
@@ -149,10 +162,17 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, lates
 		submatch := conventionalCommitRegex.FindStringSubmatch(commit.Message)
 		commitType := submatch[1]
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
+		shortHash := commit.Hash.String()[0:7]
+		var shortMessage string
+		if len(commit.Message) > 60 {
+			shortMessage = fmt.Sprintf("%s...", commit.Message[0:57])
+		} else {
+			shortMessage = commit.Message[0:len(commit.Message)-1]
+		}
 
 		if breakingChange {
-			c.logger.Printf("Detected breaking change")
-			semver.IncrMajor()
+			c.logger.Printf("[%s] Breaking change", shortHash)
+			semver.BumpMajor()
 			return nil
 		}
 
@@ -163,30 +183,26 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, lates
 
 			switch rule.ReleaseType {
 			case "major":
-				c.logger.Printf("%s : Applying major release", rule.CommitType)
-				semver.IncrMajor()
+				c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
+				semver.BumpMajor()
 			case "minor":
-				c.logger.Printf("%s : Applying minor release", rule.CommitType)
-				semver.IncrMinor()
+				c.logger.Printf("(%s) minor: \"%s\"", shortHash, shortMessage)
+				semver.BumpMinor()
 			case "patch":
-				c.logger.Printf("%s : Applying patch release", rule.CommitType)
-				semver.IncrPatch()
+				c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
+				semver.BumpPatch()
 			default:
-				c.logger.Printf("No release to apply")
+				c.logger.Printf("no release to apply")
 			}
 		}
 
 		return nil
 	})
-	failOnError(err)
+	if err != nil {
+		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to parse commit history: %w", err)
+	}
 
 	noNewVersion := ogSemver.String() == semver.String()
 
-	return semver, noNewVersion
-}
-
-func failOnError(e error) {
-	if e != nil {
-		log.Fatalf("Error: %s\n", e)
-	}
+	return semver, noNewVersion, nil
 }

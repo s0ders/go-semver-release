@@ -5,33 +5,9 @@ import (
 	"testing"
 )
 
-func TestSemverRegex(t *testing.T) {
-	type test struct {
-		tagName string
-		isValidSemver bool
-	}
-
-	matrix := []test{
-		{"foo", false},
-		{"v1.2.3", true},
-		{"v999.2.3", true},
-		{"v1.2.3-pre", false},
-		{"v1.2.3-pre+meta", false},
-		{"1.2.3", false},
-	}
-
-	
-
-	for _, item := range matrix {
-		if got := semverRegex.MatchString(item.tagName); got != item.isValidSemver {
-			t.Fatalf("Got: %t Want: %t with tag %s\n", got, item.isValidSemver, item.tagName)
-		}
-	}
-}
-
 func TestCommitTypeRegex(t *testing.T) {
 	type test struct {
-		commit string
+		commit     string
 		commitType string
 	}
 
@@ -53,7 +29,7 @@ func TestCommitTypeRegex(t *testing.T) {
 
 func TestBreakingChangeRegex(t *testing.T) {
 	type test struct {
-		commit string
+		commit     string
 		isBreaking bool
 	}
 
