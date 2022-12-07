@@ -20,7 +20,6 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-// TODO: Add a --verbose flag to enable verbose output
 func main() {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[go-semver-release]"), log.Default().Flags())
 
