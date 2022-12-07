@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/s0ders/go-semver-release/semver"
+	"github.com/s0ders/go-semver-release/tagger"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/go-playground/validator/v10"
@@ -17,7 +19,7 @@ import (
 var (
 	semverRegex             = regexp.MustCompile("^v[0-9]+.[0-9]+.[0-9]+$")
 	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
-	defaultReleaseRules     = ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}}}
+	defaultReleaseRules     = &ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}}}
 )
 
 type ReleaseRule struct {
@@ -31,28 +33,30 @@ type ReleaseRules struct {
 
 type CommitAnalyzer struct {
 	logger       *log.Logger
-	releaseRules ReleaseRules
+	releaseRules *ReleaseRules
 }
 
-func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) CommitAnalyzer {
+func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) (*CommitAnalyzer, error) {
 
-	if *releaseRulesPath != "" {
-		log.Printf("Using custom release rules")
-		releaseRules := ParseReleaseRules(releaseRulesPath)
-		log.Printf("%+v", releaseRules)
-		return CommitAnalyzer{l, releaseRules}
+	if *releaseRulesPath == "" {
+		return &CommitAnalyzer{l, defaultReleaseRules}, nil
 	}
 
-	log.Printf("Using default release rules")
+	releaseRules, err := ParseReleaseRules(releaseRulesPath)
+	if err != nil {
+		return nil, err
+	}
 
-	return CommitAnalyzer{l, defaultReleaseRules}
+	return &CommitAnalyzer{l, releaseRules}, nil
 }
 
-func ParseReleaseRules(path *string) ReleaseRules {
+func ParseReleaseRules(path *string) (*ReleaseRules, error) {
 	jsonFile, err := os.Open(*path)
-	failOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	var releaseRules ReleaseRules
+	var releaseRules *ReleaseRules
 
 	decoder := json.NewDecoder(jsonFile)
 
@@ -60,18 +64,27 @@ func ParseReleaseRules(path *string) ReleaseRules {
 
 	validate := validator.New()
 
-	err = validate.Struct(releaseRules)
-	failOnError(err)
+	if err = validate.Struct(releaseRules); err != nil {
+		return nil, err
+	}
 
 	for _, rule := range releaseRules.Rules {
 		err := validate.Struct(rule)
-		failOnError(err)
+		if err = validate.Struct(releaseRules); err != nil {
+			return nil, err
+		}
 	}
 
-	return releaseRules
+	return releaseRules, nil
 }
 
-func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
+func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
+
+	tags, err := r.TagObjects()
+	if err != nil {
+		return nil, err
+	}
+
 	semverTags := make([]*object.Tag, 0)
 
 	var latestSemverTag *object.Tag
@@ -84,10 +97,22 @@ func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 	})
 
 	if len(semverTags) < 1 {
-		// TODO: Handle case where the repo has not semver tag (craft one ?)
-		panic("No tags yet!")
+		head, err := r.Head()
+
+		if err != nil {
+			return nil, err
+		}
+
+		ref := head.Hash()
+		semver := semver.Semver{
+			Major: 0,
+			Minor: 0,
+			Patch: 0,
+		}
+
+		return tagger.NewTag(semver, ref)
 	} else if len(semverTags) < 2 {
-		return semverTags[0]
+		return semverTags[0], nil
 	}
 
 	for i := 0; i < len(semverTags)-1; i++ {
@@ -110,10 +135,10 @@ func (c CommitAnalyzer) FetchLatestSemverTag(tags *object.TagIter) *object.Tag {
 
 	c.logger.Printf("Latest semver tag: %s\n", latestSemverTag.Name)
 
-	return latestSemverTag
+	return latestSemverTag, nil
 }
 
-func (c CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) (*semver.Semver, bool) {
+func (c *CommitAnalyzer) ComputeNewSemverNumber(history object.CommitIter, latestSemverTag *object.Tag) (*semver.Semver, bool) {
 
 	ogSemver, err := semver.NewSemverFromTag(latestSemverTag)
 	semver, err := semver.NewSemverFromTag(latestSemverTag)

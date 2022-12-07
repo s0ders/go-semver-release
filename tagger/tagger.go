@@ -2,26 +2,47 @@ package tagger
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/s0ders/go-semver-release/semver"
 )
 
 type Tagger struct {
-	l *log.Logger
+	logger *log.Logger
 }
 
 func NewTagger(l *log.Logger) *Tagger {
 	return &Tagger{l}
 }
 
-// CreateAndPushNewTag create a new annotated tag on the repository
+func NewTag(semver semver.Semver, hash plumbing.Hash) (*object.Tag, error) {
+
+	tag := &object.Tag{
+		Hash: hash,
+		Name: semver.String(),
+		Tagger: object.Signature{
+			Name:  "Go Semver Release",
+			Email: "ci@ci.ci",
+			When:  time.Now(),
+		},
+	}
+
+	return tag, nil
+}
+
+// AddTagToRepository create a new annotated tag on the repository
 // with a name corresponding to the semver passed as a parameter.
-func (t *Tagger) CreateAndPushNewTag(r *git.Repository, semver *semver.Semver) *git.Repository {
+func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
 	h, err := r.Head()
-	failOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	_, err = r.CreateTag(semver.String(), h.Hash(), &git.CreateTagOptions{
 		Message: semver.String(),
@@ -32,14 +53,22 @@ func (t *Tagger) CreateAndPushNewTag(r *git.Repository, semver *semver.Semver) *
 		},
 	})
 
-	failOnError(err)
-	t.l.Printf("Created new tag %s on repository", semver.String())
+	if err != nil {
+		return nil, err
+	}
 
-	return r
+	t.logger.Printf("Created new tag %s on repository", semver.String())
+
+	return r, nil
 }
 
-func failOnError(e error) {
-	if e != nil {
-		log.Fatalf("Error: %s\n", e)
+func (t *Tagger) PushTagToRemote(r *git.Repository, auth transport.AuthMethod) error {
+	po := &git.PushOptions{
+		Auth:       auth,
+		Progress:   os.Stdout,
+		RefSpecs:   []config.RefSpec{config.RefSpec("refs/tags/*:refs/tags/*")},
+		RemoteName: "origin",
 	}
+
+	return r.Push(po)
 }

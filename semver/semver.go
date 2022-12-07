@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
+// TODO: Handle prerelease tags
 type Semver struct {
 	Major int
 	Minor int
