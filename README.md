@@ -6,7 +6,7 @@ To do so, this program fetches a repository commits and tags history and analyze
 
 ## Install
 
-You can either compile the main binary on your architecture as bellow:
+If you have [Go](https://go.dev) installed on your machine, you can directly compile and install this program by using `go install`:
 
 ```bash
 $ go install github.com/s0ders/go-semver-release
@@ -78,3 +78,12 @@ You can define custom release rules to suit your needs using a JSON file and by 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
+
+
+
+## Work in progress
+
+- [ ] Publish a Docker container GitHub Action via the CI/CD
+- [ ] Handle custom Semver prefix (e.g. "v")
+- [ ] Add an ASCIInema demo. to the README
+
