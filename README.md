@@ -29,13 +29,14 @@ The `go-release-semver` program can easily be used inside GitHub Actions as an a
 Bellow is an example usage inside a GitHub Actions pipeline:
 
 ```yaml
+jobs:
   go-semver-release:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
 
     - name: Semver Release
-      uses: ./
+      uses: s0ders/go-semver-release@0.11.1
       with:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
