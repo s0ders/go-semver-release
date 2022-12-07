@@ -35,9 +35,17 @@ func (s Semver) String() string {
 	return fmt.Sprintf("v%d.%d.%d", s.Major, s.Minor, s.Patch)
 }
 
-// NewSemver returns a semver struct corresponding to
+func NewSemver(major, minor, patch int) (*Semver, error) {
+	if major < 0 || minor < 0 || patch < 0 {
+		return nil, errors.New("Semantic version components cannot be negative")
+	}
+
+	return &Semver{major, minor, patch}, nil
+}
+
+// NewSemverFromTag returns a semver struct corresponding to
 // the tag used as an input.
-func NewSemver(tag *object.Tag) (*Semver, error) {
+func NewSemverFromTag(tag *object.Tag) (*Semver, error) {
 
 	semver := strings.Replace(tag.Name, "v", "", 1)
 	components := strings.Split(semver, ".")
