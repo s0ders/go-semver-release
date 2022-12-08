@@ -43,6 +43,26 @@ func NewTag(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 	return tag
 }
 
+func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
+	tagExists := false
+	tags, err := r.Tags()
+
+	if err != nil {
+		return false, fmt.Errorf("TagExists: failed to fetch tags: %w", err)
+	}
+
+	tags.ForEach(func(tag *plumbing.Reference) error {
+		tagRef := fmt.Sprintf("refs/tags/%s", tagName)
+		if tag.Name().String() == tagRef {
+			tagExists = true
+			return nil
+		}
+		return nil
+	})
+
+	return tagExists, nil
+}
+
 // AddTagToRepository create a new annotated tag on the repository
 // with a name corresponding to the semver passed as a parameter.
 func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
@@ -52,6 +72,15 @@ func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*
 	}
 
 	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.NormalVersion())
+
+	tagExists, err := t.TagExists(r, tag)
+	if err != nil {
+		return nil, fmt.Errorf("AddTagToRepository: failed to check if tag exists: %w", err)
+	}
+
+	if tagExists {
+		return nil, fmt.Errorf("AddTagToRepository: tag already exists")
+	}
 
 	_, err = r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 		Message: semver.NormalVersion(),
