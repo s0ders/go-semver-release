@@ -146,7 +146,7 @@ func TestBump(t *testing.T) {
 	}
 }
 
-func BenchmarkCompareSemver(b *testing.B) {
+func BenchmarkPrecedence(b *testing.B) {
 	s1, _ := NewSemver(1, 0, 2, "f61d9c2")
 	s2, _ := NewSemver(1, 0, 3, "d364937")
 
