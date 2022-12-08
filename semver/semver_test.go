@@ -33,6 +33,27 @@ func TestPrecedence(t *testing.T) {
 
 }
 
+func TestIsZero(t *testing.T) {
+	type test struct {
+		semver Semver
+		want bool
+	}
+
+	matrix := []test{
+		{Semver{0, 0, 0, ""}, true},
+		{Semver{0, 0, 1, ""}, false},
+		{Semver{0, 1, 0, ""}, false},
+		{Semver{1, 0, 0, ""}, false},
+		{Semver{1, 1, 1, ""}, false},
+	}
+
+	for _, test := range matrix {
+		if got := test.semver.IsZero(); got != test.want {
+			t.Fatalf("got: %t want: %t", got, test.want)
+		}
+	}
+}
+
 func TestNormalVersion(t *testing.T) {
 	version, err := NewSemver(1, 2, 3, "d364937ad663484d80c28485f60a91cf2af2f932")
 	if err != nil {
