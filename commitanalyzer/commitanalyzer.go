@@ -66,6 +66,10 @@ func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 	return releaseRules, nil
 }
 
+// FetchLatestSemverTag fetches all tags from a given Git repository
+// and match them all against a regex describing a valid semver number.
+// The valid semver tag are then sorted and the one with the highest
+// precedence (i.e. latest tag) is returned.
 func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
 
 	semverRegex := regexp.MustCompile(semver.SemverRegex)
@@ -136,15 +140,38 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 	return latestSemverTag, nil
 }
 
-func (c *CommitAnalyzer) ComputeNewSemverNumber(history []*object.Commit, latestSemverTag *object.Tag) (*semver.Semver, bool, error) {
+// ComputeNewSemverNumber takes a chronologically ordered (starting from oldest)
+// slice of commit history and the latest valid semver from the repository and 
+// returns the updated semver number using the defined release rules.
+func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverTag *object.Tag, releaseBranch string) (*semver.Semver, bool, error) {
 
-	ogSemver, err := semver.NewSemverFromGitTag(latestSemverTag)
-	if err != nil {
-		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to build SemVer from Git tag: %w", err)
-	}
+	newRelease := false
 	semver, err := semver.NewSemverFromGitTag(latestSemverTag)
 	if err != nil {
 		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to build SemVer from Git tag: %w", err)
+	}
+
+	logOptions := &git.LogOptions{}
+
+	if semver.IsZero() {
+		logOptions.Since = &latestSemverTag.Tagger.When
+	}
+
+	commitHistory, err := r.Log(logOptions)
+	if err != nil {
+		c.logger.Fatalf("failed to fetch commit history: %s", err)
+	}
+
+	var history []*object.Commit
+
+	commitHistory.ForEach(func(c *object.Commit) error {
+		history = append(history, c)
+		return nil
+	})
+
+	// Reverse commit history to go from oldest to most recent
+	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
+		history[i], history[j] = history[j], history[i]
 	}
 
 	for _, commit := range history {
@@ -168,6 +195,7 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history []*object.Commit, latest
 		if breakingChange {
 			c.logger.Printf("(%s) Breaking change", shortHash)
 			semver.BumpMajor()
+			newRelease = true
 		}
 
 		for _, rule := range c.releaseRules.Rules {
@@ -179,12 +207,15 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history []*object.Commit, latest
 			case "major":
 				c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
 				semver.BumpMajor()
+				newRelease = true
 			case "minor":
 				c.logger.Printf("(%s) minor: \"%s\"", shortHash, shortMessage)
 				semver.BumpMinor()
+				newRelease = true
 			case "patch":
 				c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
 				semver.BumpPatch()
+				newRelease = true
 			default:
 				c.logger.Printf("no release to apply")
 			}
@@ -197,7 +228,5 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history []*object.Commit, latest
 		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to parse commit history: %w", err)
 	}
 
-	noNewVersion := ogSemver.String() == semver.String()
-
-	return semver, noNewVersion, nil
+	return semver, newRelease, nil
 }
