@@ -22,10 +22,10 @@ var TaggerGitSignature = object.Signature{
 
 type Tagger struct {
 	logger    *log.Logger
-	tagPrefix *string
+	tagPrefix string
 }
 
-func NewTagger(logger *log.Logger, tagPrefix *string) *Tagger {
+func NewTagger(logger *log.Logger, tagPrefix string) *Tagger {
 	return &Tagger{
 		logger:    logger,
 		tagPrefix: tagPrefix,
@@ -51,10 +51,10 @@ func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*
 		return nil, fmt.Errorf("AddTagToRepository: failed to fetch head: %w", err)
 	}
 
-	tag := fmt.Sprintf("%s%s", *t.tagPrefix, semver.String())
+	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.NormalVersion())
 
 	_, err = r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
-		Message: semver.String(),
+		Message: semver.NormalVersion(),
 		Tagger:  &TaggerGitSignature,
 	})
 
