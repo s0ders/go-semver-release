@@ -8,8 +8,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/s0ders/go-semver-release/commitanalyzer"
 	"github.com/s0ders/go-semver-release/tagger"
@@ -20,29 +22,43 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
+var (
+	releaseRulesPath    string
+	gitUrl              string
+	accessToken         string
+	tagPrefix           string
+	dryrun              bool
+	defaultReleaseRules = `{
+		"releaseRules": [
+			{"type": "feat", "release": "minor"},
+			{"type": "perf", "release": "minor"},
+			{"type": "fix", "release": "patch"}
+		]
+	}`
+)
+
 func main() {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[go-semver-release]"), log.Default().Flags())
 
-	gitUrl := flag.String("url", "", "The Git repository to version")
-	releaseRulesPath := flag.String("rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
-	accessToken := flag.String("token", "", "A personnal access token to log in to the Git repository in order to push tags")
-	tagPrefix := flag.String("tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
-	dryrun := flag.Bool("dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
-
+	flag.StringVar(&releaseRulesPath, "rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
+	flag.StringVar(&gitUrl, "url", "", "The Git repository to version")
+	flag.StringVar(&accessToken, "token", "", "A personnal access token to log in to the Git repository in order to push tags")
+	flag.StringVar(&tagPrefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
+	flag.BoolVar(&dryrun, "dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 	flag.Parse()
 
-	if *gitUrl == "" {
+	if gitUrl == "" {
 		logger.Fatal("--url cannot be empty\n")
 	}
 
 	auth := &http.BasicAuth{
 		Username: "go-semver-release",
-		Password: *accessToken,
+		Password: accessToken,
 	}
 
 	r, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
 		Auth:     auth,
-		URL:      *gitUrl,
+		URL:      gitUrl,
 		Progress: nil,
 	})
 
@@ -50,7 +66,17 @@ func main() {
 		logger.Fatalf("failed to clone repository: %s", err)
 	}
 
-	commitAnalyzer, err := commitanalyzer.NewCommitAnalyzer(log.New(os.Stdout, fmt.Sprintf("%-20s ", "[commit-analyzer]"), log.LstdFlags), releaseRulesPath)
+	var releaseRulesReader io.Reader
+	if releaseRulesPath == "" {
+		releaseRulesReader = strings.NewReader(defaultReleaseRules)
+	} else {
+		releaseRulesReader, err = os.Open(releaseRulesPath)
+		if err != nil {
+			logger.Fatalf("failed to open release rules from path: %s", err)
+		}
+	}
+
+	commitAnalyzer, err := commitanalyzer.NewCommitAnalyzer(log.New(os.Stdout, fmt.Sprintf("%-20s ", "[commit-analyzer]"), log.LstdFlags), releaseRulesReader)
 	if err != nil {
 		logger.Fatalf("failed to create commit analyzer: %s", err)
 	}
@@ -94,7 +120,7 @@ func main() {
 	case noNewVersion:
 		logger.Printf("no new version, still on %s", semver)
 		os.Exit(0)
-	case *dryrun:
+	case dryrun:
 		logger.Printf("dry-run enabled, next version will be %s", semver)
 		os.Exit(0)
 	}
