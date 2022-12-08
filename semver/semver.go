@@ -39,7 +39,7 @@ func (s Semver) NormalVersion() string {
 
 func (s Semver) String() string {
 	if s.BuildMetadata != "" {
-		return fmt.Sprintf("%d.%d.%d-%s", s.Major, s.Minor, s.Patch, s.BuildMetadata)
+		return fmt.Sprintf("%d.%d.%d+%s", s.Major, s.Minor, s.Patch, s.BuildMetadata)
 	}
 
 	return s.NormalVersion()
