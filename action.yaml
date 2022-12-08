@@ -19,7 +19,7 @@ inputs:
     default: ''
 runs:
   using: 'docker'
-  image: 'soders/go-semver-release'
+  image: 'Dockerfile'
   args:
     - --url
     - ${{ inputs.repository-url }}
