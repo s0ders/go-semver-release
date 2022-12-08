@@ -98,7 +98,7 @@ func TestParseReleaseRules(t *testing.T) {
 
 func TestFetchLatestSemverTag(t *testing.T) {
 	
-	tempDirPath := filepath.Join(".", "commitanalyzer-temp-test")
+	tempDirPath := filepath.Join(".", "commitanalyzer-test")
 	err := os.Mkdir(tempDirPath, 0644)
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %s", err)

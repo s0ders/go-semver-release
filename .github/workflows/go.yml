@@ -21,6 +21,9 @@ jobs:
     - name: Go Build
       run: go build -v ./...
 
+    - name: Create Test Directory
+      run: mkdir -p ./commitanalyzer-test
+
     - name: Go Test
       run: go test -v ./...
 
