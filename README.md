@@ -117,4 +117,5 @@ The following `release` types are supported for release rules: `major`, `minor`,
 
 ## Work in progress
 
+- [ ] Support custom release branch using a `--branch` flag
 - [ ] Add support for `--dry-run` inside GitHub Actions
