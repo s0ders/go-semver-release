@@ -33,6 +33,11 @@ func (s *Semver) BumpMajor() {
 	s.Major++
 }
 
+func (s Semver) IsZero() bool {
+	isZero := s.Major == s.Minor && s.Minor == s.Patch && s.Patch == 0
+	return isZero
+}
+
 func (s Semver) NormalVersion() string {
 	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
 }
