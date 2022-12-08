@@ -3,8 +3,8 @@ package commitanalyzer
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"regexp"
 	"strings"
 
@@ -19,7 +19,6 @@ import (
 
 var (
 	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
-	defaultReleaseRules     = &ReleaseRules{Rules: []ReleaseRule{{"feat", "minor"}, {"fix", "patch"}, {"perf", "minor"}}}
 )
 
 type ReleaseRule struct {
@@ -36,13 +35,9 @@ type CommitAnalyzer struct {
 	releaseRules *ReleaseRules
 }
 
-func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) (*CommitAnalyzer, error) {
+func NewCommitAnalyzer(l *log.Logger, releaseRulesReader io.Reader) (*CommitAnalyzer, error) {
 
-	if *releaseRulesPath == "" {
-		return &CommitAnalyzer{l, defaultReleaseRules}, nil
-	}
-
-	releaseRules, err := ParseReleaseRules(releaseRulesPath)
+	releaseRules, err := ParseReleaseRules(releaseRulesReader)
 	if err != nil {
 		return nil, fmt.Errorf("NewCommitAnalyzer: failed parsing release rules: %w", err)
 	}
@@ -50,19 +45,14 @@ func NewCommitAnalyzer(l *log.Logger, releaseRulesPath *string) (*CommitAnalyzer
 	return &CommitAnalyzer{l, releaseRules}, nil
 }
 
-func ParseReleaseRules(path *string) (*ReleaseRules, error) {
-	jsonFile, err := os.Open(*path)
-	if err != nil {
-		return nil, err
-	}
-
+func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 	var releaseRules *ReleaseRules
 
-	decoder := json.NewDecoder(jsonFile)
+	decoder := json.NewDecoder(releaseRulesReader)
 	decoder.Decode(&releaseRules)
 
 	validate := validator.New()
-	if err = validate.Struct(releaseRules); err != nil {
+	if err := validate.Struct(releaseRules); err != nil {
 		return nil, fmt.Errorf("ParseReleaseRules: failed to validate release rules: %w", err)
 	}
 
@@ -86,8 +76,8 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 	}
 
 	semverTags := make([]*object.Tag, 0)
-	var latestSemverTag *object.Tag
 
+	
 	// Filter tags who match a semver number (no matter the prefix)
 	tags.ForEach(func(tag *object.Tag) error {
 		if semverRegex.MatchString(tag.Name) {
@@ -95,7 +85,7 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		}
 		return nil
 	})
-
+	
 	// If there are no existing semver tag, create one
 	if len(semverTags) == 0 {
 		c.logger.Println("no previous tag, creating one")
@@ -105,37 +95,39 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		}
 		version, err := semver.NewSemver(0, 0, 0, "")
 		if err != nil {
-			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build new SemVer: %w", err)
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build new semver: %w", err)
 		}
 		return tagger.NewTag(*version, head.Hash()), nil
-
+		
 	}
-
+	
 	// If there is only one semver tags
 	if len(semverTags) == 1 {
 		return semverTags[0], nil
 	}
-
+	
+	
 	// If there are multiple semver tags, they are sorted to find the semver tags who has the precedence
-	for i := 0; i < len(semverTags)-1; i++ {
+	var latestSemverTag *object.Tag
+
+	for i, tag := range semverTags {
 		current, err := semver.NewSemverFromGitTag(semverTags[i])
 		if err != nil {
-			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build SemVer from Git tag: %w", err)
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build semver from tag: %w", err)
 		}
-		next, err := semver.NewSemverFromGitTag(semverTags[i+1])
+
+		if i == 0 {
+			latestSemverTag = tag
+			continue
+		}
+
+		old, err := semver.NewSemverFromGitTag(latestSemverTag)
 		if err != nil {
-			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build SemVer from Git tag: %w", err)
+			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build semver from tag: %w", err)
 		}
 
-		precedence := current.Precedence(*next)
-
-		switch precedence {
-		case 1:
-			latestSemverTag = semverTags[i]
-		case -1:
-			latestSemverTag = semverTags[i+1]
-		default:
-			latestSemverTag = semverTags[i]
+		if current.Precedence(*old) == 1 {
+			latestSemverTag = tag
 		}
 	}
 
@@ -178,7 +170,6 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(history []*object.Commit, latest
 			semver.BumpMajor()
 		}
 
-		// Rules: []ReleaseRule{{"fix", "patch"},{"feat", "patch"}, {"perf", "minor"},}}
 		for _, rule := range c.releaseRules.Rules {
 			if commitType != rule.CommitType {
 				continue
