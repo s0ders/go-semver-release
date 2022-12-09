@@ -1,6 +1,7 @@
 package commitanalyzer
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -65,6 +66,12 @@ func TestBreakingChangeRegex(t *testing.T) {
 	}
 }
 
+func TestNewCommitAnalyzer(t *testing.T) {
+	if _, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules)); err != nil {
+		t.Fatalf("failed to created new commit analyzer: %s", err)
+	}
+}
+
 func TestParseReleaseRules(t *testing.T) {
 	
 	releaseRules, err := ParseReleaseRules(strings.NewReader(defaultReleaseRules))
@@ -96,54 +103,80 @@ func TestParseReleaseRules(t *testing.T) {
 	}
 }
 
-func TestFetchLatestSemverTag(t *testing.T) {
+func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 	
-	tempDirPath, err := os.MkdirTemp("", "commitanalyzer-*")
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
-		t.Fatalf("failed to create temp directory: %s", err)
+		t.Fatalf("failed to create git repository: %s", err)
 	}
 
-	defer os.RemoveAll(tempDirPath)
+	defer os.RemoveAll(repositoryPath)
 
-	r, err := git.PlainInit(tempDirPath, false)
+	commitAnalyzer, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
 	if err != nil {
-		t.Fatalf("failed to initialize git repository: %s", err)
+		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	w, err := r.Worktree()
+	latest, err := commitAnalyzer.FetchLatestSemverTag(r)
 	if err != nil {
-		t.Fatalf("failed to get worktree: %s", err)
+		t.Fatalf("faild to fetch latest semver tag: %s", err)
 	}
 
-	tempFileName := "temp"
-	tempFilePath := filepath.Join(tempDirPath, tempFileName)
-	_, err = os.Create(tempFilePath)
+	want := "0.0.0"
+	if got := latest.Name; got != want  {
+		t.Fatalf("got: %s want: %s", got, want)
+	}
+}
+
+func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
+	
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
-		t.Fatalf("failed to create temp file: %s", err)
+		t.Fatalf("failed to create git repository: %s", err)
 	}
 
-	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	defer os.RemoveAll(repositoryPath)
+
+	h, err := r.Head()
 	if err != nil {
-		t.Fatalf("failed to write to temp file: %s", err)
+		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	_, err = w.Add(tempFileName)
-	if err != nil {
-		t.Fatalf("failed to add temp file to worktree: %s", err)
-	}
+	tag := "1.0.0"
 
-	commit, err := w.Commit("firt commit", &git.CommitOptions{
-		Author: &object.Signature{
+	r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
+		Message: tag,
+		Tagger:  &object.Signature{
 			Name:  "Go Semver Release",
-			Email: "go-semver-release@ci.go",
+			Email: "ci@ci.ci",
 			When:  time.Now(),
 		},
 	})
 
-	_, err = r.CommitObject(commit)
+	commitAnalyzer, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
 	if err != nil {
-		t.Fatalf("failed to commit object %s", err)
+		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
+
+	latest, err := commitAnalyzer.FetchLatestSemverTag(r)
+	if err != nil {
+		t.Fatalf("faild to fetch latest semver tag: %s", err)
+	}
+
+	want := tag
+	if got := latest.Name; got != want  {
+		t.Fatalf("got: %s want: %s", got, want)
+	}
+}
+
+func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
+	
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
+	if err != nil {
+		t.Fatalf("failed to create git repository: %s", err)
+	}
+
+	defer os.RemoveAll(repositoryPath)
 
 	h, err := r.Head()
 	if err != nil {
@@ -177,4 +210,194 @@ func TestFetchLatestSemverTag(t *testing.T) {
 	if got := latest.Name; got != want  {
 		t.Fatalf("got: %s want: %s", got, want)
 	}
+}
+
+func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testing.T) {
+
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
+	if err != nil {
+		t.Fatalf("failed to create git repository: %s", err)
+	}
+
+	defer os.RemoveAll(repositoryPath)
+
+	if err != nil {
+		t.Fatalf("failed to fetch head: %s", err)
+	}
+
+	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	if err != nil {
+		t.Fatalf("failed to create commit analyzer: %s", err)
+	}
+	
+	latestSemverTag, err := ca.FetchLatestSemverTag(r)
+	if err != nil {
+		t.Fatalf("failed to fetch semver tag: %s", err)
+	}
+
+	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	if err != nil {
+		t.Fatalf("failed to compute new semver number: %s", err)
+	}
+
+	want := "0.0.0"
+
+	if got := version.String(); got != want {
+		t.Fatalf("got: %s want: %s", got, want)
+	}
+}
+
+func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.T) {
+
+	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	if err != nil {
+		t.Fatalf("failed to create git repository: %s", err)
+	}
+
+	defer os.RemoveAll(repositoryPath)
+
+	if err != nil {
+		t.Fatalf("failed to fetch head: %s", err)
+	}
+
+	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	if err != nil {
+		t.Fatalf("failed to create commit analyzer: %s", err)
+	}
+	
+	latestSemverTag, err := ca.FetchLatestSemverTag(r)
+	if err != nil {
+		t.Fatalf("failed to fetch semver tag: %s", err)
+	}
+
+	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	if err != nil {
+		t.Fatalf("failed to compute new semver number: %s", err)
+	}
+
+	want := "0.0.1"
+
+	if got := version.String(); got != want {
+		t.Fatalf("got: %s want: %s", got, want)
+	}
+}
+
+func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
+
+	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
+	if err != nil {
+		t.Fatalf("failed to create git repository: %s", err)
+	}
+
+	defer os.RemoveAll(repositoryPath)
+
+	if err != nil {
+		t.Fatalf("failed to fetch head: %s", err)
+	}
+
+	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	if err != nil {
+		t.Fatalf("failed to create commit analyzer: %s", err)
+	}
+	
+	latestSemverTag, err := ca.FetchLatestSemverTag(r)
+	if err != nil {
+		t.Fatalf("failed to fetch semver tag: %s", err)
+	}
+
+	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	if err != nil {
+		t.Fatalf("failed to compute new semver number: %s", err)
+	}
+
+	want := "0.1.0"
+
+	if got := version.String(); got != want {
+		t.Fatalf("got: %s want: %s", got, want)
+	}
+}
+
+func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.T) {
+
+	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
+	if err != nil {
+		t.Fatalf("failed to create git repository: %s", err)
+	}
+
+	defer os.RemoveAll(repositoryPath)
+
+	if err != nil {
+		t.Fatalf("failed to fetch head: %s", err)
+	}
+
+	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	if err != nil {
+		t.Fatalf("failed to create commit analyzer: %s", err)
+	}
+	
+	latestSemverTag, err := ca.FetchLatestSemverTag(r)
+	if err != nil {
+		t.Fatalf("failed to fetch semver tag: %s", err)
+	}
+
+	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	if err != nil {
+		t.Fatalf("failed to compute new semver number: %s", err)
+	}
+
+	want := "1.0.0"
+
+	if got := version.String(); got != want {
+		t.Fatalf("got: %s want: %s", got, want)
+	}
+}
+
+func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
+
+	tempDirPath, err := os.MkdirTemp("", "commitanalyzer-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	r, err := git.PlainInit(tempDirPath, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to initialize git repository: %s", err)
+	}
+
+	w, err := r.Worktree()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get worktree: %s", err)
+	}
+
+	tempFileName := "temp"
+	tempFilePath := filepath.Join(tempDirPath, tempFileName)
+	_, err = os.Create(tempFilePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create temp file: %s", err)
+	}
+
+	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to write to temp file: %s", err)
+	}
+
+	_, err = w.Add(tempFileName)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to add temp file to worktree: %s", err)
+	}
+
+	commit, err := w.Commit(firstCommitMessage, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Go Semver Release",
+			Email: "go-semver-release@ci.go",
+			When:  time.Now(),
+		},
+	})
+
+	_, err = r.CommitObject(commit)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to commit object %s", err)
+	}
+
+	return r, tempDirPath, nil
 }
