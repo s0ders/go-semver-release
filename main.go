@@ -57,6 +57,7 @@ func main() {
 	}
 
 	gitDirectoryPath, err := os.MkdirTemp("", "go-semver-release-*")
+	defer os.RemoveAll(gitDirectoryPath)
 	if err != nil {
 		logger.Fatalf("failed to temporary directory to clone repository: %s", err)
 	}
@@ -96,11 +97,12 @@ func main() {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
 
-	switch {
-	case noRelease:
+	if noRelease {
 		logger.Printf("no new release, still on %s", semver)
 		os.Exit(0)
-	case dryrun:
+	}
+
+	if dryrun {
 		logger.Printf("dry-run enabled, next version will be %s", semver)
 		os.Exit(0)
 	}
