@@ -92,12 +92,12 @@ func main() {
 		logger.Fatalf("failed to fetch latest semver tag: %s", err)
 	}
 
-	semver, noRelease, err := commitAnalyzer.ComputeNewSemverNumber(r, latestSemverTag)
+	semver, newRelease, err := commitAnalyzer.ComputeNewSemverNumber(r, latestSemverTag)
 	if err != nil {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
 
-	if noRelease {
+	if !newRelease {
 		logger.Printf("no new release, still on %s", semver)
 		os.Exit(0)
 	}
