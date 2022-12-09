@@ -124,8 +124,9 @@ You can define custom release rules to suit your needs using a JSON file and by 
 ```json
 {
     "releaseRules": [
-        {"type": "feat", "release": "major"},  // bad, alters the meaning of "major" for subscribers
-        {"type": "perf", "release": "patch"}   // good, perf can be interpreted as "fatch" or "minor"
+        {"type": "perf", "release": "minor"},
+        {"type": "perf", "release": "patch"},
+        {"type": "fix", "release": "patch"}
     ]
 }
 ```
