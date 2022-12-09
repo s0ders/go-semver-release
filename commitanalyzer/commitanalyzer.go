@@ -145,7 +145,8 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 
 // ComputeNewSemverNumber takes a chronologically ordered (starting from oldest)
 // slice of commit history and the latest valid semver from the repository and 
-// returns the updated semver number using the defined release rules.
+// returns the updated semver number using the defined release rules and a boolean
+// representing whether the semver was updated or not.
 func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverTag *object.Tag) (*semver.Semver, bool, error) {
 
 	newRelease := false
