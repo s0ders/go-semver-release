@@ -70,7 +70,7 @@ func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 // FetchLatestSemverTag fetches all tags from a given Git repository
 // and match them all against a regex describing a valid semver number.
 // The valid semver tag are then sorted and the one with the highest
-// precedence (i.e. latest tag) is returned. For this method to work 
+// precedence (i.e. latest tag) is returned. For this method to work
 // properly, the repository must have at least an object pointed to
 // by HEAD (i.e. the repository must have atleast one commit)
 func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
@@ -84,7 +84,6 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 
 	semverTags := make([]*object.Tag, 0)
 
-	
 	// Filter tags who match a semver number (no matter the prefix)
 	tags.ForEach(func(tag *object.Tag) error {
 		if semverRegex.MatchString(tag.Name) {
@@ -92,7 +91,7 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		}
 		return nil
 	})
-	
+
 	// If there are no existing semver tag, create one
 	if len(semverTags) == 0 {
 		c.logger.Println("no previous tag, creating one")
@@ -105,15 +104,14 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 			return nil, fmt.Errorf("FetchLatestSemverTag: failed to build new semver: %w", err)
 		}
 		return tagger.NewTag(*version, head.Hash()), nil
-		
+
 	}
-	
+
 	// If there is only one semver tags
 	if len(semverTags) == 1 {
 		return semverTags[0], nil
 	}
-	
-	
+
 	// If there are multiple semver tags, they are sorted to find the semver tags who has the precedence
 	var latestSemverTag *object.Tag
 
@@ -144,7 +142,7 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 }
 
 // ComputeNewSemverNumber takes a chronologically ordered (starting from oldest)
-// slice of commit history and the latest valid semver from the repository and 
+// slice of commit history and the latest valid semver from the repository and
 // returns the updated semver number using the defined release rules and a boolean
 // representing whether the semver was updated or not.
 func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverTag *object.Tag) (*semver.Semver, bool, error) {

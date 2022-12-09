@@ -17,6 +17,7 @@ import (
 	"github.com/s0ders/go-semver-release/tagger"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
@@ -25,7 +26,7 @@ var (
 	gitUrl              string
 	accessToken         string
 	tagPrefix           string
-	// releaseBranch       string
+	releaseBranch       string
 	dryrun              bool
 	defaultReleaseRules = `{
 		"releaseRules": [
@@ -43,7 +44,7 @@ func main() {
 	flag.StringVar(&gitUrl, "url", "", "The Git repository to version")
 	flag.StringVar(&accessToken, "token", "", "A personnal access token to log in to the Git repository in order to push tags")
 	flag.StringVar(&tagPrefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
-	// flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the main branch if empty")
+	flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the main branch if empty")
 	flag.BoolVar(&dryrun, "dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 	flag.Parse()
 
@@ -62,11 +63,17 @@ func main() {
 		logger.Fatalf("failed to temporary directory to clone repository: %s", err)
 	}
 
-	r, err := git.PlainClone(gitDirectoryPath, false, &git.CloneOptions{
+	cloneOption := &git.CloneOptions{
 		Auth:     auth,
 		URL:      gitUrl,
 		Progress: nil,
-	})
+	}
+
+	if releaseBranch != "" {
+		cloneOption.ReferenceName = plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", releaseBranch))
+	}
+
+	r, err := git.PlainClone(gitDirectoryPath, false, cloneOption)
 
 	if err != nil {
 		logger.Fatalf("failed to clone repository: %s", err)
