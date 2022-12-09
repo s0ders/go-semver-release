@@ -57,3 +57,4 @@ jobs:
       with:
         repository-url: 'https://github.com/s0ders/go-semver-release.git'
         token: ${{ secrets.GIT_TOKEN }}
+        dry-run: true
