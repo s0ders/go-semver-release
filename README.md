@@ -1,8 +1,16 @@
 # Go SemVer Release
 
-This program aims to help automating version management of Git repository using simple Git annotated tags that follow the [SemVer](https://semver.org/) convention. 
+Go program designed to automate versioning of Git repository by  analyzing their formatted commit history and tagging them with the right semver number.  This program can be used directly or via its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
 
-To do so, this program fetches a repository commits and tags history and analyze each commit that follows the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. Depending on the commit type (e.g. `feat`, `test`, `chore`), the program will apply major, minor, patch or no release rule at all. These release rules define which part of the semantic version is bumped.
+## Motivations
+
+Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that subscribers know when a non-retro-compatible change is introduced inside your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
+
+This tool aims to integrate the automation in such a way that all you have to do is:
+
+1. Choose a release branch
+
+2. Take care to format commits on that branch, which many IDEs plugins offers to do seamlessly (e.g. [VSCode]([Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
 
 ## Install
 
@@ -116,8 +124,8 @@ You can define custom release rules to suit your needs using a JSON file and by 
 ```json
 {
     "releaseRules": [
-        // {"type": "feat", "release": "major"},  // bad idea
-        {"type": "perf", "release": "patch"}
+        {"type": "feat", "release": "major"},  // bad, alters the meaning of "major" for subscribers
+        {"type": "perf", "release": "patch"}   // good, perf can be interpreted as "fatch" or "minor"
     ]
 }
 ```
@@ -125,10 +133,3 @@ You can define custom release rules to suit your needs using a JSON file and by 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
-
-
-
-## Work in progress
-
-- [ ] Support custom release branch using a `--branch` flag
-- [ ] Add support for `--dry-run` inside GitHub Actions
