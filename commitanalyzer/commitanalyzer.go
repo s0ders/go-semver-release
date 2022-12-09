@@ -45,6 +45,7 @@ func NewCommitAnalyzer(l *log.Logger, releaseRulesReader io.Reader) (*CommitAnal
 	return &CommitAnalyzer{l, releaseRules}, nil
 }
 
+// TODO: check for semantically incorrect rules (e.g. same commit types targetting )
 func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 	var releaseRules *ReleaseRules
 
@@ -69,7 +70,9 @@ func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 // FetchLatestSemverTag fetches all tags from a given Git repository
 // and match them all against a regex describing a valid semver number.
 // The valid semver tag are then sorted and the one with the highest
-// precedence (i.e. latest tag) is returned.
+// precedence (i.e. latest tag) is returned. For this method to work 
+// properly, the repository must have at least an object pointed to
+// by HEAD (i.e. the repository must have atleast one commit)
 func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
 
 	semverRegex := regexp.MustCompile(semver.SemverRegex)
@@ -192,10 +195,12 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverT
 			shortMessage = commit.Message[0 : len(commit.Message)-1]
 		}
 
+		// TODO: fix double major or <release>+major
 		if breakingChange {
 			c.logger.Printf("(%s) Breaking change", shortHash)
 			semver.BumpMajor()
 			newRelease = true
+			break
 		}
 
 		for _, rule := range c.releaseRules.Rules {
@@ -204,17 +209,17 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverT
 			}
 
 			switch rule.ReleaseType {
-			case "major":
-				c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
-				semver.BumpMajor()
+			case "patch":
+				c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
+				semver.BumpPatch()
 				newRelease = true
 			case "minor":
 				c.logger.Printf("(%s) minor: \"%s\"", shortHash, shortMessage)
 				semver.BumpMinor()
 				newRelease = true
-			case "patch":
-				c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
-				semver.BumpPatch()
+			case "major":
+				c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
+				semver.BumpMajor()
 				newRelease = true
 			default:
 				c.logger.Printf("no release to apply")
