@@ -8,9 +8,9 @@ Handling a Git repository versions can be done seamlessly using well-thought con
 
 This tool aims to integrate the automation in such a way that all you have to do is:
 
-1. Choose a release branch
+- Choose a release branch
 
-2. Take care to format commits on that branch, which many IDEs plugins offers to do seamlessly (e.g. [VSCode]([Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
+- Take care to format commits on that branch, which many IDEs plugins offers to do seamlessly (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
 
 ## Install
 
