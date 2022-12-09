@@ -25,7 +25,7 @@ var (
 	gitUrl              string
 	accessToken         string
 	tagPrefix           string
-	releaseBranch       string
+	// releaseBranch       string
 	dryrun              bool
 	defaultReleaseRules = `{
 		"releaseRules": [
@@ -43,7 +43,7 @@ func main() {
 	flag.StringVar(&gitUrl, "url", "", "The Git repository to version")
 	flag.StringVar(&accessToken, "token", "", "A personnal access token to log in to the Git repository in order to push tags")
 	flag.StringVar(&tagPrefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
-	flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the main branch if empty")
+	// flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the main branch if empty")
 	flag.BoolVar(&dryrun, "dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 	flag.Parse()
 
@@ -91,14 +91,14 @@ func main() {
 		logger.Fatalf("failed to fetch latest semver tag: %s", err)
 	}
 
-	semver, noNewVersion, err := commitAnalyzer.ComputeNewSemverNumber(r, latestSemverTag, releaseBranch)
+	semver, noRelease, err := commitAnalyzer.ComputeNewSemverNumber(r, latestSemverTag)
 	if err != nil {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
 
 	switch {
-	case noNewVersion:
-		logger.Printf("no new version, still on %s", semver)
+	case noRelease:
+		logger.Printf("no new release, still on %s", semver)
 		os.Exit(0)
 	case dryrun:
 		logger.Printf("dry-run enabled, next version will be %s", semver)
