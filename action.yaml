@@ -38,4 +38,4 @@ runs:
     - --branch
     - ${{ inputs.branch }}
     - --dry-run
-    - ${{ inputs.dry-run != 'false' }}
+    - ${{ inputs.dry-run == 'true' && 'true' || 'false' }}
