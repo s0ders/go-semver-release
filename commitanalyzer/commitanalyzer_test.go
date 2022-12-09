@@ -340,7 +340,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 		t.Fatalf("failed to fetch semver tag: %s", err)
 	}
 
-	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	version, newRelease, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -349,6 +349,10 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 
 	if got := version.String(); got != want {
 		t.Fatalf("got: %s want: %s", got, want)
+	}
+
+	if newRelease != true {
+		t.Fatalf("got: %t want: %t", newRelease, true)
 	}
 }
 
