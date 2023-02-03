@@ -1,4 +1,4 @@
-<img alt="github actions badge" src="https://github.com/s0ders/go-semver-release/actions/workflows/go.yaml/badge.svg"> <img alt="go report card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release"> <img alt="gitleaks badge" src="https://img.shields.io/badge/protected%20by-gitleaks-blue">
+<img alt="github actions badge" src="https://github.com/s0ders/go-semver-release/actions/workflows/main.yaml/badge.svg"> <img alt="go report card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release"> <img alt="gitleaks badge" src="https://img.shields.io/badge/protected%20by-gitleaks-blue">
 
 # Go SemVer Release
 
