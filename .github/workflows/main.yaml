@@ -55,7 +55,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
-        ile: ./build/Dockerfile
+        file: ./build/Dockerfile
         push: true
         tags: soders/go-semver-release:latest
 
