@@ -7,7 +7,7 @@ COPY go.* .
 RUN go mod download
 
 COPY . .
-RUN go build -o /go/bin/go-semver-release
+RUN go build ./cmd/main.go -o /go/bin/go-semver-release
 
 # Now copy it into our base image.
 FROM gcr.io/distroless/base-debian11
