@@ -28,7 +28,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19
+        go-version: 1.20
 
     - name: Go Build
       run: go build -v ./...
@@ -55,6 +55,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
+        ile: ./build/Dockerfile
         push: true
         tags: soders/go-semver-release:latest
 
