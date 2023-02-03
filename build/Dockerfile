@@ -1,10 +1,12 @@
 # Start by building the application.
-FROM golang:1.19 as build
+FROM golang:1.20 as build
 
 WORKDIR /go/src/app
-COPY . .
+COPY go.* .
 
 RUN go mod download
+
+COPY . .
 RUN go build -o /go/bin/go-semver-release
 
 # Now copy it into our base image.
