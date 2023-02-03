@@ -1,10 +1,12 @@
+<img alt="github actions badge" src="https://github.com/s0ders/go-semver-release/actions/workflows/go.yaml/badge.svg"> <img alt="go report card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release"> <img alt="gitleaks badge" src="https://img.shields.io/badge/protected%20by-gitleaks-blue">
+
 # Go SemVer Release
 
 Go program designed to automate versioning of Git repository by  analyzing their formatted commit history and tagging them with the right semver number.  This program can be used directly or via its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
 
 ## Motivations
 
-Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that subscribers know when a non-retro-compatible change is introduced inside your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
+Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that subscribers know when a non-retro-compatible change is introduced inside your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.
 
 This tool aims to integrate the automation in such a way that all you have to do is:
 
@@ -134,3 +136,7 @@ You can define custom release rules to suit your needs using a JSON file and by 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
+
+## Work in progress
+- [ ] Handle `--dry-run` for Github Action
+- [ ] If a new version is computed, return it as the action `output`
