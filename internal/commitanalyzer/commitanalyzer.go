@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/s0ders/go-semver-release/semver"
-	"github.com/s0ders/go-semver-release/tagger"
+	"github.com/s0ders/go-semver-release/internal/semver"
+	"github.com/s0ders/go-semver-release/internal/tagger"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"

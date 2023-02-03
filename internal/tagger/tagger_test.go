@@ -10,7 +10,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/s0ders/go-semver-release/semver"
+	
+	"github.com/s0ders/go-semver-release/internal/semver"
 )
 
 func TestTagExists(t *testing.T) {
@@ -131,8 +132,8 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 		},
 	})
 
-	_, err = r.CommitObject(commit)
-	if err != nil {
+
+	if _, err = r.CommitObject(commit); err != nil {
 		return nil, "", fmt.Errorf("failed to commit object %s", err)
 	}
 
