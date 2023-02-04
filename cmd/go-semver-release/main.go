@@ -111,12 +111,11 @@ func main() {
 	}
 	
 	os.Setenv("GITHUB_OUTPUT", "version="+semver.NormalVersion())
-	
+
 	if !newRelease {
 		logger.Printf("no new release, still on %s", semver)
 		os.Exit(0)
 	}
-
 
 	if dryrunMod {
 		logger.Printf("dry-run enabled, next version will be %s", semver)
