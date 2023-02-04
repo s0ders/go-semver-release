@@ -121,7 +121,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Semver Release
-      uses: s0ders/go-semver-release@0.11.1
+      uses: s0ders/go-semver-release@v1.3.0
       with:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
