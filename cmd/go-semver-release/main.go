@@ -112,8 +112,11 @@ func main() {
 	}
 	
 
-	ghCmd := exec.Command(fmt.Sprintf("echo version=%s >> $GITHUB_OUTPUT", semver.NormalVersion()))	
+	ghCmd := exec.Command(fmt.Sprintf("echo \"version=%s\" >> $GITHUB_OUTPUT", semver.NormalVersion()))	
 	_, err = ghCmd.Output()
+
+	ghOutput := os.Getenv("GITHUB_OUTPUT")
+	logger.Printf("Wrote %s to $GITHUB_OUTPUT", ghOutput)
 
 	if err != nil {
 		logger.Fatalf("failed to generate output: %s", err)
