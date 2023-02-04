@@ -7,8 +7,8 @@ Go program designed to automate versioning of Git repository by analyzing their 
 <ul>
     <li><a href="#Motivations">Motivations</a></li>
     <li><a href="#Install">Install</a></li>
-    <li><a href="#github-actions">Github Actions</a></li>
     <li><a href="#Usage">Usage</a></li>
+    <li><a href="#github-actions">Github Actions</a></li>
     <li><a href="#release-rules">Release rules</a></li>
 </ul>
 
@@ -16,7 +16,9 @@ Go program designed to automate versioning of Git repository by analyzing their 
 
 ## Motivations
 
-Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. <br>Because versioning should not be a bottleneck of any kind in your CI/CD workflow, the Docker image merely weight 7Mb and the Go program inside will compute your semver in seconds, no matter the size of your commit history.
+Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
+
+Because versioning should not be a bottleneck of any kind in your CI/CD workflow, the Docker image merely weight 7Mb and the Go program inside will compute your semver in seconds, no matter the size of your commit history.
 
 This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
 
@@ -91,7 +93,7 @@ A custom prefix can be added to the tag name pushed to the remote, by default th
 $ go-semver-release --url ... --token ... --tag-prefix v
 ```
 
-> **Note**: You can change your tag prefix during the lifetime of your repository (e.g. going from none to `v`) and this will **not** affect the way `go-semver-release` will fetch your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
+> **Note**: You can change your tag prefix during the lifetime of your repository (e.g. going from none to `v`) and this will **not** affect your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
 
 
 
@@ -130,7 +132,7 @@ jobs:
 
 ## Release Rules
 
-Release rules define which commit type will trigger a release, and what type of release (i.e. major, minor, patch). By default, the program applies the following release rules:
+Release rules define which commit type will trigger a release, and what type of release (i.e. major, minor, patch). **By default**, the program applies the following release rules:
 
 ```json
 {
@@ -148,7 +150,7 @@ You can define custom release rules to suit your needs using a JSON file and by 
 {
     "releaseRules": [
         {"type": "perf", "release": "minor"},
-        {"type": "perf", "release": "patch"},
+        {"type": "ci", "release": "patch"},
         {"type": "fix", "release": "patch"}
     ]
 }
