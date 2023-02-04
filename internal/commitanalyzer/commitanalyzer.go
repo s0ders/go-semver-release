@@ -45,7 +45,7 @@ func NewCommitAnalyzer(l *log.Logger, releaseRulesReader io.Reader) (*CommitAnal
 	return &CommitAnalyzer{l, releaseRules}, nil
 }
 
-// TODO: check for semantically incorrect rules (e.g. same commit types targetting )
+// TODO: check for semantically incorrect rules (e.g. same commit types targeting )
 func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 	var releaseRules *ReleaseRules
 
