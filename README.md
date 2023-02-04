@@ -4,15 +4,27 @@
 
 Go program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging them with the right semver number. This program can be used directly via its CLI or via its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
 
+<ul>
+    <li><a href="#Motivations">Motivations</a></li>
+    <li><a href="#Install">Install</a></li>
+    <li><a href="#github-actions">Github Actions</a></li>
+    <li><a href="#Usage">Usage</a></li>
+    <li><a href="#release-rules">Release rules</a></li>
+</ul>
+
+
+
 ## Motivations
 
-Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.
+Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. <br>Because versioning should not be a bottleneck of any kind in your CI/CD workflow, the Docker image merely weight 7Mb and the Go program inside will compute your semver in seconds, no matter the size of your commit history.
 
 This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
 
 - Choose a release branch (e.g. `main`, `release`)
 
 - Take care to format commits on that branch by following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, which many IDEs plugins offers to do seamlessly (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
+
+
 
 ## Install
 
@@ -30,35 +42,14 @@ $ docker pull soders/go-semver-release
 $ docker run --rm soders/go-semver-release --help
 ```
 
+
+
 ## Prerequisites
 
 There are only a few prerequisites for using this tool and getting the benefits it brings :
 
 - The Git repository commits must follow the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, as it is what is used to compute the semantic version.
 - The repository passed to the program (or action) must already be initialized (i.e. Git `HEAD` does not point to nothing)
-
-## GitHub Actions
-
-The `go-release-semver` program can easily be used inside your Github Actions pipeline. It takes the same parameters as those described in the usage section).
-
-Bellow is an example of this action inside a GitHub Actions pipeline.
-
-```yaml
-jobs:
-  go-semver-release:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Semver Release
-      uses: s0ders/go-semver-release@0.11.1
-      with:
-        repository-url: 'https://github.com/path/to/your/repo.git'
-        tag-prefix: 'v'
-        branch: 'release'
-        dry-run: 'true'
-        token: ${{ secrets.ACCESS_TOKEN }}
-```
 
 
 
@@ -88,7 +79,7 @@ Custom release rules are passed to the program using the `--rules`:
 $ go-semver-release --url ... --token ... --rules [PATH TO RULES]
 ```
 
-The program supports a dry-run mode that will only compute the next semantic version, if any, and will stop here without pushing any tag to the remote, dry-run is off by default:
+The program supports a dry-run mode that will only compute the next semantic version, if any, and will stop here without pushing any tag to the remote, dry-run is `false` by default:
 
 ```bash
 $ go-semver-release --url ... --token ... --dry-run true
@@ -100,7 +91,40 @@ A custom prefix can be added to the tag name pushed to the remote, by default th
 $ go-semver-release --url ... --token ... --tag-prefix v
 ```
 
-**Note**: a cool thing with the `--tag-prefix` flag is that you can change your tag prefix during the lifetime of your repository (e.g. going from nothing to `v`) and this will **not** affect the way `go-semver-release` will fetch your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
+> **Note**: You can change your tag prefix during the lifetime of your repository (e.g. going from none to `v`) and this will **not** affect the way `go-semver-release` will fetch your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
+
+
+
+## GitHub Actions
+
+### Inputs
+
+The action takes the same parameters as those defined in the <a href="#Usage">usage</a> section. Note that the `--dry-run` needs to be passed as a string inside your YAML workflow due to how Github Actions works.
+
+### Outputs
+
+The action generate a single output named `version` that corresponds to the semver computed (or the current one if no new were computed), prefixed with the given `tag-prefix` if any.
+
+### Example Workflow
+
+Bellow is an example of this action inside a GitHub Actions pipeline.
+
+```yaml
+jobs:
+  go-semver-release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Semver Release
+      uses: s0ders/go-semver-release@0.11.1
+      with:
+        repository-url: 'https://github.com/path/to/your/repo.git'
+        tag-prefix: 'v'
+        branch: 'release'
+        dry-run: 'false'
+        token: ${{ secrets.ACCESS_TOKEN }}
+```
 
 
 
