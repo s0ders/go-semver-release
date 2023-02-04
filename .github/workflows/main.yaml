@@ -21,7 +21,6 @@ jobs:
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
           GITLEAKS_ENABLE_SUMMARY: false
 
-
   go-build:
     runs-on: ubuntu-latest
     needs: gitleaks
