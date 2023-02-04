@@ -82,9 +82,9 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		return nil, err
 	}
 
-	semverTags := make([]*object.Tag, 0)
+	var semverTags []*object.Tag
 
-	// Filter tags who match a semver number (no matter the prefix)
+	// Filter matching semver tags
 	tags.ForEach(func(tag *object.Tag) error {
 		if semverRegex.MatchString(tag.Name) {
 			semverTags = append(semverTags, tag)
@@ -92,7 +92,7 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		return nil
 	})
 
-	// If there are no existing semver tag, create one
+	// If no existing tag, create one
 	if len(semverTags) == 0 {
 		c.logger.Println("no previous tag, creating one")
 		head, err := r.Head()
@@ -107,12 +107,12 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 
 	}
 
-	// If there is only one semver tags
+	// If only one semver tags
 	if len(semverTags) == 1 {
 		return semverTags[0], nil
 	}
 
-	// If there are multiple semver tags, they are sorted to find the semver tags who has the precedence
+	// If multiple semver tags, sort them to get the latest
 	var latestSemverTag *object.Tag
 
 	for i, tag := range semverTags {
@@ -194,9 +194,8 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverT
 			shortMessage = commit.Message[0 : len(commit.Message)-1]
 		}
 
-		// TODO: fix double major or <release>+major
 		if breakingChange {
-			c.logger.Printf("(%s) Breaking change", shortHash)
+			c.logger.Printf("(%s) breaking change", shortHash)
 			semver.BumpMajor()
 			newRelease = true
 			break

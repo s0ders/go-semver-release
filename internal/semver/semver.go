@@ -15,7 +15,7 @@ type Semver struct {
 	Major         int    `validate:"gte=0"`
 	Minor         int    `validate:"gte=0"`
 	Patch         int    `validate:"gte=0"`
-	BuildMetadata string // `validate:"omitempty,alphanum"`
+	BuildMetadata string `validate:"omitempty,alphaunicode"`
 }
 
 func (s *Semver) BumpPatch() {
@@ -50,7 +50,6 @@ func (s Semver) String() string {
 	return s.NormalVersion()
 }
 
-// TODO: return a value not a pointer
 func NewSemver(major, minor, patch int, metadata string) (*Semver, error) {
 
 	version := &Semver{major, minor, patch, metadata}
