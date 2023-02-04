@@ -27,6 +27,8 @@ inputs:
 outputs:
   SEMVER:
     description: 'The newly computed version or the current one if no new version were computed'
+  NEW_RELEASE:
+    description: 'Boolean that indicate whether a new semver was computed or not'
 runs:
   using: 'docker'
   image: 'docker://soders/go-semver-release:latest'
