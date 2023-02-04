@@ -115,7 +115,7 @@ func main() {
 
 	os.WriteFile(ghOutputFile, []byte(ghOutput), os.ModeAppend)
 
-	logger.Printf("Wrote \"%s\" to %s", ghOutput, ghOutputFile)
+	logger.Printf("generated output \"%s\"", ghOutput)
 
 	if err != nil {
 		logger.Fatalf("failed to generate output: %s", err)
