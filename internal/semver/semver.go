@@ -15,7 +15,7 @@ type Semver struct {
 	Major         int    `validate:"gte=0"`
 	Minor         int    `validate:"gte=0"`
 	Patch         int    `validate:"gte=0"`
-	BuildMetadata string `validate:"omitempty,alphaunicode"`
+	BuildMetadata string `validate:"omitempty,alphanumunicode"`
 }
 
 func (s *Semver) BumpPatch() {
