@@ -29,7 +29,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.20
+        go-version: 1.19
 
     - name: Go Build
       run: go build -v ./...
@@ -53,7 +53,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - uses: ko-build/setup-ko@v0.6
-    - run: cd ./cmd/app && ko build -B .
+    - run: KO_DOCKER_REPO=docker.io/soders ko build -B .
 
     # - name: Build and push
     #   uses: docker/build-push-action@v3
