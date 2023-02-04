@@ -65,6 +65,7 @@ jobs:
         dry-run: 'true'
 
     - uses: ko-build/setup-ko@v0.6
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
     - name: ko
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
