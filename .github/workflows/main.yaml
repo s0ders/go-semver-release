@@ -38,9 +38,11 @@ jobs:
     - name: Go Test
       run: go test -v ./...
 
-  ko-build-and-push:
+  ko:
     runs-on: ubuntu-latest
     needs: go-build
+    outputs:
+      release: ${{ steps.gosemver.outputs.NEW_RELEASE }}
     steps:
     - uses: actions/checkout@v3
 
@@ -70,8 +72,8 @@ jobs:
 
   go-semver-release:
     runs-on: ubuntu-latest
-    needs: ko-build-and-push
-    if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+    needs: ko
+    if: ${{needs.ko.outputs.release == 'true' }}
     steps:
     - uses: actions/checkout@v3
 
