@@ -36,7 +36,7 @@ func TestPrecedence(t *testing.T) {
 func TestIsZero(t *testing.T) {
 	type test struct {
 		semver Semver
-		want bool
+		want   bool
 	}
 
 	matrix := []test{

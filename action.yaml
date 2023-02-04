@@ -22,9 +22,9 @@ inputs:
     required: false
     default: ''
   dry-run:
-    description: 'Enable dry-run which prevents pushing any tag, only computes the next, if any, semantic version'
+    description: 'Enable dry-run which prevents pushing any tag, only computes the next - if any - semantic version'
     required: false
-    default: "false"
+    default: 'false'
 outputs:
   version:
     description: 'The newly computed version, if any'

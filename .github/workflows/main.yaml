@@ -37,7 +37,7 @@ jobs:
     - name: Go Test
       run: go test -v ./...
 
-  docker-build-and-push:
+  ko-build-and-push:
     runs-on: ubuntu-latest
     needs: go-build
     steps:
@@ -54,14 +54,6 @@ jobs:
 
     - uses: ko-build/setup-ko@v0.6
     - run: cd ./cmd/app && KO_DOCKER_REPO=docker.io/soders ko build -B .
-
-    # - name: Build and push
-    #   uses: docker/build-push-action@v3
-    #   with:
-    #     context: .
-    #     file: ./build/Dockerfile
-    #     push: true
-    #     tags: soders/go-semver-release:latest
 
   go-semver-release:
     runs-on: ubuntu-latest

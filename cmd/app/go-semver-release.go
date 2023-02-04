@@ -115,7 +115,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	os.Setenv("GITHUB_OUTPUT", "version=" + semver.NormalVersion())
+	os.Setenv("GITHUB_OUTPUT", "version="+semver.NormalVersion())
 
 	if dryrunMod {
 		logger.Printf("dry-run enabled, next version will be %s", semver)

@@ -73,7 +73,7 @@ func TestNewCommitAnalyzer(t *testing.T) {
 }
 
 func TestParseReleaseRules(t *testing.T) {
-	
+
 	releaseRules, err := ParseReleaseRules(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to parse release rules: %s", err)
@@ -92,7 +92,7 @@ func TestParseReleaseRules(t *testing.T) {
 
 	for i := 0; i < len(releaseRules.Rules); i++ {
 		got := releaseRules.Rules[i]
-		want :=  matrix[i]
+		want := matrix[i]
 
 		if got.CommitType != want.commitType {
 			t.Fatalf("got: %s want: %s", got.CommitType, want.commitType)
@@ -104,7 +104,7 @@ func TestParseReleaseRules(t *testing.T) {
 }
 
 func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
-	
+
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -123,13 +123,13 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 	}
 
 	want := "0.0.0"
-	if got := latest.Name; got != want  {
+	if got := latest.Name; got != want {
 		t.Fatalf("got: %s want: %s", got, want)
 	}
 }
 
 func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
-	
+
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -146,7 +146,7 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 
 	r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 		Message: tag,
-		Tagger:  &object.Signature{
+		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "ci@ci.ci",
 			When:  time.Now(),
@@ -164,13 +164,13 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 	}
 
 	want := tag
-	if got := latest.Name; got != want  {
+	if got := latest.Name; got != want {
 		t.Fatalf("got: %s want: %s", got, want)
 	}
 }
 
 func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
-	
+
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -188,7 +188,7 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	for i, tag := range tags {
 		r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 			Message: tag,
-			Tagger:  &object.Signature{
+			Tagger: &object.Signature{
 				Name:  "Go Semver Release",
 				Email: "ci@ci.ci",
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
@@ -207,7 +207,7 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	}
 
 	want := "3.0.0"
-	if got := latest.Name; got != want  {
+	if got := latest.Name; got != want {
 		t.Fatalf("got: %s want: %s", got, want)
 	}
 }
@@ -229,7 +229,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
-	
+
 	latestSemverTag, err := ca.FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("failed to fetch semver tag: %s", err)
@@ -264,7 +264,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
-	
+
 	latestSemverTag, err := ca.FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("failed to fetch semver tag: %s", err)
@@ -299,7 +299,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
-	
+
 	latestSemverTag, err := ca.FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("failed to fetch semver tag: %s", err)
@@ -334,7 +334,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
-	
+
 	latestSemverTag, err := ca.FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("failed to fetch semver tag: %s", err)
@@ -397,6 +397,10 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 			When:  time.Now(),
 		},
 	})
+
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create commit object %s", err)
+	}
 
 	_, err = r.CommitObject(commit)
 	if err != nil {

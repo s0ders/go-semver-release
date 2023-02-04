@@ -58,8 +58,7 @@ func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 	}
 
 	for _, rule := range releaseRules.Rules {
-		err := validate.Struct(rule)
-		if err = validate.Struct(releaseRules); err != nil {
+		if err := validate.Struct(rule); err != nil {
 			return nil, fmt.Errorf("ParseReleaseRules: failed to validate release rules: %w", err)
 		}
 	}
