@@ -106,8 +106,8 @@ The action takes the same parameters as those defined in the <a href="#Usage">us
 ### Outputs
 
 The action generate a two outputs 
-- `SEMVER`, the computed semver or the current one if no new were computed, prefixed with the given `tag-prefix` if any
-- `NEW_RELEASE`, whether a new semver was computed or not
+- `SEMVER`, the computed semver or the current one if no new were computed, prefixed with the given `tag-prefix` if any;
+- `NEW_RELEASE`, whether a new semver was computed or not.
 
 ### Example Workflow
 
