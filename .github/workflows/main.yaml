@@ -52,13 +52,16 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push
-      uses: docker/build-push-action@v3
-      with:
-        context: .
-        file: ./build/Dockerfile
-        push: true
-        tags: soders/go-semver-release:latest
+    - uses: ko-build/setup-ko@v0.6
+    - run: ko build --local -P cmd/app
+
+    # - name: Build and push
+    #   uses: docker/build-push-action@v3
+    #   with:
+    #     context: .
+    #     file: ./build/Dockerfile
+    #     push: true
+    #     tags: soders/go-semver-release:latest
 
   go-semver-release:
     runs-on: ubuntu-latest
