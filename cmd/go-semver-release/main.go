@@ -109,13 +109,14 @@ func main() {
 	if err != nil {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
-
+	
+	os.Setenv("GITHUB_OUTPUT", "version="+semver.NormalVersion())
+	
 	if !newRelease {
 		logger.Printf("no new release, still on %s", semver)
 		os.Exit(0)
 	}
 
-	os.Setenv("GITHUB_OUTPUT", "version="+semver.NormalVersion())
 
 	if dryrunMod {
 		logger.Printf("dry-run enabled, next version will be %s", semver)

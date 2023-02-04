@@ -27,7 +27,7 @@ inputs:
     default: 'false'
 outputs:
   version:
-    description: 'The newly computed version, if any'
+    description: 'The newly computed version or the current one if no new version were computed'
 runs:
   using: 'docker'
   image: 'docker://soders/go-semver-release:latest'
