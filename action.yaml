@@ -1,6 +1,5 @@
-# action.yml
 name: 'Go Semver Release'
-description: 'Computes the next, if any, semver for a Git repository and push the semver as Git annotated tag'
+description: 'Computes the next, if any, semver for a Git repository and push it to the repository as a Git annotated tag'
 branding:
   icon: 'at-sign'
   color: 'green'
