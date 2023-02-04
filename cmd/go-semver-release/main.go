@@ -109,7 +109,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
-	
+
 	ghOutputFile := os.Getenv("GITHUB_OUTPUT")
 	ghOutput := fmt.Sprintf("SEMVER=%s%s", tagPrefix, semver.NormalVersion())
 
