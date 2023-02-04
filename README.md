@@ -2,49 +2,46 @@
 
 # Go SemVer Release
 
-Go program designed to automate versioning of Git repository by  analyzing their formatted commit history and tagging them with the right semver number.  This program can be used directly or via its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
+Go program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging them with the right semver number. This program can be used directly or via its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
 
 ## Motivations
 
-Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that subscribers know when a non-retro-compatible change is introduced inside your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.
+Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.
 
-This tool aims to integrate the automation in such a way that all you have to do is:
+This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
 
-- Choose a release branch
+- Choose a release branch (e.g. `main`, `release`)
 
-- Take care to format commits on that branch, which many IDEs plugins offers to do seamlessly (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
+- Take care to format commits on that branch by following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, which many IDEs plugins offers to do seamlessly (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
 
 ## Install
 
-If [Go](https://go.dev) is installed on your machine, you can directly compile and install this program with `go install`:
+If [Go](https://go.dev) is installed on your machine, you can install from source using `go install`:
 
 ```bash
 $ go install github.com/s0ders/go-semver-release
 $ go-semver-release --help
 ```
 
-For more cross-platform compatibility, you can use the official [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
+For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
 $ docker pull soders/go-semver-release
 $ docker run --rm soders/go-semver-release --help
 ```
 
-
 ## Prerequisites
 
 There are only a few prerequisites for using this tool and getting the benefits it brings :
 
 - The Git repository commits must follow the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, as it is what is used to compute the semantic version.
-- The repository passed to the program (or action) must already be initialized (i.e. `HEAD` does not point to nothing)
-
-
+- The repository passed to the program (or action) must already be initialized (i.e. Git `HEAD` does not point to nothing)
 
 ## GitHub Actions
 
-The `go-release-semver` program can easily be used inside your Actions pipeline. It takes the same parameters as those describe in the usage section bellow except for `--dry-run` (yet).
+The `go-release-semver` program can easily be used inside your Github Actions pipeline. It takes the same parameters as those described in the usage section).
 
-Bellow is an example usage of this action inside a GitHub Actions pipeline.
+Bellow is an example of this action inside a GitHub Actions pipeline.
 
 ```yaml
 jobs:
@@ -56,9 +53,10 @@ jobs:
     - name: Semver Release
       uses: s0ders/go-semver-release@0.11.1
       with:
-        repository-url: "https://github.com/path/to/your/repo.git"
-        tag-prefix: "v"
-        branch : "release"
+        repository-url: 'https://github.com/path/to/your/repo.git'
+        tag-prefix: 'v'
+        branch: 'release'
+        dry-run: 'true'
         token: ${{ secrets.ACCESS_TOKEN }}
 ```
 
@@ -102,7 +100,7 @@ A custom prefix can be added to the tag name pushed to the remote, by default th
 $ go-semver-release --url ... --token ... --tag-prefix v
 ```
 
-**Note**: with the `--tag-prefix` flag is that you can change your tag prefix during the lifetime of your repository (e.g. going from `v` to `version-`) and this will **not** affect the way `go-semver-release` will fetch your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes.
+**Note**: a cool thing with the `--tag-prefix` flag is that you can change your tag prefix during the lifetime of your repository (e.g. going from nothing to `v`) and this will **not** affect the way `go-semver-release` will fetch your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
 
 
 
