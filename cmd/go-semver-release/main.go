@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -111,11 +110,8 @@ func main() {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
 	
-
-	ghCmd := exec.Command(fmt.Sprintf("echo \"version=%s\" >> $GITHUB_OUTPUT", semver.NormalVersion()))	
-	_, err = ghCmd.Output()
-
 	ghOutput := os.Getenv("GITHUB_OUTPUT")
+	os.Setenv("GITHUB_OUTPUT", fmt.Sprintf("%s\n%s=%s", ghOutput, "version", semver.NormalVersion()))
 	logger.Printf("Wrote %s to $GITHUB_OUTPUT", ghOutput)
 
 	if err != nil {
