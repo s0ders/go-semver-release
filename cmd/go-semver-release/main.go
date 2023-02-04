@@ -110,9 +110,8 @@ func main() {
 		fmt.Printf("failed to compute SemVer: %s", err)
 	}
 	
-	ghOutput := os.Getenv("GITHUB_OUTPUT")
-	os.Setenv("GITHUB_OUTPUT", fmt.Sprintf("%s\n%s=%s", ghOutput, "version", semver.NormalVersion()))
-	logger.Printf("Wrote %s to $GITHUB_OUTPUT", ghOutput)
+	ghOutputFile := os.Getenv("GITHUB_OUTPUT")
+	os.WriteFile(ghOutputFile, []byte(fmt.Sprintf("version=%s", semver.NormalVersion())), os.ModeAppend)
 
 	if err != nil {
 		logger.Fatalf("failed to generate output: %s", err)
