@@ -63,7 +63,7 @@ jobs:
         dry-run: 'true'
 
     - uses: ko-build/setup-ko@v0.6
-    - run: cd ./cmd/go-semver-release && KO_DOCKER_REPO=${{ secrets.KO_DOCKER_REPO }} ko build -B -t ${{ steps.gosemver.outputs.version }} -t latest
+    - run: cd ./cmd/go-semver-release && KO_DOCKER_REPO=${{ secrets.KO_DOCKER_REPO }} ko build -B -t ${{ steps.gosemver.outputs.SEMVER }} -t latest
 
   go-semver-release:
     runs-on: ubuntu-latest

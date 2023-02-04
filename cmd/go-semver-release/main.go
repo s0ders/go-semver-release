@@ -111,7 +111,7 @@ func main() {
 	}
 	
 	ghOutputFile := os.Getenv("GITHUB_OUTPUT")
-	ghOutput := fmt.Sprintf("version=%s%s", tagPrefix, semver.NormalVersion())
+	ghOutput := fmt.Sprintf("SEMVER=%s%s", tagPrefix, semver.NormalVersion())
 
 	os.WriteFile(ghOutputFile, []byte(ghOutput), os.ModeAppend)
 

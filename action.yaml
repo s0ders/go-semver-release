@@ -25,7 +25,7 @@ inputs:
     required: false
     default: 'false'
 outputs:
-  version:
+  SEMVER:
     description: 'The newly computed version or the current one if no new version were computed'
 runs:
   using: 'docker'
