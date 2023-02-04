@@ -65,16 +65,16 @@ jobs:
         dry-run: 'true'
 
     - uses: ko-build/setup-ko@v0.6
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE != "false" }}
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE != 'false' }}
 
     - name: ko
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE != "false" }}
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE != 'false' }}
       run: cd ./cmd/go-semver-release && KO_DOCKER_REPO=${{ secrets.KO_DOCKER_REPO }} ko build -B -t ${{ steps.gosemver.outputs.SEMVER }} -t latest
 
   go-semver-release:
     runs-on: ubuntu-latest
     needs: ko
-    if: ${{needs.ko.outputs.release != "false" }}
+    if: ${{needs.ko.outputs.release != 'false' }}
     steps:
     - uses: actions/checkout@v3
 
