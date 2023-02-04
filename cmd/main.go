@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/s0ders/go-semver-release/internal/commitanalyzer"
@@ -27,7 +28,7 @@ var (
 	accessToken         string
 	tagPrefix           string
 	releaseBranch       string
-	dryrun              bool
+	dryrun              string
 	defaultReleaseRules = `{
 		"releaseRules": [
 			{"type": "feat", "release": "minor"},
@@ -45,11 +46,16 @@ func main() {
 	flag.StringVar(&accessToken, "token", "", "A personnal access token to log in to the Git repository in order to push tags")
 	flag.StringVar(&tagPrefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
 	flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the main branch if empty")
-	flag.BoolVar(&dryrun, "dry-run", false, "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
+	flag.StringVar(&dryrun, "dry-run", "false", "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 	flag.Parse()
 
 	if gitUrl == "" {
 		logger.Fatal("--url cannot be empty\n")
+	}
+
+	dryrunMod, err := strconv.ParseBool(dryrun)
+	if err != nil {
+		logger.Fatalf("failed to parse --dry-run value")
 	}
 
 	auth := &http.BasicAuth{
@@ -109,7 +115,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	if dryrun {
+	os.Setenv("GITHUB_OUTPUT", "version=" + semver.NormalVersion())
+
+	if dryrunMod {
 		logger.Printf("dry-run enabled, next version will be %s", semver)
 		os.Exit(0)
 	}
