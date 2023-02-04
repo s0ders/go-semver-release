@@ -20,9 +20,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
 
-  go-build:
+  go-semver-release:
     runs-on: ubuntu-latest
     needs: gitleaks
+    outputs:
+      version: ${{ steps.gosemver.outputs.version }}
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Go Semver Release
+      id: gosemver
+      uses: ./
+      with:
+        repository-url: 'https://github.com/s0ders/go-semver-release.git'
+        token: ${{ secrets.GIT_TOKEN }}
+        tag-prefix: 'v'
+
+  go-build:
+    runs-on: ubuntu-latest
+    needs: go-semver-release
     steps:
     - uses: actions/checkout@v3
 
@@ -43,6 +59,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Go Semver Release
+      uses: ./
+      with:
+        repository-url: 'https://github.com/s0ders/go-semver-release.git'
+        token: ${{ secrets.GIT_TOKEN }}
+        tag-prefix: 'v'
+        dry-run: 'true'
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
@@ -53,17 +77,5 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - uses: ko-build/setup-ko@v0.6
-    - run: cd ./cmd/go-semver-release && KO_DOCKER_REPO=docker.io/soders ko build -B 
+    - run: cd ./cmd/go-semver-release && KO_DOCKER_REPO=${{ secrets.KO_DOCKER_REPO }} ko build -B -t ${{needs.go-semver-release.outputs.version}}
 
-  go-semver-release:
-    runs-on: ubuntu-latest
-    needs: ko-build-and-push
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Go Semver Release
-      uses: ./
-      with:
-        repository-url: 'https://github.com/s0ders/go-semver-release.git'
-        token: ${{ secrets.GIT_TOKEN }}
-        tag-prefix: 'v'
