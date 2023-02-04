@@ -53,7 +53,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - uses: ko-build/setup-ko@v0.6
-    - run: ko build --local -P cmd/app
+    - run: cd ./cmd/app && ko build -B .
 
     # - name: Build and push
     #   uses: docker/build-push-action@v3
