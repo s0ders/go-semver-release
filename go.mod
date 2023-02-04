@@ -1,6 +1,6 @@
 module github.com/s0ders/go-semver-release
 
-go 1.19
+go 1.20
 
 require (
 	github.com/go-git/go-git/v5 v5.5.0
