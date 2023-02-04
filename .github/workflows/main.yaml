@@ -1,4 +1,4 @@
-name: CI workflow
+name: build
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19
+        go-version: 1.20
 
     - name: Go Build
       run: go build -v ./...
@@ -71,3 +71,4 @@ jobs:
       with:
         repository-url: 'https://github.com/s0ders/go-semver-release.git'
         token: ${{ secrets.GIT_TOKEN }}
+        tag-prefix: 'v'
