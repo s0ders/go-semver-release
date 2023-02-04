@@ -53,7 +53,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - uses: ko-build/setup-ko@v0.6
-    - run: cd ./cmd/app && KO_DOCKER_REPO=docker.io/soders ko build -B .
+    - run: cd ./cmd/app && KO_DOCKER_REPO=docker.io/soders ko build -B 
 
   go-semver-release:
     runs-on: ubuntu-latest
