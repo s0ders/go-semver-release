@@ -114,8 +114,7 @@ jobs:
     - name: Sign Artifacts
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
-        cosign sign -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} \\
-        ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}
+        cosign sign -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}
       env:
         COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
         COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
