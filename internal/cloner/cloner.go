@@ -22,14 +22,13 @@ func NewCloner() Cloner {
 	}
 }
 
-func (c Cloner) Clone(url, branch, token string) *git.Repository {
+func (c Cloner) Clone(url, branch, token string) (*git.Repository, string) {
 	auth := &http.BasicAuth{
 		Username: "go-semver-release",
 		Password: token,
 	}
 
-	gitDirectoryPath, err := os.MkdirTemp("", "go-semver-release-*")
-	defer os.RemoveAll(gitDirectoryPath)
+	path, err := os.MkdirTemp("", "go-semver-release-*")
 	if err != nil {
 		c.l.Fatalf("failed to create temporary directory to clone repository in: %s", err)
 	}
@@ -44,11 +43,11 @@ func (c Cloner) Clone(url, branch, token string) *git.Repository {
 		cloneOption.ReferenceName = plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))
 	}
 
-	r, err := git.PlainClone(gitDirectoryPath, false, cloneOption)
+	repository, err := git.PlainClone(path, false, cloneOption)
 
 	if err != nil {
 		c.l.Fatalf("failed to clone repository: %s", err)
 	}
 
-	return r
+	return repository, path
 }
