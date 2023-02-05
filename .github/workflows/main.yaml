@@ -105,7 +105,7 @@ jobs:
 
     - name: Crane Delete Prerelease Tag
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
+      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} -v
 
     - name: Install Cosign
       uses: sigstore/cosign-installer@main
