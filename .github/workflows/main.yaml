@@ -7,8 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  DOCKER_REPOSITORY_BASE: docker.io/soders
-  KO_DOCKER_REPO: ${{ env.DOCKER_REPOSITORY_BASE }}
+  KO_DOCKER_REPO: docker.io/soders
   SEMVER_GIT_REPO_URL: https://github.com/s0ders/go-semver-release.gitc 
 
 jobs:
@@ -72,15 +71,15 @@ jobs:
     - uses: ko-build/setup-ko@v0.6
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
-    - name: ko
+    - name: Ko Build
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
   
-    - name: Run Trivy vulnerability scanner
+    - name: Trivy Scan
       uses: aquasecurity/trivy-action@master
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       with:
-        image-ref: '${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}'
+        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
@@ -90,14 +89,13 @@ jobs:
     - uses: imjasonh/setup-crane@v0.1
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
     
-    - name: Crane create release tag
-      run: crane tag ${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }}
+    - name: Crane Add Release Tag
+      run: |
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }} && \\ 
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} latest
 
-    - name: Crane create latest tag
-      run: crane tag ${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }}
-
-    - name: Crane delete build tag
-      run: crane delete ${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
+    - name: Crane Delete Build Tag
+      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
 
   go-semver-release:
     runs-on: ubuntu-latest
