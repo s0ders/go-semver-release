@@ -69,6 +69,9 @@ jobs:
         tag-prefix: 'v'
         dry-run: 'true'
 
+    - name: output check
+      run: echo ${{ steps.gosemver.outputs.NEW_RELEASE }}
+
     - uses: ko-build/setup-ko@v0.6
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
