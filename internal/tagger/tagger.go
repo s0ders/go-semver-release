@@ -10,7 +10,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 
 	"github.com/s0ders/go-semver-release/internal/semver"
 )
@@ -26,7 +26,8 @@ type Tagger struct {
 	tagPrefix string
 }
 
-func NewTagger(logger *log.Logger, tagPrefix string) *Tagger {
+func NewTagger(tagPrefix string) *Tagger {
+	logger := log.New(os.Stdout, "tagger", log.Default().Flags())
 	return &Tagger{
 		logger:    logger,
 		tagPrefix: tagPrefix,
@@ -49,7 +50,7 @@ func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
 	tags, err := r.Tags()
 
 	if err != nil {
-		return false, fmt.Errorf("TagExists: failed to fetch tags: %w", err)
+		return false, fmt.Errorf("failed to fetch tags: %w", err)
 	}
 
 	tags.ForEach(func(tag *plumbing.Reference) error {
@@ -66,21 +67,21 @@ func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
 
 // AddTagToRepository create a new annotated tag on the repository
 // with a name corresponding to the semver passed as a parameter.
-func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
+func (t *Tagger) addTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
 	h, err := r.Head()
 	if err != nil {
-		return nil, fmt.Errorf("AddTagToRepository: failed to fetch head: %w", err)
+		return nil, fmt.Errorf("failed to fetch head: %w", err)
 	}
 
 	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.NormalVersion())
 
 	tagExists, err := t.TagExists(r, tag)
 	if err != nil {
-		return nil, fmt.Errorf("AddTagToRepository: failed to check if tag exists: %w", err)
+		return nil, fmt.Errorf("failed to check if tag exists: %w", err)
 	}
 
 	if tagExists {
-		return nil, fmt.Errorf("AddTagToRepository: tag already exists")
+		return nil, fmt.Errorf("tag already exists")
 	}
 
 	_, err = r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
@@ -89,7 +90,7 @@ func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("AddTagToRepository: failed to create tag on repository: %w", err)
+		return nil, fmt.Errorf("failed to create tag on repository: %w", err)
 	}
 
 	t.logger.Printf("created new tag %s on repository", semver.String())
@@ -97,16 +98,25 @@ func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*
 	return r, nil
 }
 
-func (t *Tagger) PushTagToRemote(r *git.Repository, auth transport.AuthMethod) error {
+func (t *Tagger) PushTagToRemote(r *git.Repository, token string, semver *semver.Semver) error {
+
+	repo, err := t.addTagToRepository(r, semver)
+	if err != nil {
+		return fmt.Errorf("failed to add tag on repository: %w", err)
+	}
+
 	po := &git.PushOptions{
-		Auth:       auth,
+		Auth: &http.BasicAuth{
+			Username: "go-semver-release",
+			Password: token,
+		},
 		Progress:   os.Stdout,
 		RefSpecs:   []config.RefSpec{config.RefSpec("refs/tags/*:refs/tags/*")},
 		RemoteName: "origin",
 	}
 
-	if err := r.Push(po); err != nil {
-		return fmt.Errorf("PushTagToRemote: failed to push: %w", err)
+	if err := repo.Push(po); err != nil {
+		return fmt.Errorf("failed to push tag to remote: %w", err)
 	}
 
 	return nil

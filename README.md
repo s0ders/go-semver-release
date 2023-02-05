@@ -9,14 +9,18 @@ Go program designed to automate versioning of Git repository by analyzing their 
     <li><a href="#Install">Install</a></li>
     <li><a href="#Usage">Usage</a></li>
     <li><a href="#github-actions">Github Actions</a></li>
-    <li><a href="#release-rules">Release rules</a></li>
+    <li><a href="#release-rules">Release Rules</a></li>
+    <li><a href="#SLSA">SLSA</a></li>
 </ul>
 
-## Motivations
 
-Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
+## Motivation
 
-Because versioning should not be a bottleneck of any kind in your CI/CD workflow, the Docker image merely weight 7Mb and the Go program inside will compute your semver in seconds, no matter the size of your commit history.
+Handling a Git repository versions can be done using well-thought convention such as [SemVer](https://semver.org/) so that your API consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation can be achieved by using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
+
+This project was built to create a lightweight and simple tool to seamlessly automate versioning on your Git repository. Following the UNIX philosophy of "make each program do one thing well", it only handles publishing semver tags to your Git repository, no package publishing or any other features. 
+
+The Docker image merely weight `7Mb` and the Go program inside will compute your semver tag in seconds, no matter the size of your commit history.
 
 This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
 
@@ -58,37 +62,37 @@ There are only a few prerequisites for using this tool and getting the benefits 
 You must pass the Git URL of the repository to target using the `--url` flag:
 
 ```bash
-$ go-semver-release --url [GIT URL]
+$ go-semver-release --url <GIT URL>
 ```
 
 Because the program needs to push tag to the remote, it must authenticate itself using a personal access token passed with `--token`:
 
 ```bash
-$ go-semver-release --url ... --token [ACCESS TOKEN]
+$ go-semver-release [...] --token <ACCESS TOKEN>
 ```
 
 The release branch on which the commits are fetched is specified using `--branch`:
 
 ```bash
-$ go-semver-release --url ... --token ... --branch release
+$ go-semver-release [...] --branch <BRANCH NAME>
 ```
 
 Custom release rules are passed to the program using the `--rules`:
 
 ```bash
-$ go-semver-release --url ... --token ... --rules [PATH TO RULES]
+$ go-semver-release [...] --rules <PATH TO RULES>
 ```
 
 The program supports a dry-run mode that will only compute the next semantic version, if any, and will stop here without pushing any tag to the remote, dry-run is `false` by default:
 
 ```bash
-$ go-semver-release --url ... --token ... --dry-run true
+$ go-semver-release [...] --dry-run true
 ```
 
 A custom prefix can be added to the tag name pushed to the remote, by default the tag name correspond to the SemVer (e.g. `1.2.3`) but you might want to use some prefix like `v` using `--tag-prefix`:
 
 ```bash
-$ go-semver-release --url ... --token ... --tag-prefix v
+$ go-semver-release [...] --tag-prefix <PREFIX>
 ```
 
 > **Note**: You can change your tag prefix during the lifetime of your repository (e.g. going from none to `v`) and this will **not** affect your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
@@ -99,7 +103,7 @@ $ go-semver-release --url ... --token ... --tag-prefix v
 
 ### Inputs
 
-The action takes the same parameters as those defined in the <a href="#Usage">usage</a> section. Note that the `--dry-run` needs to be passed as a string inside your YAML workflow due to how Github Actions works.
+The action takes the same parameters as those defined in the <a href="#Usage">usage</a> section. Note that the `--dry-run` needs to be passed as a string inside your YAML work-flow due to how Github Actions works.
 
 ### Outputs
 
@@ -147,8 +151,9 @@ You can define custom release rules to suit your needs using a JSON file and by 
 ```json
 {
     "releaseRules": [
-        {"type": "perf", "release": "minor"},
-        {"type": "ci", "release": "patch"},
+        {"type": "feat", "release": "minor"},
+        {"type": "perf", "release": "patch"},
+        {"type": "refactor", "release": "patch"},
         {"type": "fix", "release": "patch"}
     ]
 }
@@ -157,3 +162,20 @@ You can define custom release rules to suit your needs using a JSON file and by 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
+
+
+
+## SLSA
+
+This project follows the [**Supply chain Levels for Software Artifacts**](https://slsa.dev/) framework so that you do not have to worry about this tool introducing vulnerabilities in your CI environment. Aiming to provide a level 3 SLSA, this means that :
+
+- all commits are signed;
+- all artifacts and their SBOM are signed;
+- artifacts are scanned for vulnerabilities before being released.
+
+
+
+## Work In Progress
+
+- [ ] Sign commits
+- [ ] Refactor (diminish cyclo. complexity)

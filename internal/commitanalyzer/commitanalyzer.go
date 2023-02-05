@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 
@@ -35,14 +36,17 @@ type CommitAnalyzer struct {
 	releaseRules *ReleaseRules
 }
 
-func NewCommitAnalyzer(l *log.Logger, releaseRulesReader io.Reader) (*CommitAnalyzer, error) {
-
+func NewCommitAnalyzer(releaseRulesReader io.Reader) (*CommitAnalyzer, error) {
+	logger := log.New(os.Stdout, "commit-analyzer", log.Default().Flags())
 	releaseRules, err := ParseReleaseRules(releaseRulesReader)
 	if err != nil {
 		return nil, fmt.Errorf("NewCommitAnalyzer: failed parsing release rules: %w", err)
 	}
 
-	return &CommitAnalyzer{l, releaseRules}, nil
+	return &CommitAnalyzer{
+		logger: logger, 
+		releaseRules: releaseRules,
+		}, nil
 }
 
 // TODO: check for semantically incorrect rules (e.g. same commit types targeting )
@@ -72,7 +76,7 @@ func ParseReleaseRules(releaseRulesReader io.Reader) (*ReleaseRules, error) {
 // precedence (i.e. latest tag) is returned. For this method to work
 // properly, the repository must have at least an object pointed to
 // by HEAD (i.e. the repository must have atleast one commit)
-func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
+func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
 
 	semverRegex := regexp.MustCompile(semver.SemverRegex)
 
@@ -144,12 +148,17 @@ func (c *CommitAnalyzer) FetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 // slice of commit history and the latest valid semver from the repository and
 // returns the updated semver number using the defined release rules and a boolean
 // representing whether the semver was updated or not.
-func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverTag *object.Tag) (*semver.Semver, bool, error) {
+func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository) (*semver.Semver, bool, error) {
+
+	latestSemverTag, err := c.fetchLatestSemverTag(r)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to fetch latest semver: %w", err)
+	}
 
 	newRelease := false
 	semver, err := semver.NewSemverFromGitTag(latestSemverTag)
 	if err != nil {
-		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to build SemVer from Git tag: %w", err)
+		return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
 	}
 
 	logOptions := &git.LogOptions{}
@@ -227,7 +236,7 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository, latestSemverT
 	}
 
 	if err != nil {
-		return nil, false, fmt.Errorf("ComputeNewSemverNumber: failed to parse commit history: %w", err)
+		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
 	}
 
 	return semver, newRelease, nil

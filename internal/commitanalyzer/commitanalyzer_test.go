@@ -2,7 +2,6 @@ package commitanalyzer
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,7 +66,7 @@ func TestBreakingChangeRegex(t *testing.T) {
 }
 
 func TestNewCommitAnalyzer(t *testing.T) {
-	if _, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules)); err != nil {
+	if _, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules)); err != nil {
 		t.Fatalf("failed to created new commit analyzer: %s", err)
 	}
 }
@@ -112,12 +111,12 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 
 	defer os.RemoveAll(repositoryPath)
 
-	commitAnalyzer, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	commitAnalyzer, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latest, err := commitAnalyzer.FetchLatestSemverTag(r)
+	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("faild to fetch latest semver tag: %s", err)
 	}
@@ -153,12 +152,12 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 		},
 	})
 
-	commitAnalyzer, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	commitAnalyzer, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latest, err := commitAnalyzer.FetchLatestSemverTag(r)
+	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("faild to fetch latest semver tag: %s", err)
 	}
@@ -196,12 +195,12 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		})
 	}
 
-	commitAnalyzer, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	commitAnalyzer, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latest, err := commitAnalyzer.FetchLatestSemverTag(r)
+	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("faild to fetch latest semver tag: %s", err)
 	}
@@ -225,17 +224,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latestSemverTag, err := ca.FetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("failed to fetch semver tag: %s", err)
-	}
-
-	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	version, _, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -260,17 +254,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latestSemverTag, err := ca.FetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("failed to fetch semver tag: %s", err)
-	}
-
-	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	version, _, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -295,17 +284,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latestSemverTag, err := ca.FetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("failed to fetch semver tag: %s", err)
-	}
-
-	version, _, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	version, _, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -330,17 +314,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(log.Default(), strings.NewReader(defaultReleaseRules))
+	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
 	if err != nil {
 		t.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	latestSemverTag, err := ca.FetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("failed to fetch semver tag: %s", err)
-	}
-
-	version, newRelease, err := ca.ComputeNewSemverNumber(r, latestSemverTag)
+	version, newRelease, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
