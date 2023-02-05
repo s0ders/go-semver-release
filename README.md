@@ -12,8 +12,6 @@ Go program designed to automate versioning of Git repository by analyzing their 
     <li><a href="#release-rules">Release rules</a></li>
 </ul>
 
-
-
 ## Motivations
 
 Handling a Git repository versions can be done seamlessly using well-thought convention such as [SemVer](https://semver.org/) so that consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation is achieved using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
@@ -129,8 +127,6 @@ jobs:
         dry-run: 'false'
         token: ${{ secrets.ACCESS_TOKEN }}
 ```
-
-
 
 ## Release Rules
 
