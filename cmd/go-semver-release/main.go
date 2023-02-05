@@ -114,7 +114,7 @@ func main() {
 
 	if ghEnv {
 		ghOutputFile := os.Getenv("GITHUB_OUTPUT")
-		ghOutput := fmt.Sprintf("SEMVER=%s%s\nNEW_RELEASE=%t", tagPrefix, semver.NormalVersion(), newRelease)
+		ghOutput := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t", tagPrefix, semver.NormalVersion(), newRelease)
 	
 		os.WriteFile(ghOutputFile, []byte(ghOutput), os.ModeAppend)
 	
