@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 
@@ -27,15 +28,8 @@ func (o Output) Generate(prefix string, semver *semver.Semver, release bool) {
 
 	output := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t\n", prefix, semver.NormalVersion(), release)
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
+	if err := os.WriteFile(path, []byte(output), fs.ModeAppend); err != nil {
 		o.logger.Fatalf("failed to open output file: %s", err)
 	}
 
-	defer f.Close()
-
-	_, err = f.WriteString(output)
-	if err != nil {
-		o.logger.Fatalf("failed to write output to file: %s", err)
-	}
 }
