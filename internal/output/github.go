@@ -27,6 +27,13 @@ func (o Output) Generate(prefix string, semver *semver.Semver, release bool) {
 
 	o.logger.Printf("$GITHUB_OUTPUT=%s", path)
 
+	info, err := os.Stat(path)
+	if err != nil {
+		o.logger.Fatalf("failed to get stat on output file: %s", err)
+	}
+
+	o.logger.Printf("%+v", info)
+
 	output := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t\n", prefix, semver.NormalVersion(), release)
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
