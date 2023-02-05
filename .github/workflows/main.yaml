@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  DOCKER_REPOSITORY_BASE: docker.io/soders
+  KO_DOCKER_REPO: ${{ env.DOCKER_REPOSITORY_BASE }}
+  SEMVER_GIT_REPO_URL: https://github.com/s0ders/go-semver-release.gitc 
+
 jobs:
 
   gitleaks:
@@ -59,7 +64,7 @@ jobs:
       id: gosemver
       uses: ./
       with:
-        repository-url: 'https://github.com/s0ders/go-semver-release.git'
+        repository-url: ${{ env.SEMVER_GIT_REPO_URL }}
         token: ${{ secrets.GIT_TOKEN }}
         tag-prefix: 'v'
         dry-run: 'true'
@@ -68,8 +73,31 @@ jobs:
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
     - name: ko
-      run: cd ./cmd/go-semver-release && KO_DOCKER_REPO=${{ secrets.KO_DOCKER_REPO }} ko build -B -t ${{ steps.gosemver.outputs.SEMVER }} -t latest
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+      run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
+  
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+      with:
+        image-ref: '${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
+
+    - uses: imjasonh/setup-crane@v0.1
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+    
+    - name: Crane create release tag
+      run: crane tag ${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }}
+
+    - name: Crane create latest tag
+      run: crane tag ${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }}
+
+    - name: Crane delete build tag
+      run: crane delete ${{ env.DOCKER_REPOSITORY_BASE }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
 
   go-semver-release:
     runs-on: ubuntu-latest
@@ -81,6 +109,6 @@ jobs:
     - name: Go Semver Release
       uses: ./
       with:
-        repository-url: 'https://github.com/s0ders/go-semver-release.git'
+        repository-url: ${{ env.SEMVER_GIT_REPO_URL }}
         token: ${{ secrets.GIT_TOKEN }}
         tag-prefix: 'v'
