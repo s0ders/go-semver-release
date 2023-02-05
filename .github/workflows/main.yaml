@@ -90,11 +90,13 @@ jobs:
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
     
     - name: Crane Add Release Tag
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
         crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }} && \\ 
         crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }} latest
 
     - name: Crane Delete Build Tag
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
 
   go-semver-release:
