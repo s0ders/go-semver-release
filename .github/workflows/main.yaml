@@ -60,6 +60,9 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    - name: Permission outputs
+      run: ls -l $GITHUB_OUTPUT
+
     - name: Go Semver Release Dryrun
       id: gosemver
       uses: ./
