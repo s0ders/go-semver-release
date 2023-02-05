@@ -31,7 +31,8 @@ This tool aims to integrate semantic versioning automation in such a way that, a
 If [Go](https://go.dev) is installed on your machine, you can install from source using `go install`:
 
 ```bash
-$ go install github.com/s0ders/go-semver-release
+$ 
+$ go install go install github.com/s0ders/go-semver-release/cmd/go-semver-release@latest
 $ go-semver-release --help
 ```
 
@@ -119,7 +120,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Semver Release
-      uses: s0ders/go-semver-release@v1.3.0
+      uses: s0ders/go-semver-release@v1.3.3
       with:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
