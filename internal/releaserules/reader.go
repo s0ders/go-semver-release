@@ -24,6 +24,6 @@ func (r ReleaseRuleReader) Read(path string) (io.Reader, error) {
 	if path == "" {
 		return strings.NewReader(helpers.DefaultReleaseRules), nil
 	}
-	
+
 	return os.Open(path)
 }

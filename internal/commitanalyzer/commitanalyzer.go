@@ -44,9 +44,9 @@ func NewCommitAnalyzer(releaseRulesReader io.Reader) (*CommitAnalyzer, error) {
 	}
 
 	return &CommitAnalyzer{
-		logger: logger, 
+		logger:       logger,
 		releaseRules: releaseRules,
-		}, nil
+	}, nil
 }
 
 // TODO: check for semantically incorrect rules (e.g. same commit types targeting )
@@ -191,16 +191,10 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository) (*semver.Semv
 		}
 
 		submatch := conventionalCommitRegex.FindStringSubmatch(commit.Message)
-		commitType := submatch[1]
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
+		commitType := submatch[1]
 		shortHash := commit.Hash.String()[0:7]
-		var shortMessage string
-
-		if len(commit.Message) > 60 {
-			shortMessage = fmt.Sprintf("%s...", commit.Message[0:57])
-		} else {
-			shortMessage = commit.Message[0 : len(commit.Message)-1]
-		}
+		shortMessage := c.shortMessage(commit.Message)
 
 		if breakingChange {
 			c.logger.Printf("(%s) breaking change", shortHash)
@@ -240,4 +234,12 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository) (*semver.Semv
 	}
 
 	return semver, newRelease, nil
+}
+
+func (c *CommitAnalyzer) shortMessage(message string) string {
+	if len(message) > 60 {
+		return fmt.Sprintf("%s...", message[0:57])
+	}
+
+	return message[0 : len(message)-1]
 }

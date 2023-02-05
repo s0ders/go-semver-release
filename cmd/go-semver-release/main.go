@@ -14,37 +14,37 @@ import (
 )
 
 var (
-	releaseRulesPath    string
-	gitUrl              string
-	accessToken         string
-	tagPrefix           string
-	releaseBranch       string
-	dryrun              string
+	rulesPath     string
+	gitUrl        string
+	token         string
+	prefix        string
+	releaseBranch string
+	dryrunFlag    string
 )
 
 func main() {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[go-semver-release]"), log.Default().Flags())
 
-	flag.StringVar(&releaseRulesPath, "rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
+	flag.StringVar(&rulesPath, "rules", "", "Path to a JSON file containing the rules for releasing new semantic versions based on commit types")
 	flag.StringVar(&gitUrl, "url", "", "The Git repository to version")
-	flag.StringVar(&accessToken, "token", "", "A personnal access token to log in to the Git repository in order to push tags")
-	flag.StringVar(&tagPrefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
+	flag.StringVar(&token, "token", "", "A personnal access token to log in to the Git repository in order to push tags")
+	flag.StringVar(&prefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
 	flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the branch pointed by HEAD if empty")
-	flag.StringVar(&dryrun, "dry-run", "false", "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
+	flag.StringVar(&dryrunFlag, "dry-run", "false", "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
 	flag.Parse()
 
 	if gitUrl == "" {
 		logger.Fatal("--url cannot be empty\n")
 	}
 
-	dryrunMod, err := strconv.ParseBool(dryrun)
+	dryrun, err := strconv.ParseBool(dryrunFlag)
 	if err != nil {
 		logger.Fatalf("failed to parse --dry-run value")
 	}
 
-	r := cloner.NewCloner().Clone(gitUrl, releaseBranch, accessToken)
+	r := cloner.NewCloner().Clone(gitUrl, releaseBranch, token)
 
-	rules, err := releaserules.NewReleaseRuleReader().Read(releaseRulesPath)
+	rules, err := releaserules.NewReleaseRuleReader().Read(rulesPath)
 	if err != nil {
 		logger.Fatalf("failed to parse release rules: %s", err)
 	}
@@ -59,9 +59,9 @@ func main() {
 		logger.Fatalf("failed to compute semver: %s", err)
 	}
 
-	ghOutputFile := os.Getenv("GITHUB_OUTPUT")
-	ghOutput := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t", tagPrefix, semver.NormalVersion(), newRelease)
-	if err = os.WriteFile(ghOutputFile, []byte(ghOutput), os.ModeAppend); err != nil {
+	outputFile := os.Getenv("GITHUB_OUTPUT")
+	output := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t", prefix, semver.NormalVersion(), newRelease)
+	if err = os.WriteFile(outputFile, []byte(output), os.ModeAppend); err != nil {
 		logger.Fatalf("failed to generate output: %s", err)
 	}
 
@@ -70,15 +70,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	if dryrunMod {
+	if dryrun {
 		logger.Printf("dry-run enabled, next version will be %s", semver)
 		os.Exit(0)
 	}
 
-	if err = tagger.NewTagger(tagPrefix).PushTagToRemote(r, accessToken, semver); err != nil {
+	if err = tagger.NewTagger(prefix).PushTagToRemote(r, token, semver); err != nil {
 		logger.Fatalf("Failed to push tag: %s", err)
 	}
 
-	logger.Printf("pushed tag %s on repository", semver)
 	os.Exit(0)
 }

@@ -119,5 +119,7 @@ func (t *Tagger) PushTagToRemote(r *git.Repository, token string, semver *semver
 		return fmt.Errorf("failed to push tag to remote: %w", err)
 	}
 
+	t.logger.Printf("pushed tag %s on repository", semver)
+
 	return nil
 }
