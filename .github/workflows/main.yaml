@@ -8,7 +8,7 @@ on:
 
 env:
   KO_DOCKER_REPO: docker.io/soders
-  SEMVER_GIT_REPO_URL: https://github.com/s0ders/go-semver-release.gitc 
+  SEMVER_GIT_REPO_URL: https://github.com/s0ders/go-semver-release.git
 
 jobs:
 
