@@ -60,9 +60,6 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Permission outputs
-      run: ls -l $GITHUB_OUTPUT
-
     - name: Go Semver Release Dryrun
       id: gosemver
       uses: ./
@@ -77,7 +74,7 @@ jobs:
 
     - name: Ko Build Prerelease
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
+      run: cd ./cmd/go-semver-release && ko build -B --platform linux/amd64 --tags ${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
 
     - name: Trivy Scan
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
