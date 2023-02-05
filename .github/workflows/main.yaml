@@ -69,7 +69,7 @@ jobs:
         tag-prefix: 'v'
         dry-run: 'true'
 
-    - name: output check
+    - name: Output Check
       run: echo ${{ steps.gosemver.outputs.NEW_RELEASE }}
 
     - uses: ko-build/setup-ko@v0.6
@@ -83,7 +83,7 @@ jobs:
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }}'
+        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
@@ -96,32 +96,22 @@ jobs:
     - name: Crane Add Release Tag
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }} ${{needs.jobs.ko-build.outputs.semver}} && \\ 
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }} latest
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }} && \\ 
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} latest
 
     - name: Crane Delete Prerelease Tag
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }}
+      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
 
     - name: Sign Artifacts
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
         cosign sign -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} \\
-        ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}
+        ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}
       env:
         COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
         COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
 
-  go-semver-release:
-    runs-on: ubuntu-latest
-    needs: scan-and-sign
-    if: ${{needs.jobs.ko-build.outputs.release == 'true'}}
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Go Semver Release
-      uses: ./
-      with:
-        repository-url: ${{ env.SEMVER_GIT_REPO_URL }}
-        token: ${{ secrets.GIT_TOKEN }}
-        tag-prefix: 'v'
+    - name: Push Semver Tag
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+      run: git tag ${{ steps.gosemver.outputs.SEMVER }} && git push origin ${{ steps.gosemver.outputs.SEMVER }}
