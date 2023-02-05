@@ -31,7 +31,7 @@ outputs:
     description: 'Boolean that indicate whether a new semver was computed or not'
 runs:
   using: 'docker'
-  image: 'build/Dockerfile'
+  image: 'docker://soders/go-semver-release:latest'
   args:
     - --url
     - ${{ inputs.repository-url }}

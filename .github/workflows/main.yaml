@@ -72,20 +72,12 @@ jobs:
         tag-prefix: 'v'
         dry-run: 'true'
 
-    # - uses: ko-build/setup-ko@v0.6
-    #   if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+    - uses: ko-build/setup-ko@v0.6
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
-    # - name: Ko Build Prerelease
-    #   if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-    #   run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
-
-    - name: Build and push
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: build/Dockerfile
-        push: true
-        tags: soders/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
+    - name: Ko Build Prerelease
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+      run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
 
     - name: Trivy Scan
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
