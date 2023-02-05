@@ -46,6 +46,11 @@ $ docker pull soders/go-semver-release
 $ docker run --rm soders/go-semver-release --help
 ```
 
+Verify that the downloaded image has not be tampered using [Cosign]:
+```bash
+$ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
+$ cosign verify --key $PUB_KEY soders/go-semver-release:vX.Y.Z
+```
 
 
 ## Prerequisites

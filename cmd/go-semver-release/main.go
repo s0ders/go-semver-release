@@ -9,6 +9,7 @@ import (
 
 	"github.com/s0ders/go-semver-release/internal/cloner"
 	"github.com/s0ders/go-semver-release/internal/commitanalyzer"
+	"github.com/s0ders/go-semver-release/internal/output"
 	"github.com/s0ders/go-semver-release/internal/releaserules"
 	"github.com/s0ders/go-semver-release/internal/tagger"
 )
@@ -54,18 +55,14 @@ func main() {
 		logger.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	semver, newRelease, err := commitAnalyzer.ComputeNewSemverNumber(r)
+	semver, release, err := commitAnalyzer.ComputeNewSemverNumber(r)
 	if err != nil {
 		logger.Fatalf("failed to compute semver: %s", err)
 	}
 
-	outputFile := os.Getenv("GITHUB_OUTPUT")
-	output := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t", prefix, semver.NormalVersion(), newRelease)
-	if err = os.WriteFile(outputFile, []byte(output), os.ModeAppend); err != nil {
-		logger.Fatalf("failed to generate output: %s", err)
-	}
+	output.NewOutput().Generate(prefix, semver, release)
 
-	if !newRelease {
+	if !release {
 		logger.Printf("no new release, still on %s", semver)
 		os.Exit(0)
 	}
