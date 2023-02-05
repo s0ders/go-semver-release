@@ -107,6 +107,10 @@ jobs:
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
 
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@main
+      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
+
     - name: Sign Artifacts
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
