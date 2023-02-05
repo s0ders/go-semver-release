@@ -31,8 +31,7 @@ This tool aims to integrate semantic versioning automation in such a way that, a
 If [Go](https://go.dev) is installed on your machine, you can install from source using `go install`:
 
 ```bash
-$ 
-$ go install go install github.com/s0ders/go-semver-release/cmd/go-semver-release@latest
+$ go install github.com/s0ders/go-semver-release/cmd/go-semver-release@latest
 $ go-semver-release --help
 ```
 
