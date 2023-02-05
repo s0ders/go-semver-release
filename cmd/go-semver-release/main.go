@@ -1,8 +1,3 @@
-// go-semver-release package aims to be a simple
-// program for CI/CD runner that applies the semver
-// spec. and conventional commit spec. to a Git repository
-// so that version number are automatically and reliably
-// handled by Git annotated tags.
 package main
 
 import (
