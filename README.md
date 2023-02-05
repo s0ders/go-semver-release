@@ -178,9 +178,3 @@ This project follows the [**Supply chain Levels for Software Artifacts**](https:
 - all artifacts and their SBOM are signed;
 - artifacts are scanned for vulnerabilities before being released.
 
-
-
-## Work In Progress
-
-- [ ] Sign commits
-- [ ] Refactor (diminish cyclo. complexity)
