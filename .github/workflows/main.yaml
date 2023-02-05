@@ -75,9 +75,9 @@ jobs:
     - uses: ko-build/setup-ko@v0.6
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
-    - name: Ko Build
+    - name: Ko Build Prerelease
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}+${{ github.sha }}
+      run: cd ./cmd/go-semver-release && ko build -B -t ${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
   
   scan-and-sign:
     runs-on: ubuntu-latest
@@ -95,7 +95,7 @@ jobs:
     - name: Trivy Scan
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}+${{ github.sha }}'
+        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
@@ -106,11 +106,11 @@ jobs:
     
     - name: Crane Add Release Tag
       run: |
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}+${{ github.sha }} ${{needs.jobs.ko-build.outputs.semver}} && \\ 
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}+${{ github.sha }} latest
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }} ${{needs.jobs.ko-build.outputs.semver}} && \\ 
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }} latest
 
-    - name: Crane Delete Build Tag
-      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}+${{ github.sha }}
+    - name: Crane Delete Prerelease Tag
+      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.jobs.ko-build.outputs.semver}}-${{ github.sha }}
 
     - name: Sign Artifacts
       run: |
