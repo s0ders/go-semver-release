@@ -43,7 +43,8 @@ func main() {
 		logger.Fatalf("failed to parse --dry-run value")
 	}
 
-	r := cloner.NewCloner().Clone(gitUrl, releaseBranch, token)
+	repository, path := cloner.NewCloner().Clone(gitUrl, releaseBranch, token)
+	defer os.RemoveAll(path)
 
 	rules, err := releaserules.NewReleaseRuleReader().Read(rulesPath)
 	if err != nil {
@@ -55,7 +56,7 @@ func main() {
 		logger.Fatalf("failed to create commit analyzer: %s", err)
 	}
 
-	semver, release, err := commitAnalyzer.ComputeNewSemverNumber(r)
+	semver, release, err := commitAnalyzer.ComputeNewSemverNumber(repository)
 	if err != nil {
 		logger.Fatalf("failed to compute semver: %s", err)
 	}
@@ -72,7 +73,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err = tagger.NewTagger(prefix).PushTagToRemote(r, token, semver); err != nil {
+	if err = tagger.NewTagger(prefix).PushTagToRemote(repository, token, semver); err != nil {
 		logger.Fatalf("Failed to push tag: %s", err)
 	}
 
