@@ -98,7 +98,7 @@ jobs:
     - name: Crane Add Latest Tag
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} latest
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} latest -v
 
     - name: Crane Delete Prerelease Tag
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
