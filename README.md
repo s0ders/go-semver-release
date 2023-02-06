@@ -137,6 +137,8 @@ jobs:
         token: ${{ secrets.ACCESS_TOKEN }}
 ```
 
+> **Notes**: `go-semver-release` can only read **annotated** Git tags, so if you plan on only using it in dry-run mode to then use its output to tag your repository with an other action, make sure the tag you are pushing is annotated, otherwise the program will not be able to detect it. This is a temporary limitation.
+
 ## Release Rules
 
 Release rules define which commit type will trigger a release, and what type of release (i.e. major, minor, patch). **By default**, the program applies the following release rules:
