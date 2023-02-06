@@ -42,7 +42,7 @@ jobs:
     - name: Go Test
       run: go test -v ./...
 
-  ko-build:
+  build:
     runs-on: ubuntu-latest
     needs: go-build
     outputs:
@@ -83,7 +83,7 @@ jobs:
         context: .
         file: build/Dockerfile
         push: true
-        tags: soders/go-semver-release:latest${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
+        tags: soders/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
 
     - name: Trivy Scan
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
