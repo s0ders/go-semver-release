@@ -9,6 +9,8 @@ on:
 env:
   KO_DOCKER_REPO: docker.io/soders
   SEMVER_GIT_REPO_URL: https://github.com/s0ders/go-semver-release.git
+  GIT_CI_USERNAME: go-semver-ci
+  GIT_CI_EMAIL: go-semver@release.ci
 
 jobs:
 
@@ -42,7 +44,7 @@ jobs:
     - name: Go Test
       run: go test -v ./...
 
-  build:
+  pre-release-detection:
     runs-on: ubuntu-latest
     needs: go-build
     outputs:
@@ -69,55 +71,62 @@ jobs:
         tag-prefix: 'v'
         dry-run: 'true'
 
+  docker-build-scan-and-sign:
+    runs-on: ubuntu-latest
+    needs: pre-release-detection
+    if: ${{needs.pre-release-detection.outputs.release == 'true'}}
+    steps:
+    - uses: actions/checkout@v3
+
     - name: Docker Build Prerelease
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       uses: docker/build-push-action@v4
       with:
         context: .
         file: build/Dockerfile
         push: true
-        tags: soders/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
+        tags: soders/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}
 
     - name: Trivy Scan
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}'
+        image-ref: '${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
 
+  release-tag:
+    runs-on: ubuntu-latest
+    needs: docker-build-scan-and-sign
+    if: ${{needs.pre-release-detection.outputs.release == 'true'}}
+    steps:
+
     - uses: imjasonh/setup-crane@v0.1
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
     
     - name: Crane Add Release Tag
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} ${{ steps.gosemver.outputs.SEMVER }}
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }} ${{needs.pre-release-detection.outputs.semver}}
     
     - name: Crane Add Latest Tag
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} latest -v
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }} latest -v
 
     - name: Crane Delete Prerelease Tag
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }} -v
+      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }} -v
 
     - name: Install Cosign
       uses: sigstore/cosign-installer@main
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
 
     - name: Sign Artifacts
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       run: |
-        cosign sign --key env://COSIGN_PRIVATE_KEY -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{ steps.gosemver.outputs.SEMVER }}
+        cosign sign --key env://COSIGN_PRIVATE_KEY -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}
       env:
         COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
         COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
 
+    - name: Git Configuration
+      run: git config --global user.email "${{ env.GIT_CI_EMAIL }}" && git config --global user.name "${{ env.GIT_CI_NAME }}"
+
     - name: Push Semver Tag
-      if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: git tag -a ${{ steps.gosemver.outputs.SEMVER }} -m "${{ steps.gosemver.outputs.SEMVER }}" && git push origin ${{ steps.gosemver.outputs.SEMVER }}
+      run: git tag -a ${{needs.pre-release-detection.outputs.semver}} -m "${{needs.pre-release-detection.outputs.semver}}" && git push origin ${{needs.pre-release-detection.outputs.semver}}
