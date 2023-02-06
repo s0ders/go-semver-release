@@ -10,7 +10,6 @@ Go program designed to automate versioning of Git repository by analyzing their 
     <li><a href="#Usage">Usage</a></li>
     <li><a href="#github-actions">Github Actions</a></li>
     <li><a href="#release-rules">Release Rules</a></li>
-    <li><a href="#SLSA">SLSA</a></li>
 </ul>
 
 
@@ -169,14 +168,4 @@ You can define custom release rules to suit your needs using a JSON file and by 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
-
-
-
-## SLSA
-
-This project follows the [**Supply chain Levels for Software Artifacts**](https://slsa.dev/) framework so that you do not have to worry about this tool introducing vulnerabilities in your CI environment. Aiming to provide a level 3 SLSA, this means that :
-
-- all commits are signed;
-- all artifacts and their SBOM are signed;
-- artifacts are scanned for vulnerabilities before being released.
 
