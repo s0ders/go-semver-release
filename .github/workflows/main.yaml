@@ -94,7 +94,7 @@ jobs:
         exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
-        severity: 'CRITICAL,HIGH'
+        severity: 'CRITICAL,HIGH,MEDIUM'
 
   sign-and-release-tag:
     runs-on: ubuntu-latest
@@ -119,10 +119,10 @@ jobs:
     
     - name: Crane Add Latest Tag
       run: |
-        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }} latest -v
+        crane tag ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }} latest
 
     - name: Crane Delete Prerelease Tag
-      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }} -v
+      run: crane delete ${{ env.KO_DOCKER_REPO }}/go-semver-release:${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}
 
     - name: Install Cosign
       uses: sigstore/cosign-installer@main
