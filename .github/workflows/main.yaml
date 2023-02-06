@@ -62,7 +62,7 @@ jobs:
         tag-prefix: 'v'
         dry-run: 'true'
 
-  docker-build-scan-and-sign:
+  docker-build-and-scan:
     runs-on: ubuntu-latest
     needs: pre-release-detection
     if: ${{needs.pre-release-detection.outputs.release == 'true'}}
@@ -96,10 +96,10 @@ jobs:
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
 
-  release-tag:
+  sign-and-release-tag:
     runs-on: ubuntu-latest
     needs: 
-      - docker-build-scan-and-sign
+      - docker-build-and-scan
       - pre-release-detection
     if: ${{needs.pre-release-detection.outputs.release == 'true'}}
     steps:
@@ -135,7 +135,7 @@ jobs:
         COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
 
     - name: Git Configuration
-      run: git config --global user.email "${{ env.GIT_CI_EMAIL }}" && git config --global user.name "${{ env.GIT_CI_NAME }}"
+      run: git config --global user.email "${{ env.GIT_CI_EMAIL }}" && git config --global user.name "${{ env.GIT_CI_USERNAME }}"
 
     - name: Push Semver Tag
       run: git tag -a ${{needs.pre-release-detection.outputs.semver}} -m "${{needs.pre-release-detection.outputs.semver}}" && git push origin ${{needs.pre-release-detection.outputs.semver}}
