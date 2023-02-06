@@ -69,13 +69,6 @@ jobs:
         tag-prefix: 'v'
         dry-run: 'true'
 
-    # - uses: ko-build/setup-ko@v0.6
-    #   if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-
-    # - name: Ko Build Prerelease
-    #   if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-    #   run: cd ./cmd/go-semver-release && ko build -B --platform linux/amd64 --tags ${{ steps.gosemver.outputs.SEMVER }}-${{ github.sha }}
-
     - name: Docker Build Prerelease
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
       uses: docker/build-push-action@v4
@@ -127,4 +120,4 @@ jobs:
 
     - name: Push Semver Tag
       if: ${{ steps.gosemver.outputs.NEW_RELEASE == 'true' }}
-      run: git tag ${{ steps.gosemver.outputs.SEMVER }} && git push origin ${{ steps.gosemver.outputs.SEMVER }}
+      run: git tag -a ${{ steps.gosemver.outputs.SEMVER }} -m "${{ steps.gosemver.outputs.SEMVER }}" && git push origin ${{ steps.gosemver.outputs.SEMVER }}
