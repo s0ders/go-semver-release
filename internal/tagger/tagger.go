@@ -27,7 +27,7 @@ type Tagger struct {
 }
 
 func NewTagger(tagPrefix string) *Tagger {
-	logger := log.New(os.Stdout, "tagger", log.Default().Flags())
+	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[tagger]"), log.Default().Flags())
 	return &Tagger{
 		logger:    logger,
 		tagPrefix: tagPrefix,

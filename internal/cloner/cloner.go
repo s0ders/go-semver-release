@@ -15,7 +15,7 @@ type Cloner struct {
 }
 
 func NewCloner() Cloner {
-	logger := log.New(os.Stdout, "cloner", log.Default().Flags())
+	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[cloner]"), log.Default().Flags())
 
 	return Cloner{
 		l: logger,

@@ -1,6 +1,7 @@
 package releaserules
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -14,7 +15,7 @@ type ReleaseRuleReader struct {
 }
 
 func NewReleaseRuleReader() ReleaseRuleReader {
-	logger := log.New(os.Stdout, "release-rule-reader", log.Default().Flags())
+	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[releas-rule-reader]"), log.Default().Flags())
 	return ReleaseRuleReader{
 		l: logger,
 	}

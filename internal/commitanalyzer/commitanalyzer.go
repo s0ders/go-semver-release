@@ -37,7 +37,7 @@ type CommitAnalyzer struct {
 }
 
 func NewCommitAnalyzer(releaseRulesReader io.Reader) (*CommitAnalyzer, error) {
-	logger := log.New(os.Stdout, "commit-analyzer", log.Default().Flags())
+	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[commit-analyzer]"), log.Default().Flags())
 	releaseRules, err := ParseReleaseRules(releaseRulesReader)
 	if err != nil {
 		return nil, fmt.Errorf("NewCommitAnalyzer: failed parsing release rules: %w", err)
