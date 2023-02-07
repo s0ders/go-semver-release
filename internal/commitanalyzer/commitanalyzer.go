@@ -176,7 +176,6 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 			c.logger.Printf("no release to apply")
 		}
 		c.logger.Printf("version is now %s", semver)
-		break
 
 	}
 
