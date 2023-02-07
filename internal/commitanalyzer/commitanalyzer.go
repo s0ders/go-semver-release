@@ -96,7 +96,7 @@ func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 	return latestSemverTag, nil
 }
 
-func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository) (*semver.Semver, bool, error) {
+func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
 
 	latestSemverTag, err := c.fetchLatestSemverTag(r)
 	if err != nil {
@@ -132,6 +132,8 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository) (*semver.Semv
 		history[i], history[j] = history[j], history[i]
 	}
 
+	rulesMap := c.releaseRules.Map()
+
 	for _, commit := range history {
 
 		if !conventionalCommitRegex.MatchString(commit.Message) {
@@ -151,30 +153,30 @@ func (c *CommitAnalyzer) ComputeNewSemverNumber(r *git.Repository) (*semver.Semv
 			break
 		}
 
-		for _, rule := range c.releaseRules.Rules {
-			if commitType != rule.CommitType {
-				continue
-			}
+		releaseType, commitMatchesARule := rulesMap[commitType]
 
-			switch rule.ReleaseType {
-			case "patch":
-				c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
-				semver.BumpPatch()
-				newRelease = true
-			case "minor":
-				c.logger.Printf("(%s) minor: \"%s\"", shortHash, shortMessage)
-				semver.BumpMinor()
-				newRelease = true
-			case "major":
-				c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
-				semver.BumpMajor()
-				newRelease = true
-			default:
-				c.logger.Printf("no release to apply")
-			}
-			c.logger.Printf("version is now %s", semver)
-			break
+		if !commitMatchesARule {
+			continue
 		}
+
+		switch releaseType {
+		case "patch":
+			c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
+			semver.BumpPatch()
+			newRelease = true
+		case "minor":
+			c.logger.Printf("(%s) minor: \"%s\"", shortHash, shortMessage)
+			semver.BumpMinor()
+			newRelease = true
+		case "major":
+			c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
+			semver.BumpMajor()
+			newRelease = true
+		default:
+			c.logger.Printf("no release to apply")
+		}
+		c.logger.Printf("version is now %s", semver)
+		break
 
 	}
 

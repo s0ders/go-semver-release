@@ -26,6 +26,14 @@ type ReleaseRules struct {
 	Rules []ReleaseRule `json:"releaseRules" validate:"required"`
 }
 
+func (r *ReleaseRules) Map() map[string]string {
+	m := make(map[string]string)
+	for _, rule := range r.Rules {
+		m[rule.CommitType] = rule.ReleaseType
+	}
+	return m
+}
+
 func NewReleaseRuleReader() *ReleaseRuleReader {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[releas-rule-reader]"), log.Default().Flags())
 	return &ReleaseRuleReader{

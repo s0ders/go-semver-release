@@ -223,7 +223,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 
 	ca := NewCommitAnalyzer(rules)
 
-	version, _, err := ca.ComputeNewSemverNumber(r)
+	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -255,7 +255,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 
 	ca := NewCommitAnalyzer(rules)
 
-	version, _, err := ca.ComputeNewSemverNumber(r)
+	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -287,7 +287,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 
 	ca := NewCommitAnalyzer(rules)
 
-	version, _, err := ca.ComputeNewSemverNumber(r)
+	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
@@ -319,7 +319,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 
 	ca := NewCommitAnalyzer(rules)
 
-	version, newRelease, err := ca.ComputeNewSemverNumber(r)
+	version, newRelease, err := ca.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}

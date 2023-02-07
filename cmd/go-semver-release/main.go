@@ -51,7 +51,7 @@ func main() {
 		logger.Fatalf("failed to parse rules: %s", err)
 	}
 
-	semver, release, err := commitanalyzer.NewCommitAnalyzer(rules).ComputeNewSemverNumber(repository)
+	semver, release, err := commitanalyzer.NewCommitAnalyzer(rules).ComputeNewSemver(repository)
 	if err != nil {
 		logger.Fatalf("failed to compute semver: %s", err)
 	}
