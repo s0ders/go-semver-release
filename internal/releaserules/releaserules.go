@@ -34,8 +34,9 @@ func NewReleaseRuleReader() *ReleaseRuleReader {
 }
 
 func (r *ReleaseRuleReader) Read(path string) *ReleaseRuleReader {
-	if path == "" {
+	if len(path) == 0 {
 		r.reader = strings.NewReader(helpers.DefaultReleaseRules)
+		return r
 	}
 
 	reader, err := os.Open(path)
