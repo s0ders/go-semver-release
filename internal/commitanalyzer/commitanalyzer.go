@@ -150,7 +150,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 			c.logger.Printf("(%s) breaking change", shortHash)
 			semver.BumpMajor()
 			newRelease = true
-			break
+			continue
 		}
 
 		releaseType, commitMatchesARule := rulesMap[commitType]
