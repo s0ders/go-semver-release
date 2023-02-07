@@ -155,4 +155,4 @@ jobs:
       run: sed -E -e 's/s0ders\/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/s0ders\/go-semver-release@${{needs.pre-release-detection.outputs.semver}}/' README.md > README.md
 
     - name: Push Docs Update
-      run: git commit -A -m "[ci] updated version in documentation" && git push origin
+      run: git commit -a -m "[ci] updated version in documentation" && git push origin
