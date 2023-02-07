@@ -133,9 +133,26 @@ jobs:
       env:
         COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
         COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
+        
+    - name: Import GPG key
+      uses: crazy-max/ghaction-import-gpg@v5
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        git_user_signingkey: true
+        git_commit_gpgsign: true
+        git_tag_gpgsign: true
 
     - name: Git Configuration
-      run: git config --global user.email "${{ env.GIT_CI_EMAIL }}" && git config --global user.name "${{ env.GIT_CI_USERNAME }}"
+      run: git config --global user.email "${{ env.GIT_CI_EMAIL }}" && git config --global user.name "${{ env.GIT_CI_USERNAME }} && git config --global commit.gpgsign true"
 
     - name: Push Semver Tag
       run: git tag -a ${{needs.pre-release-detection.outputs.semver}} -m "${{needs.pre-release-detection.outputs.semver}}" && git push origin ${{needs.pre-release-detection.outputs.semver}}
+
+    - name: Update Docker Image Version In Documentation
+      run: sed -E -e -i 's/soders\/go-semver-release:v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/soders\/go-semver-release:${{needs.pre-release-detection.outputs.semver}}/' README.md 
+
+    - name: Update Go Module Version In Documentation
+      run: sed -E -e -i 's/s0ders\/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/s0ders\/go-semver-release@${{needs.pre-release-detection.outputs.semver}}/' README.md
+
+    - name: Push Docs Update
+      run: git commit -A -m "[ci] updated version in documentation" && git push origin
