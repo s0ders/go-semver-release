@@ -27,7 +27,7 @@ This tool aims to integrate semantic versioning automation in such a way that, a
 
 - Take care to format commits on that branch by following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, which many IDEs plugins offers to do seamlessly (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
 
-
+> **Note**: `go-semver-release` can only read **annotated** Git tags, so if you plan on only using it in dry-run mode to then use its output to tag your repository with an other action, make sure the tag you are pushing is annotated, otherwise the program will not be able to detect it.
 
 ## Install
 
@@ -135,8 +135,6 @@ jobs:
         dry-run: 'false'
         token: ${{ secrets.ACCESS_TOKEN }}
 ```
-
-> **Note**: `go-semver-release` can only read **annotated** Git tags, so if you plan on only using it in dry-run mode to then use its output to tag your repository with an other action, make sure the tag you are pushing is annotated, otherwise the program will not be able to detect it. This is a temporary limitation.
 
 ## Release Rules
 
