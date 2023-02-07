@@ -149,10 +149,10 @@ jobs:
       run: git tag -a ${{needs.pre-release-detection.outputs.semver}} -m "${{needs.pre-release-detection.outputs.semver}}" && git push origin ${{needs.pre-release-detection.outputs.semver}}
 
     - name: Update Docker Image Version In Documentation
-      run: sed -E -e 's/soders\/go-semver-release:v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/soders\/go-semver-release:${{needs.pre-release-detection.outputs.semver}}/' README.md > README.md
+      run: sed -i -e 's/soders\/go-semver-release:v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/soders\/go-semver-release:${{needs.pre-release-detection.outputs.semver}}/' README.md
 
     - name: Update Go Module Version In Documentation
-      run: sed -E -e 's/s0ders\/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/s0ders\/go-semver-release@${{needs.pre-release-detection.outputs.semver}}/' README.md > README.md
+      run: sed -i -e 's/s0ders\/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/s0ders\/go-semver-release@${{needs.pre-release-detection.outputs.semver}}/' README.md
 
     - name: Push Docs Update
       run: git commit -a -m "[ci] updated version in documentation" && git push origin
