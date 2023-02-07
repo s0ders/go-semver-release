@@ -46,17 +46,12 @@ func main() {
 	repository, path := cloner.NewCloner().Clone(gitUrl, releaseBranch, token)
 	defer os.RemoveAll(path)
 
-	rules, err := releaserules.NewReleaseRuleReader().Read(rulesPath)
+	rules, err := releaserules.NewReleaseRuleReader().Read(rulesPath).Parse()
 	if err != nil {
-		logger.Fatalf("failed to parse release rules: %s", err)
+		logger.Fatalf("failed to parse rules: %s", err)
 	}
 
-	commitAnalyzer, err := commitanalyzer.NewCommitAnalyzer(rules)
-	if err != nil {
-		logger.Fatalf("failed to create commit analyzer: %s", err)
-	}
-
-	semver, release, err := commitAnalyzer.ComputeNewSemverNumber(repository)
+	semver, release, err := commitanalyzer.NewCommitAnalyzer(rules).ComputeNewSemverNumber(repository)
 	if err != nil {
 		logger.Fatalf("failed to compute semver: %s", err)
 	}

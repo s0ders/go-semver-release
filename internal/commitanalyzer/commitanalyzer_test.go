@@ -10,16 +10,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-)
-
-var (
-	defaultReleaseRules = `{
-		"releaseRules": [
-			{"type": "feat", "release": "minor"},
-			{"type": "perf", "release": "minor"},
-			{"type": "fix", "release": "patch"}
-		]
-	}`
+	"github.com/s0ders/go-semver-release/internal/releaserules"
 )
 
 func TestCommitTypeRegex(t *testing.T) {
@@ -65,42 +56,37 @@ func TestBreakingChangeRegex(t *testing.T) {
 	}
 }
 
-func TestNewCommitAnalyzer(t *testing.T) {
-	if _, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules)); err != nil {
-		t.Fatalf("failed to created new commit analyzer: %s", err)
-	}
-}
+// TODO: move this to reader_test.go
+// func TestParseReleaseRules(t *testing.T) {
 
-func TestParseReleaseRules(t *testing.T) {
+// 	releaseRules, err := ParseReleaseRules(strings.NewReader(defaultReleaseRules))
+// 	if err != nil {
+// 		t.Fatalf("failed to parse release rules: %s", err)
+// 	}
 
-	releaseRules, err := ParseReleaseRules(strings.NewReader(defaultReleaseRules))
-	if err != nil {
-		t.Fatalf("failed to parse release rules: %s", err)
-	}
+// 	type test struct {
+// 		commitType  string
+// 		releaseType string
+// 	}
 
-	type test struct {
-		commitType  string
-		releaseType string
-	}
+// 	matrix := []test{
+// 		{"feat", "minor"},
+// 		{"perf", "minor"},
+// 		{"fix", "patch"},
+// 	}
 
-	matrix := []test{
-		{"feat", "minor"},
-		{"perf", "minor"},
-		{"fix", "patch"},
-	}
+// 	for i := 0; i < len(releaseRules.Rules); i++ {
+// 		got := releaseRules.Rules[i]
+// 		want := matrix[i]
 
-	for i := 0; i < len(releaseRules.Rules); i++ {
-		got := releaseRules.Rules[i]
-		want := matrix[i]
-
-		if got.CommitType != want.commitType {
-			t.Fatalf("got: %s want: %s", got.CommitType, want.commitType)
-		}
-		if got.ReleaseType != want.releaseType {
-			t.Fatalf("got: %s want: %s", got.ReleaseType, want.releaseType)
-		}
-	}
-}
+// 		if got.CommitType != want.commitType {
+// 			t.Fatalf("got: %s want: %s", got.CommitType, want.commitType)
+// 		}
+// 		if got.ReleaseType != want.releaseType {
+// 			t.Fatalf("got: %s want: %s", got.ReleaseType, want.releaseType)
+// 		}
+// 	}
+// }
 
 func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 
@@ -111,10 +97,12 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 
 	defer os.RemoveAll(repositoryPath)
 
-	commitAnalyzer, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	commitAnalyzer := NewCommitAnalyzer(rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -152,10 +140,12 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 		},
 	})
 
-	commitAnalyzer, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	commitAnalyzer := NewCommitAnalyzer(rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -195,10 +185,12 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		})
 	}
 
-	commitAnalyzer, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	commitAnalyzer := NewCommitAnalyzer(rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -224,10 +216,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	ca := NewCommitAnalyzer(rules)
 
 	version, _, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
@@ -254,10 +248,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	ca := NewCommitAnalyzer(rules)
 
 	version, _, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
@@ -284,10 +280,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	ca := NewCommitAnalyzer(rules)
 
 	version, _, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
@@ -314,10 +312,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 		t.Fatalf("failed to fetch head: %s", err)
 	}
 
-	ca, err := NewCommitAnalyzer(strings.NewReader(defaultReleaseRules))
+	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create commit analyzer: %s", err)
+		t.Fatalf("failed to create rules: %s", err)
 	}
+
+	ca := NewCommitAnalyzer(rules)
 
 	version, newRelease, err := ca.ComputeNewSemverNumber(r)
 	if err != nil {
