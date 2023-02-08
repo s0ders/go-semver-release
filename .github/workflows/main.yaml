@@ -167,8 +167,8 @@ jobs:
 
     - name: Update version tag in documentation
       run: |
-        sed -E 's/soders\/go-semver-release:v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/soders\/go-semver-release:${{ env.RELEASE_TAG }}/' -i README.md
-        sed -E 's/s0ders\/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/s0ders\/go-semver-release@${{ env.RELEASE_TAG }}/' -i README.md
+        sed -E 's/go-semver-release:v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/go-semver-release:${{ env.RELEASE_TAG }}/' -i README.md
+        sed -E 's/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/go-semver-release@${{ env.RELEASE_TAG }}/' -i README.md
 
     - name: Push documentation update
       run: |
