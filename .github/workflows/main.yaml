@@ -85,7 +85,7 @@ jobs:
         context: .
         file: build/Dockerfile
         push: true
-        tags: soders/go-semver-release:$PRERELEASE_TAG
+        tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
 
     - name: Trivy Scan
       uses: aquasecurity/trivy-action@master
