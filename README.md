@@ -41,14 +41,14 @@ $ go-semver-release --help
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release:v1.4.6
+$ docker pull soders/go-semver-release:v1.5.0
 $ docker run --rm soders/go-semver-release --help
 ```
 
 Verify that the downloaded image has not be tampered using [Cosign](https://github.com/sigstore/cosign):
 ```bash
 $ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
-$ cosign verify --key $PUB_KEY soders/go-semver-release:v1.4.6
+$ cosign verify --key $PUB_KEY soders/go-semver-release:v1.5.0
 ```
 
 
@@ -127,7 +127,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Semver Release
-      uses: s0ders/go-semver-release@v1.4.6
+      uses: s0ders/go-semver-release@v1.5.0
       with:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
