@@ -5,7 +5,7 @@
 Go program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging them with the right semver number. This program can be used directly via its CLI or its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
 
 <ul>
-    <li><a href="#Motivations">Motivations</a></li>
+    <li><a href="#Motivation">Motivation</a></li>
     <li><a href="#Install">Install</a></li>
     <li><a href="#Usage">Usage</a></li>
     <li><a href="#github-actions">Github Actions</a></li>
