@@ -31,6 +31,7 @@ func NewCommitAnalyzer(releaseRules *releaserules.ReleaseRules, verbose bool) *C
 	return &CommitAnalyzer{
 		logger:       logger,
 		releaseRules: releaseRules,
+		verbose: verbose,
 	}
 }
 
