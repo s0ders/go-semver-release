@@ -1,4 +1,4 @@
-<img alt="go version badge" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"> <img alt="github actions badge" src="https://github.com/s0ders/go-semver-release/actions/workflows/main.yaml/badge.svg"> <img alt="go report card" src="http://goreportcard.com/badge/github.com/s0ders/go-semver-release"> <img alt="license badge" src="https://img.shields.io/github/license/s0ders/go-semver-release"> <img alt="gitleaks badge" src="https://img.shields.io/badge/protected%20by-gitleaks-blue"> 
+<img alt="go version badge" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"> <img alt="github actions badge" src="https://github.com/s0ders/go-semver-release/actions/workflows/main.yaml/badge.svg"> <img alt="go report card" src="http://goreportcard.com/badge/github.com/s0ders/go-semver-release"> <img alt="license badge" src="https://img.shields.io/github/license/s0ders/go-semver-release">
 
 # Go SemVer Release
 
@@ -34,14 +34,14 @@ This tool aims to integrate semantic versioning automation in such a way that, a
 If [Go](https://go.dev) is installed on your machine, you can install from source using `go install`:
 
 ```bash
-$ go install github.com/s0ders/go-semver-release/cmd/go-semver-release@latest
+$ go install github.com/s0ders/go-semver-release/cmd/go-semver-release@v1.4.6
 $ go-semver-release --help
 ```
 
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release
+$ docker pull soders/go-semver-release:v1.4.6
 $ docker run --rm soders/go-semver-release --help
 ```
 
