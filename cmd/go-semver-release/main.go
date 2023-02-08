@@ -21,6 +21,7 @@ var (
 	prefix        string
 	releaseBranch string
 	dryrunFlag    string
+	verbose       string
 )
 
 func main() {
@@ -32,6 +33,7 @@ func main() {
 	flag.StringVar(&prefix, "tag-prefix", "", "A prefix to append to the semantic version number used to name tag (e.g. 'v') and used to match existing tags on remote")
 	flag.StringVar(&releaseBranch, "branch", "", "The branch to check commit history from (e.g. \"main\", \"master\", \"release\"), will default to the branch pointed by HEAD if empty")
 	flag.StringVar(&dryrunFlag, "dry-run", "false", "Enable dry-run which only computes the next semantic version for a repository, no tags are pushed")
+	flag.StringVar(&verbose, "verbose", "false", "If set to true, show a log for each commit that triggered a new release and the release type, default to false")
 	flag.Parse()
 
 	if gitUrl == "" {
@@ -40,7 +42,12 @@ func main() {
 
 	dryrun, err := strconv.ParseBool(dryrunFlag)
 	if err != nil {
-		logger.Fatalf("failed to parse --dry-run value")
+		logger.Fatalf("failed to parse --dry-run")
+	}
+
+	verbose, err := strconv.ParseBool(verbose)
+	if err != nil {
+		logger.Fatalf("failed to parse --verbose")
 	}
 
 	repository, path := cloner.NewCloner().Clone(gitUrl, releaseBranch, token)
@@ -51,7 +58,7 @@ func main() {
 		logger.Fatalf("failed to parse rules: %s", err)
 	}
 
-	semver, release, err := commitanalyzer.NewCommitAnalyzer(rules).ComputeNewSemver(repository)
+	semver, release, err := commitanalyzer.NewCommitAnalyzer(rules, verbose).ComputeNewSemver(repository)
 	if err != nil {
 		logger.Fatalf("failed to compute semver: %s", err)
 	}

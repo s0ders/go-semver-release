@@ -22,9 +22,10 @@ var (
 type CommitAnalyzer struct {
 	logger       *log.Logger
 	releaseRules *releaserules.ReleaseRules
+	verbose      bool
 }
 
-func NewCommitAnalyzer(releaseRules *releaserules.ReleaseRules) *CommitAnalyzer {
+func NewCommitAnalyzer(releaseRules *releaserules.ReleaseRules, verbose bool) *CommitAnalyzer {
 	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[commit-analyzer]"), log.Default().Flags())
 
 	return &CommitAnalyzer{
@@ -104,6 +105,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 	}
 
 	newRelease := false
+	newReleaseType := ""
 	semver, err := semver.NewSemverFromGitTag(latestSemverTag)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
@@ -161,22 +163,28 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 
 		switch releaseType {
 		case "patch":
-			c.logger.Printf("(%s) patch: \"%s\"", shortHash, shortMessage)
 			semver.BumpPatch()
 			newRelease = true
+			newReleaseType = "patch"
 		case "minor":
-			c.logger.Printf("(%s) minor: \"%s\"", shortHash, shortMessage)
 			semver.BumpMinor()
 			newRelease = true
+			newReleaseType = "minor"
 		case "major":
-			c.logger.Printf("(%s) major: \"%s\"", shortHash, shortMessage)
 			semver.BumpMajor()
 			newRelease = true
+			newReleaseType = "major"
 		default:
 			c.logger.Fatalf("found a rule but no associated release type")
 		}
-		c.logger.Printf("version is now %s", semver)
+
+		if newRelease && c.verbose {
+			c.logger.Printf("(%s) %s: \"%s\"", shortHash, newReleaseType, shortMessage)
+		}
+
 	}
+
+	c.logger.Printf("version is now %s", semver)
 
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
