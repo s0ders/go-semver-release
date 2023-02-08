@@ -102,7 +102,7 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	commitAnalyzer := NewCommitAnalyzer(rules)
+	commitAnalyzer := NewCommitAnalyzer(rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -145,7 +145,7 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	commitAnalyzer := NewCommitAnalyzer(rules)
+	commitAnalyzer := NewCommitAnalyzer(rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -190,7 +190,7 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	commitAnalyzer := NewCommitAnalyzer(rules)
+	commitAnalyzer := NewCommitAnalyzer(rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -221,7 +221,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules)
+	ca := NewCommitAnalyzer(rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -253,7 +253,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules)
+	ca := NewCommitAnalyzer(rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -285,7 +285,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules)
+	ca := NewCommitAnalyzer(rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -319,7 +319,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 		t.Fatalf("failed to create rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules)
+	ca := NewCommitAnalyzer(rules, true)
 
 	version, newRelease, err := ca.ComputeNewSemver(r)
 	if err != nil {
