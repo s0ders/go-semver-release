@@ -141,9 +141,10 @@ jobs:
         COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
         COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
       run: |
+        SBOM_TAG=$(crane digest ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }} | sed -e 's/:/-/')
         cosign sign --key env://COSIGN_PRIVATE_KEY -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }}
         cosign attach sbom --sbom ${{ env.SBOM_FILE }} ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }}
-        cosign sign --key env://COSIGN_PRIVATE_KEY ${{ env.DOCKER_IMAGE }}:sha256-$(crane digest ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }}).sbom
+        cosign sign --key env://COSIGN_PRIVATE_KEY ${{ env.DOCKER_IMAGE }}:$SBOM_TAG.sbom
         
     - name: Import GPG key
       uses: crazy-max/ghaction-import-gpg@v5
