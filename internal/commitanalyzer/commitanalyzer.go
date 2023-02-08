@@ -186,8 +186,8 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 }
 
 func (c *CommitAnalyzer) shortMessage(message string) string {
-	if len(message) > 60 {
-		return fmt.Sprintf("%s...", message[0:57])
+	if len(message) > 50 {
+		return fmt.Sprintf("%s...", message[0:47])
 	}
 
 	return message[0 : len(message)-1]
