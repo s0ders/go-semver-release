@@ -173,10 +173,9 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 			semver.BumpMajor()
 			newRelease = true
 		default:
-			c.logger.Printf("no release to apply")
+			c.logger.Fatalf("found a rule but no associated release type")
 		}
 		c.logger.Printf("version is now %s", semver)
-
 	}
 
 	if err != nil {
