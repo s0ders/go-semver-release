@@ -308,6 +308,8 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 
 	defer os.RemoveAll(repositoryPath)
 
+	addCommit(r, "fix: added hello feature")
+
 	if err != nil {
 		t.Fatalf("failed to fetch head: %s", err)
 	}
@@ -324,7 +326,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 		t.Fatalf("failed to compute new semver number: %s", err)
 	}
 
-	want := "1.0.0"
+	want := "1.0.1"
 
 	if got := version.String(); got != want {
 		t.Fatalf("got: %s want: %s", got, want)
@@ -387,4 +389,49 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 	}
 
 	return r, tempDirPath, nil
+}
+
+func addCommit(r *git.Repository, message string) error {
+	w, err := r.Worktree()
+	if err != nil {
+		return fmt.Errorf("could not get worktree: %w", err)
+	}
+
+	tempDirPath, err := os.MkdirTemp("", "commit-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	defer os.RemoveAll(tempDirPath)
+
+	tempFileName := "temp"
+	tempFilePath := filepath.Join(tempDirPath, tempFileName)
+	_, err = os.Create(tempFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write to temp file: %w", err)
+	}
+
+	_, err = w.Add(tempFileName)
+	if err != nil {
+		return fmt.Errorf("failed to add temp file to worktree: %w", err)
+	}
+
+	_, err = w.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Go Semver Release",
+			Email: "go-semver-release@ci.go",
+			When:  time.Now(),
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create commit: %w", err)
+	}
+
+	return nil
 }
