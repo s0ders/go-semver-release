@@ -48,7 +48,7 @@ $ docker run --rm soders/go-semver-release --help
 Verify that the downloaded image has not be tampered using [Cosign](https://github.com/sigstore/cosign):
 ```bash
 $ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
-$ cosign verify --key $PUB_KEY soders/go-semver-release:vX.Y.Z
+$ cosign verify --key $PUB_KEY soders/go-semver-release:v1.4.5
 ```
 
 
@@ -127,7 +127,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Semver Release
-      uses: s0ders/go-semver-release@v1.3.3
+      uses: s0ders/go-semver-release@v1.4.5
       with:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
