@@ -56,38 +56,6 @@ func TestBreakingChangeRegex(t *testing.T) {
 	}
 }
 
-// TODO: move this to reader_test.go
-// func TestParseReleaseRules(t *testing.T) {
-
-// 	releaseRules, err := ParseReleaseRules(strings.NewReader(defaultReleaseRules))
-// 	if err != nil {
-// 		t.Fatalf("failed to parse release rules: %s", err)
-// 	}
-
-// 	type test struct {
-// 		commitType  string
-// 		releaseType string
-// 	}
-
-// 	matrix := []test{
-// 		{"feat", "minor"},
-// 		{"perf", "minor"},
-// 		{"fix", "patch"},
-// 	}
-
-// 	for i := 0; i < len(releaseRules.Rules); i++ {
-// 		got := releaseRules.Rules[i]
-// 		want := matrix[i]
-
-// 		if got.CommitType != want.commitType {
-// 			t.Fatalf("got: %s want: %s", got.CommitType, want.commitType)
-// 		}
-// 		if got.ReleaseType != want.releaseType {
-// 			t.Fatalf("got: %s want: %s", got.ReleaseType, want.releaseType)
-// 		}
-// 	}
-// }
-
 func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")

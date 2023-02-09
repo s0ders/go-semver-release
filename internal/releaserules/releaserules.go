@@ -52,6 +52,10 @@ func (r *ReleaseRuleReader) Read(path string) *ReleaseRuleReader {
 		r.logger.Fatalf("failed to open rules file: %s", err)
 	}
 
+	return r.setReader(reader)
+}
+
+func (r *ReleaseRuleReader) setReader(reader io.Reader) *ReleaseRuleReader {
 	r.reader = reader
 	return r
 }
