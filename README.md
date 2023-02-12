@@ -50,7 +50,7 @@ Verify that the downloaded image has not be tampered using [Cosign](https://gith
 $ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
 $ cosign verify --key $PUB_KEY soders/go-semver-release:v1.5.1
 ```
-
+Each Docker image comes with a corresponding SBOM (SPDX format) also signed using the same key-pair.
 
 ## Prerequisites
 
