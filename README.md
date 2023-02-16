@@ -150,7 +150,7 @@ Release rules define which commit type will trigger a release, and what type of 
 }
 ```
 
-You can define custom release rules to suit your needs using a JSON file and by passing it to the program as bellow. Be careful with release rules though, especially major ones, as their misuse might can easily make you loose the benefits of using a semantic version number.
+You can define custom release rules to suit your needs using a JSON file and by passing it to the program as bellow. Be careful with release rules though, especially major ones, as their misuse might easily make you loose the benefits of using a semantic version number.
 
 ```json
 {
