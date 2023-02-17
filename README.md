@@ -34,21 +34,21 @@ This tool aims to integrate semantic versioning automation in such a way that, a
 If [Go](https://go.dev) is installed on your machine, you can install from source using `go install`:
 
 ```bash
-$ go install github.com/s0ders/go-semver-release/cmd/go-semver-release@v1.5.1
+$ go install github.com/s0ders/go-semver-release/cmd/go-semver-release@v1.5.2
 $ go-semver-release --help
 ```
 
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release@sha256:3d73f9c53bf00a00ebb56b391b18ad9bf8053c14015ac5a86dcbe9a03df6a8a3
+$ docker pull soders/go-semver-release@
 $ docker run --rm soders/go-semver-release --help
 ```
 
 Verify that the downloaded image has not be tampered using [Cosign](https://github.com/sigstore/cosign):
 ```bash
 $ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
-$ cosign verify --key $PUB_KEY soders/go-semver-release@sha256:3d73f9c53bf00a00ebb56b391b18ad9bf8053c14015ac5a86dcbe9a03df6a8a3
+$ cosign verify --key $PUB_KEY soders/go-semver-release@
 ```
 Each Docker image comes with a corresponding SBOM (SPDX format) also signed using the same key-pair.
 
@@ -133,7 +133,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Semver Release
-      uses: s0ders/go-semver-release@v1.5.1
+      uses: s0ders/go-semver-release@v1.5.2
       with:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
