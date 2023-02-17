@@ -41,14 +41,14 @@ $ go-semver-release --help
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release:v1.5.1
+$ docker pull soders/go-semver-release@sha256:3d73f9c53bf00a00ebb56b391b18ad9bf8053c14015ac5a86dcbe9a03df6a8a3
 $ docker run --rm soders/go-semver-release --help
 ```
 
 Verify that the downloaded image has not be tampered using [Cosign](https://github.com/sigstore/cosign):
 ```bash
 $ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
-$ cosign verify --key $PUB_KEY soders/go-semver-release:v1.5.1
+$ cosign verify --key $PUB_KEY soders/go-semver-release@sha256:3d73f9c53bf00a00ebb56b391b18ad9bf8053c14015ac5a86dcbe9a03df6a8a3
 ```
 Each Docker image comes with a corresponding SBOM (SPDX format) also signed using the same key-pair.
 
