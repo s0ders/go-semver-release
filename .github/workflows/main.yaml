@@ -68,8 +68,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: pre-release-detection
     if: ${{needs.pre-release-detection.outputs.release == 'true'}}
-    outputs:
-      image-hash: ${{ steps.compute-hash.outputs.IMAGE_HASH }}
     env:
       PRERELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}
     steps:
@@ -92,12 +90,6 @@ jobs:
         push: true
         tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
 
-    - name: Compute image SHA256 hash
-      id: compute-hash
-      run: |
-        HASH=$(docker inspect --format='{{index .RepoDigests 0}}' soders/go-semver-release:${{ env.PRERELEASE_TAG }} | awk 'BEGIN{FS="@"} { print $2 }')
-        echo "IMAGE_HASH=$HASH" >> "$GITHUB_OUTPUT"
-
     - name: Trivy Scan
       uses: aquasecurity/trivy-action@master
       with:
@@ -117,7 +109,6 @@ jobs:
     env:
       PRERELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}
       RELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}
-      IMAGE_HASH: ${{needs.docker-build-and-scan.outputs.image-hash}}
     steps:
     - uses: actions/checkout@v3
 
@@ -180,7 +171,8 @@ jobs:
 
     - name: Update docker image hash
       run: |
-        sed -E 's/go-semver-release@sha256:[0-9a-f]{64}/go-semver-release@${{ env.IMAGE_HASH }}/' -i README.md
+        HASH=$(crane digest soders/go-semver-release:${{ env.RELEASE_TAG }} | awk 'BEGIN{FS="@"} { print $2 }')
+        sed -E 's/go-semver-release@sha256:[0-9a-f]{64}/go-semver-release@$HASH/' -i README.md
 
     - name: Push documentation update
       run: |
