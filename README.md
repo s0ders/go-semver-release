@@ -23,9 +23,9 @@ The Docker image merely weight `7Mb` and the Go program inside will compute your
 
 This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
 
-- Choose a release branch (e.g. `main`, `release`)
+- Choose a release branch (e.g., `main`, `release`)
 
-- Take care to format commits on that branch by following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, which many IDEs plugins offers to do seamlessly (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
+- Take care to format commits on that branch by following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, which many IDEs plugins offers to do seamlessly (e.g., [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
 
 > **Note**: `go-semver-release` can only read **annotated** Git tags, so if you plan on only using it in dry-run mode to then use its output to tag your repository with an other action, make sure the tag you are pushing is annotated, otherwise the program will not be able to detect it.
 
@@ -93,13 +93,19 @@ The program supports a dry-run mode that will only compute the next semantic ver
 $ go-semver-release [...] --dry-run true
 ```
 
+Verbose output can be enabled as bellow which will show each commit (hash and short message) that triggers a release during the process and the associated release type, verbose output is `false` by default:
+
+```bash
+$ go-semver-release [...] --verbose true
+```
+
 A custom prefix can be added to the tag name pushed to the remote, by default the tag name correspond to the SemVer (e.g. `1.2.3`) but you might want to use some prefix like `v` using `--tag-prefix`:
 
 ```bash
 $ go-semver-release [...] --tag-prefix <PREFIX>
 ```
 
-> **Note**: You can change your tag prefix during the lifetime of your repository (e.g. going from none to `v`) and this will **not** affect your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
+> **Note**: You can change your tag prefix during the lifetime of your repository (e.g., going from none to `v`) and this will **not** affect your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
 
 
 
@@ -107,7 +113,7 @@ $ go-semver-release [...] --tag-prefix <PREFIX>
 
 ### Inputs
 
-The action takes the same parameters as those defined in the <a href="#Usage">usage</a> section. Note that the `--dry-run` needs to be passed as a string inside your YAML work-flow due to how Github Actions works.
+The action takes the same parameters as those defined in the <a href="#Usage">usage</a> section. Note that the boolean flags (e.g., `--dry-run`, `--verbose`) need to be passed as a string inside your YAML work-flow due to how Github Actions works.
 
 ### Outputs
 
@@ -132,7 +138,8 @@ jobs:
         repository-url: 'https://github.com/path/to/your/repo.git'
         tag-prefix: 'v'
         branch: 'release'
-        dry-run: 'false'
+        dry-run: 'true'
+        verbose: 'true'
         token: ${{ secrets.ACCESS_TOKEN }}
 ```
 
@@ -167,3 +174,7 @@ The following `type` are supported for release rules: `build`, `chore`, `ci`, `d
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
 
+## WIP
+
+- [ ] Use Cobra for better CLI
+- [ ] Support a local mode (repo already on local host, no need to push tags to a remote, no token)
