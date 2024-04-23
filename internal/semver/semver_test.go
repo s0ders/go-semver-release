@@ -9,19 +9,19 @@ import (
 
 func TestPrecedence(t *testing.T) {
 	type test struct {
-		s1, s2 Semver
+		s1, s2 *Semver
 		want   int
 	}
 
 	matrix := []test{
-		{Semver{1, 0, 2, ""}, Semver{1, 0, 1, ""}, 1},
-		{Semver{1, 0, 2, ""}, Semver{1, 0, 3, ""}, -1},
-		{Semver{1, 0, 2, ""}, Semver{1, 1, 0, ""}, -1},
-		{Semver{0, 0, 1, ""}, Semver{1, 1, 0, ""}, -1},
-		{Semver{2, 0, 0, ""}, Semver{1, 99, 99, ""}, 1},
-		{Semver{99, 0, 0, ""}, Semver{2, 99, 99, ""}, 1},
-		{Semver{1, 0, 0, ""}, Semver{1, 0, 0, ""}, 0},
-		{Semver{0, 1, 0, "d364937"}, Semver{0, 1, 0, "f61d9c2"}, 0},
+		{&Semver{1, 0, 2, ""}, &Semver{1, 0, 1, ""}, 1},
+		{&Semver{1, 0, 2, ""}, &Semver{1, 0, 3, ""}, -1},
+		{&Semver{1, 0, 2, ""}, &Semver{1, 1, 0, ""}, -1},
+		{&Semver{0, 0, 1, ""}, &Semver{1, 1, 0, ""}, -1},
+		{&Semver{2, 0, 0, ""}, &Semver{1, 99, 99, ""}, 1},
+		{&Semver{99, 0, 0, ""}, &Semver{2, 99, 99, ""}, 1},
+		{&Semver{1, 0, 0, ""}, &Semver{1, 0, 0, ""}, 0},
+		{&Semver{0, 1, 0, "d364937"}, &Semver{0, 1, 0, "f61d9c2"}, 0},
 	}
 
 	for _, test := range matrix {
@@ -167,6 +167,6 @@ func BenchmarkPrecedence(b *testing.B) {
 	s2, _ := New(1, 0, 3, "d364937")
 
 	for i := 0; i < b.N; i++ {
-		s1.Precedence(*s2)
+		s1.Precedence(s2)
 	}
 }

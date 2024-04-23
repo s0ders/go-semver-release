@@ -163,7 +163,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		}
 
 		if c.verbose {
-			c.logger.Info("(%s) %s: \"%s\"", shortHash, newReleaseType, shortMessage)
+			c.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
 		}
 
 	}

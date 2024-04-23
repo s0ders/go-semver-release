@@ -58,7 +58,12 @@ var remoteCmd = &cobra.Command{
 			}
 		}(path)
 
-		rules, err := releaserules.New(logger).Read(rulesPath).Parse()
+		rulesReader, err := releaserules.New(logger).Read(rulesPath)
+		if err != nil {
+			return err
+		}
+
+		rules, err := rulesReader.Parse()
 		if err != nil {
 			return err
 		}

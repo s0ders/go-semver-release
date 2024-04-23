@@ -2,17 +2,26 @@ package releaserules
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 )
 
 func TestMap(t *testing.T) {
-	releaseRules, err := New().Read("").Parse()
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to parse release rules: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	got := releaseRules.Map()
+	rules, err := rulesReader.Parse()
+	if err != nil {
+		t.Fatalf("failed to parse rules: %s", err)
+	}
+
+	got := rules.Map()
 	want := map[string]string{
 		"feat": "minor",
 		"perf": "minor",
@@ -25,10 +34,16 @@ func TestMap(t *testing.T) {
 }
 
 func TestParseReleaseRules(t *testing.T) {
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	releaseRules, err := New().Read("").Parse()
+	rulesReader, err := New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to parse release rules: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
+	}
+
+	rules, err := rulesReader.Parse()
+	if err != nil {
+		t.Fatalf("failed to parse rules: %s", err)
 	}
 
 	type test struct {
@@ -42,8 +57,8 @@ func TestParseReleaseRules(t *testing.T) {
 		{"fix", "patch"},
 	}
 
-	for i := 0; i < len(releaseRules.Rules); i++ {
-		got := releaseRules.Rules[i]
+	for i := 0; i < len(rules.Rules); i++ {
+		got := rules.Rules[i]
 		want := matrix[i]
 
 		if got.CommitType != want.commitType {
@@ -66,7 +81,8 @@ func TestSemanticallyIncorrectRules(t *testing.T) {
 
 	reader := strings.NewReader(incorrectRules)
 
-	ruleReader, err := New().setReader(reader).Parse()
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	ruleReader, err := New(logger).setReader(reader).Parse()
 
 	if err == nil {
 		t.Fatalf("did not detect incorrect rules: %+v", ruleReader)

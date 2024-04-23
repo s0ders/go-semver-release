@@ -29,7 +29,7 @@ func TestTagExists(t *testing.T) {
 	tags := []string{"1.0.0", "1.0.2"}
 
 	for i, tag := range tags {
-		r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
+		_, err := r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 			Message: tag,
 			Tagger: &object.Signature{
 				Name:  "Go Semver Release",
@@ -37,6 +37,9 @@ func TestTagExists(t *testing.T) {
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
+		if err != nil {
+			t.Fatalf("failed to create tag: %s", err)
+		}
 	}
 
 	tagger := NewTagger("")
