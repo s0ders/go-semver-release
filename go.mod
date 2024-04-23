@@ -1,10 +1,11 @@
 module github.com/s0ders/go-semver-release
 
-go 1.19
+go 1.22
 
 require (
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-playground/validator/v10 v10.11.2
+	github.com/spf13/cobra v1.8.0
 )
 
 require (
@@ -25,7 +26,6 @@ require (
 	github.com/pjbgf/sha1cd v0.2.3 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/skeema/knownhosts v1.1.0 // indirect
-	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
