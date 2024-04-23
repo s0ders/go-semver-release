@@ -1,5 +1,5 @@
 build:
-	GOOS=linux GOARCH=amd64 go build -o bin/go-semver-release-linux-amd64 main.go
+	go build -o bin/go-semver-release
 
 test:
 	go test -race ./...
@@ -9,3 +9,5 @@ vuln:
 
 docker-build:
 	docker build -f ./build/Dockerfile -t soders/go-semver-release .
+
+.PHONY: build
