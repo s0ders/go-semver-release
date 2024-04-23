@@ -14,7 +14,6 @@ import (
 )
 
 func TestTagExists(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -67,7 +66,7 @@ func TestAddTagToRepository(t *testing.T) {
 
 	defer os.RemoveAll(repositoryPath)
 
-	semver, err := semver.NewSemver(1, 0, 0, "")
+	semver, err := semver.New(1, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create semver: %s", err)
 	}
@@ -89,7 +88,6 @@ func TestAddTagToRepository(t *testing.T) {
 }
 
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
-
 	tempDirPath, err := os.MkdirTemp("", "tagger-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
@@ -112,7 +110,7 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 		return nil, "", fmt.Errorf("failed to create temp file: %s", err)
 	}
 
-	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to write to temp file: %s", err)
 	}
@@ -129,7 +127,6 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 			When:  time.Now(),
 		},
 	})
-
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create commit object %s", err)
 	}

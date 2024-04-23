@@ -8,7 +8,6 @@ import (
 )
 
 func TestPrecedence(t *testing.T) {
-
 	type test struct {
 		s1, s2 Semver
 		want   int
@@ -30,7 +29,6 @@ func TestPrecedence(t *testing.T) {
 			t.Fatalf("got: %d want: %d\n", got, test.want)
 		}
 	}
-
 }
 
 func TestIsZero(t *testing.T) {
@@ -55,7 +53,7 @@ func TestIsZero(t *testing.T) {
 }
 
 func TestNormalVersion(t *testing.T) {
-	version, err := NewSemver(1, 2, 3, "d364937ad663484d80c28485f60a91cf2af2f932")
+	version, err := New(1, 2, 3, "d364937ad663484d80c28485f60a91cf2af2f932")
 	if err != nil {
 		t.Fatalf("Failed to create semver: %s", err)
 	}
@@ -72,7 +70,7 @@ func TestNormalVersion(t *testing.T) {
 }
 
 func TestNegativeSemver(t *testing.T) {
-	_, err := NewSemver(-1, 0, 0, "")
+	_, err := New(-1, 0, 0, "")
 
 	if err == nil {
 		t.Fatalf("managed to create negative semver")
@@ -80,7 +78,7 @@ func TestNegativeSemver(t *testing.T) {
 }
 
 func TestSemverString(t *testing.T) {
-	s, _ := NewSemver(1, 2, 3, "")
+	s, _ := New(1, 2, 3, "")
 
 	want := "1.2.3"
 	if got := s.String(); got != want {
@@ -89,7 +87,6 @@ func TestSemverString(t *testing.T) {
 }
 
 func TestNewSemverFromGitTag(t *testing.T) {
-
 	type test struct {
 		tag  *object.Tag
 		want string
@@ -132,8 +129,7 @@ func TestNewSemverFromGitTag(t *testing.T) {
 	}
 
 	for _, test := range matrix {
-		semver, err := NewSemverFromGitTag(test.tag)
-
+		semver, err := FromGitTag(test.tag)
 		if err != nil {
 			t.Fatalf("failed to create semver: %s", err)
 		}
@@ -145,8 +141,7 @@ func TestNewSemverFromGitTag(t *testing.T) {
 }
 
 func TestBump(t *testing.T) {
-	s, err := NewSemver(0, 0, 0, "")
-
+	s, err := New(0, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to created semver: %s", err)
 	}
@@ -168,8 +163,8 @@ func TestBump(t *testing.T) {
 }
 
 func BenchmarkPrecedence(b *testing.B) {
-	s1, _ := NewSemver(1, 0, 2, "f61d9c2")
-	s2, _ := NewSemver(1, 0, 3, "d364937")
+	s1, _ := New(1, 0, 2, "f61d9c2")
+	s2, _ := New(1, 0, 3, "d364937")
 
 	for i := 0; i < b.N; i++ {
 		s1.Precedence(*s2)

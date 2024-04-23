@@ -133,27 +133,6 @@ jobs:
         image: ${{ env.DOCKER_IMAGE }}
         artifact-name: ${{ env.SBOM_FILE }}
 
-    - name: Install Cosign
-      uses: sigstore/cosign-installer@main
-
-    - name: Sign Docker image and SBOM
-      env:
-        COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
-        COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
-      run: |
-        SBOM_TAG=$(crane digest ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }} | sed -e 's/:/-/')
-        cosign sign --key env://COSIGN_PRIVATE_KEY -a repository=${{ github.repository }} -a commit=${{ github.sha }} -a actor=${{ github.triggering_actor }} ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }}
-        cosign attach sbom --sbom ${{ env.SBOM_FILE }} ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_TAG }}
-        cosign sign --key env://COSIGN_PRIVATE_KEY ${{ env.DOCKER_IMAGE }}:$SBOM_TAG.sbom
-        
-    - name: Import GPG key
-      uses: crazy-max/ghaction-import-gpg@v5
-      with:
-        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        git_user_signingkey: true
-        git_commit_gpgsign: true
-        git_tag_gpgsign: true
-
     - name: Git configuration
       run: |
         git config --global user.email "${{ env.GIT_CI_EMAIL }}"

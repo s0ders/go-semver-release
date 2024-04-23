@@ -7,7 +7,7 @@ import (
 )
 
 func TestMap(t *testing.T) {
-	releaseRules, err := NewReleaseRuleReader().Read("").Parse()
+	releaseRules, err := New().Read("").Parse()
 	if err != nil {
 		t.Fatalf("failed to parse release rules: %s", err)
 	}
@@ -16,7 +16,7 @@ func TestMap(t *testing.T) {
 	want := map[string]string{
 		"feat": "minor",
 		"perf": "minor",
-		"fix": "patch",
+		"fix":  "patch",
 	}
 
 	if fmt.Sprintf("%+v", got) != fmt.Sprintf("%+v", want) {
@@ -26,7 +26,7 @@ func TestMap(t *testing.T) {
 
 func TestParseReleaseRules(t *testing.T) {
 
-	releaseRules, err := NewReleaseRuleReader().Read("").Parse()
+	releaseRules, err := New().Read("").Parse()
 	if err != nil {
 		t.Fatalf("failed to parse release rules: %s", err)
 	}
@@ -66,7 +66,7 @@ func TestSemanticallyIncorrectRules(t *testing.T) {
 
 	reader := strings.NewReader(incorrectRules)
 
-	ruleReader, err := NewReleaseRuleReader().setReader(reader).Parse()
+	ruleReader, err := New().setReader(reader).Parse()
 
 	if err == nil {
 		t.Fatalf("did not detect incorrect rules: %+v", ruleReader)

@@ -4,16 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/s0ders/go-semver-release/internal/helpers"
 )
 
+const DefaultRules = `{
+	"releaseRules": [
+		{"type": "feat", "release": "minor"},
+		{"type": "perf", "release": "minor"},
+		{"type": "fix", "release": "patch"}
+	]
+}`
+
 type ReleaseRuleReader struct {
-	logger *log.Logger
+	logger *slog.Logger
 	reader io.Reader
 }
 
@@ -34,25 +41,25 @@ func (r *ReleaseRules) Map() map[string]string {
 	return m
 }
 
-func NewReleaseRuleReader() *ReleaseRuleReader {
-	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[releas-rule-reader]"), log.Default().Flags())
+func New(logger *slog.Logger) *ReleaseRuleReader {
 	return &ReleaseRuleReader{
 		logger: logger,
 	}
 }
 
-func (r *ReleaseRuleReader) Read(path string) *ReleaseRuleReader {
+// TODO: pass an io.Reader directly ?
+func (r *ReleaseRuleReader) Read(path string) (*ReleaseRuleReader, error) {
 	if len(path) == 0 {
-		r.reader = strings.NewReader(helpers.DefaultReleaseRules)
-		return r
+		r.reader = strings.NewReader(DefaultRules)
+		return r, nil
 	}
 
 	reader, err := os.Open(path)
 	if err != nil {
-		r.logger.Fatalf("failed to open rules file: %s", err)
+		return nil, fmt.Errorf("failed to open rules file: %w", err)
 	}
 
-	return r.setReader(reader)
+	return r.setReader(reader), nil
 }
 
 func (r *ReleaseRuleReader) setReader(reader io.Reader) *ReleaseRuleReader {
@@ -65,7 +72,10 @@ func (r *ReleaseRuleReader) Parse() (*ReleaseRules, error) {
 	existingType := make(map[string]string)
 
 	decoder := json.NewDecoder(r.reader)
-	decoder.Decode(&releaseRules)
+	err := decoder.Decode(&releaseRules)
+	if err != nil {
+		return nil, err
+	}
 
 	validate := validator.New()
 	if err := validate.Struct(releaseRules); err != nil {
