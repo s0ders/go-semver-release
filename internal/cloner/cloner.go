@@ -26,7 +26,6 @@ func (c Cloner) Clone(url, branch, token string) (*git.Repository, string, error
 		Password: token,
 	}
 
-	// TODO: create helper method to c.l.Error() and return error
 	path, err := os.MkdirTemp("", "go-semver-release-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp dir: %w", err)
