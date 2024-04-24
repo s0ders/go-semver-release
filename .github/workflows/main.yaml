@@ -13,10 +13,8 @@ env:
   SBOM_FILE: sbom.spdx
 
 jobs:
-
   go-build:
     runs-on: ubuntu-latest
-    needs: gitleaks
     steps:
     - uses: actions/checkout@v3
 
