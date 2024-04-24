@@ -12,5 +12,7 @@ WORKDIR /app
 
 COPY --from=build /build/go-semver-release .
 
+RUN echo "test"
+
 ENTRYPOINT ["./go-semver-release"]
 CMD ["--help"]
