@@ -19,7 +19,7 @@ Handling a Git repository versions can be done using well-thought convention suc
 
 This project was built to create a lightweight and simple tool to seamlessly automate versioning on your Git repository. Following the UNIX philosophy of "make each program do one thing well", it only handles publishing semver tags to your Git repository, no package publishing or any other features. 
 
-The Docker image merely weight `7Mb` and the Go program inside will compute your semver tag in seconds, no matter the size of your commit history.
+The Docker image merely weight 7MB and the Go program inside will compute your semver tag in seconds, no matter the size of your commit history.
 
 This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
 
@@ -34,78 +34,52 @@ This tool aims to integrate semantic versioning automation in such a way that, a
 If [Go](https://go.dev) is installed on your machine, you can install from source using `go install`:
 
 ```bash
-$ go install github.com/s0ders/go-semver-release/cmd/go-semver-release@v1.5.2
+$ go install github.com/s0ders/go-semver-release@latest
 $ go-semver-release --help
 ```
 
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release@
+$ docker pull soders/go-semver-release@latest
 $ docker run --rm soders/go-semver-release --help
 ```
 
-Verify that the downloaded image has not be tampered using [Cosign](https://github.com/sigstore/cosign):
-```bash
-$ PUB_KEY=https://raw.githubusercontent.com/s0ders/go-semver-release/main/cosign.pub
-$ cosign verify --key $PUB_KEY soders/go-semver-release@
-```
-Each Docker image comes with a corresponding SBOM (SPDX format) also signed using the same key-pair.
-
+For security purposes, each Docker image comes with a corresponding SBOM.
 ## Prerequisites
 
-There are only a few prerequisites for using this tool and getting the benefits it brings :
-
-- The Git repository commits must follow the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, as it is what is used to compute the semantic version.
-- The repository passed to the program (or action) must already be initialized (i.e. Git `HEAD` does not point to nothing)
-
-
+- The commits of the Git repository to version must follow the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.
+- The Git repository must already be initialized (i.e., Git `HEAD` does not point to nothing)
 
 ## Usage
 
-You must pass the Git URL of the repository to target using the `--url` flag:
+The CLI supports two mode of execution: remote and local.
+
+In remote mode, the program will attempt to clone the remote repository using the provided URL and access token to then compute the next semver, tag it onto the cloned repository and push it back to the remote.
+
+In local mode, the program takes the path of the already present Git repository, computes the next semver, tags the local repository with it and stops. This mode is a good option security-wise since it lets you use the program without having to configure any kind of right management because it does not require any access token.
+
+Remote mode example:
 
 ```bash
-$ go-semver-release --url <GIT URL>
+$ go-semver-release remote --git-url <URL> --rules-path <PATH> --token <TOKEN> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
 ```
 
-Because the program needs to push tag to the remote, it must authenticate itself using a personal access token passed with `--token`:
+Local mode example:
 
 ```bash
-$ go-semver-release [...] --token <ACCESS TOKEN>
-```
-
-The release branch on which the commits are fetched is specified using `--branch`:
-
-```bash
-$ go-semver-release [...] --branch <BRANCH NAME>
-```
-
-Custom release rules are passed to the program using the `--rules`:
-
-```bash
-$ go-semver-release [...] --rules <PATH TO RULES>
-```
-
-The program supports a dry-run mode that will only compute the next semantic version, if any, and will stop here without pushing any tag to the remote, dry-run is `false` by default:
-
-```bash
-$ go-semver-release [...] --dry-run true
-```
-
-Verbose output can be enabled as bellow which will show each commit (hash and short message) that triggers a release during the process and the associated release type, verbose output is `false` by default:
-
-```bash
-$ go-semver-release [...] --verbose true
-```
-
-A custom prefix can be added to the tag name pushed to the remote, by default the tag name correspond to the SemVer (e.g. `1.2.3`) but you might want to use some prefix like `v` using `--tag-prefix`:
-
-```bash
-$ go-semver-release [...] --tag-prefix <PREFIX>
+$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
 ```
 
 > **Note**: You can change your tag prefix during the lifetime of your repository (e.g., going from none to `v`) and this will **not** affect your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
+
+For more informations about commands and flags usage as well as the default value, simply run:
+
+```bash
+$ go-semver-release <COMMAND> --help
+```
+
+
 
 
 
@@ -121,35 +95,13 @@ The action generate a two outputs
 - `SEMVER`, the computed semver or the current one if no new were computed, prefixed with the given `tag-prefix` if any;
 - `NEW_RELEASE`, whether a new semver was computed or not.
 
-### Example Workflow
-
-Bellow is an example of this action inside a GitHub Actions pipeline.
-
-```yaml
-jobs:
-  go-semver-release:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Semver Release
-      uses: s0ders/go-semver-release@v1.5.2
-      with:
-        repository-url: 'https://github.com/path/to/your/repo.git'
-        tag-prefix: 'v'
-        branch: 'release'
-        dry-run: 'true'
-        verbose: 'true'
-        token: ${{ secrets.ACCESS_TOKEN }}
-```
-
 ## Release Rules
 
-Release rules define which commit type will trigger a release, and what type of release (i.e. major, minor, patch). **By default**, the program applies the following release rules:
+Release rules define which commit type will trigger a release, and what type of release (i.e. `major`, `minor`, `patch`). **By default**, the program applies the following release rules:
 
 ```json
 {
-    "releaseRules": [
+    "rules": [
         {"type": "feat", "release": "minor"},
         {"type": "perf", "release": "minor"},
         {"type": "fix", "release": "patch"}
@@ -157,24 +109,20 @@ Release rules define which commit type will trigger a release, and what type of 
 }
 ```
 
-You can define custom release rules to suit your needs using a JSON file and by passing it to the program as bellow. Be careful with release rules though, especially major ones, as their misuse might easily make you loose the benefits of using a semantic version number.
+You can define custom release rules to suit your needs using a JSON or YAML file and by passing it to the program as bellow. Be careful with release rules though, especially major ones, as their misuse might easily make you loose the benefits of using a semantic version number.
 
-```json
-{
-    "releaseRules": [
-        {"type": "feat", "release": "minor"},
-        {"type": "perf", "release": "patch"},
-        {"type": "refactor", "release": "patch"},
-        {"type": "fix", "release": "patch"}
-    ]
-}
+```yaml
+rules:
+  - type: feat
+    release: minor
+  - type: perf
+    release: patch
+  - type: fix
+  	release: patch
 ```
+
+If a commit type (e.g., `chore`) is not specified in you rule file, it won't trigger any kind of release.
 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
-
-## WIP
-
-- [ ] Use Cobra for better CLI
-- [ ] Support a local mode (repo already on local host, no need to push tags to a remote, no token)
