@@ -70,7 +70,7 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         context: .
-        file: build/Dockerfile
+        file: Dockerfile
         push: true
         tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
 
