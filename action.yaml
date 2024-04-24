@@ -31,15 +31,6 @@ outputs:
     description: 'Boolean that indicate whether a new semver was computed or not'
 runs:
   using: 'docker'
-  image: 'Dockerfile'
+  image: 'build/Dockerfile'
   args:
-    - "local"
-    - ${{ inputs.repository-path }}
-    - --tag-prefix
-    - ${{ inputs.tag-prefix }}
-    - --release-branch
-    - ${{ inputs.branch }}
-    - --dry-run
-    - ${{ inputs.dry-run }}
-    - --verbose
-    - ${{ inputs.verbose }}
+    - "--help"
