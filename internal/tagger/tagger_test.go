@@ -75,7 +75,7 @@ func TestAddTagToRepository(t *testing.T) {
 	}
 
 	tagger := NewTagger("")
-	taggedRepository, err := tagger.addTagToRepository(r, semver)
+	taggedRepository, err := tagger.AddTagToRepository(r, semver)
 	if err != nil {
 		t.Fatalf("failed to tag repository: %s", err)
 	}

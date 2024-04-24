@@ -68,7 +68,7 @@ func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
 
 // AddTagToRepository create a new annotated tag on the repository
 // with a name corresponding to the semver passed as a parameter.
-func (t *Tagger) addTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
+func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
 	h, err := r.Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch head: %w", err)
@@ -99,7 +99,7 @@ func (t *Tagger) addTagToRepository(r *git.Repository, semver *semver.Semver) (*
 }
 
 func (t *Tagger) PushTagToRemote(r *git.Repository, token string, semver *semver.Semver) error {
-	repo, err := t.addTagToRepository(r, semver)
+	repo, err := t.AddTagToRepository(r, semver)
 	if err != nil {
 		return fmt.Errorf("failed to add tag on repository: %w", err)
 	}
