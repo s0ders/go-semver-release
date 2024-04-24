@@ -1,6 +1,7 @@
 package releaserules
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v3"
@@ -82,15 +83,17 @@ func (r *Reader) Parse() (*ReleaseRules, error) {
 		return nil, fmt.Errorf("failed to read rules file: %w", err)
 	}
 
+	bufReader := bytes.NewReader(buf)
+
 	switch {
 	case isJSON(buf):
-		decoder := json.NewDecoder(r.reader)
+		decoder := json.NewDecoder(bufReader)
 		err = decoder.Decode(&rules)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode JSON into rules")
 		}
 	case isYAML(buf):
-		decoder := yaml.NewDecoder(r.reader)
+		decoder := yaml.NewDecoder(bufReader)
 		err = decoder.Decode(&rules)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode YAML into rules")
