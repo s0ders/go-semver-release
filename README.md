@@ -15,15 +15,13 @@ Go program designed to automate versioning of Git repository by analyzing their 
 
 ## Motivation
 
-Handling a Git repository versions can be done using well-thought convention such as [SemVer](https://semver.org/) so that your API consumers know when a non-retro-compatible change is introduced in your API. Building on that, versioning automation can be achieved by using formated commits following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention. 
-
 This project was built to create a lightweight and simple tool to seamlessly automate versioning on your Git repository. Following the UNIX philosophy of "make each program do one thing well", it only handles publishing semver tags to your Git repository, no package publishing or any other features. 
 
-The Docker image merely weight 7MB and the Go program inside will compute your semver tag in seconds, no matter the size of your commit history.
+The Docker image merely weight 7MB and the Go program inside will compute your [semver](https://semver.org) tag in seconds, no matter the size of your commit history.
 
-This tool aims to integrate semantic versioning automation in such a way that, all you have to do is:
+To use this tool, all you have to do is:
 
-- Choose a release branch (e.g., `main`, `release`)
+- Choose a release branch (e.g., `main`)
 
 - Take care to format commits on that branch by following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention, which many IDEs plugins offers to do seamlessly (e.g., [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
 
@@ -62,13 +60,15 @@ In local mode, the program takes the path of the already present Git repository,
 Remote mode example:
 
 ```bash
-$ go-semver-release remote --git-url <URL> --rules-path <PATH> --token <TOKEN> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
+$ go-semver-release remote --git-url <URL> --rules-path <PATH> --token <TOKEN> \
+                           --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
 ```
 
 Local mode example:
 
 ```bash
-$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
+$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> \
+                                            --release-branch <NAME> --dry-run --verbose
 ```
 
 > **Note**: You can change your tag prefix during the lifetime of your repository (e.g., going from none to `v`) and this will **not** affect your semver tags history, meaning that the program will still be able to recognize semver tags made with your old-prefixes, if any. There are no limitation to how many time you can change your tag prefix during the lifetime of your repository.
