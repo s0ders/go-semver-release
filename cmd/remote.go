@@ -25,7 +25,7 @@ var (
 )
 
 func init() {
-	remoteCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON containing the release rules")
+	remoteCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
 	remoteCmd.Flags().StringVarP(&gitURL, "git-url", "u", "", "URL of the git repository to version")
 	remoteCmd.Flags().StringVarP(&token, "token", "t", "", "Secret token to access the git repository")
 	remoteCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
@@ -46,7 +46,7 @@ var remoteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-		repository, path, err := cloner.New(logger).Clone(gitURL, releaseBranch, token)
+		repo, path, err := cloner.New(logger).Clone(gitURL, releaseBranch, token)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ var remoteCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := commitanalyzer.New(logger, rules, verbose).ComputeNewSemver(repository)
+		semver, release, err := commitanalyzer.New(logger, rules, verbose).ComputeNewSemver(repo)
 		if err != nil {
 			return err
 		}
@@ -78,17 +78,18 @@ var remoteCmd = &cobra.Command{
 			return err
 		}
 
-		if !release {
-			logger.Info("no new release", "current-version", semver)
-		}
-
-		if release && dryRun {
+		switch {
+		case !release:
+			logger.Info("no new release", "current-version", semver.NormalVersion())
+			return nil
+		case release && dryRun:
 			logger.Info("new release found, dry-run is enabled", "next-version", semver)
-		}
-
-		err = tagger.NewTagger(tagPrefix).PushTagToRemote(repository, token, semver)
-		if err != nil {
-			return err
+			return nil
+		default:
+			err = tagger.New(logger, tagPrefix).PushTagToRemote(repo, token, semver)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil

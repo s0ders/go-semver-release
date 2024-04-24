@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	localCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON containing the release rules")
+	localCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
@@ -54,17 +54,18 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		if !release {
-			logger.Info("no new release", "current-version", semver)
-		}
-
-		if release && dryRun {
+		switch {
+		case !release:
+			logger.Info("no new release", "current-version", semver.NormalVersion())
+			return nil
+		case release && dryRun:
 			logger.Info("new release found, dry-run is enabled", "next-version", semver)
-		}
-
-		_, err = tagger.NewTagger(tagPrefix).AddTagToRepository(repo, semver)
-		if err != nil {
-			return err
+			return nil
+		default:
+			_, err = tagger.New(logger, tagPrefix).AddTagToRepository(repo, semver)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil

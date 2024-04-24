@@ -3,6 +3,7 @@ package releaserules
 import (
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io"
 	"log/slog"
 	"os"
@@ -12,25 +13,33 @@ import (
 )
 
 const DefaultRules = `{
-	"releaseRules": [
+	"rules": [
 		{"type": "feat", "release": "minor"},
 		{"type": "perf", "release": "minor"},
 		{"type": "fix", "release": "patch"}
 	]
 }`
 
-type ReleaseRuleReader struct {
+type rulesFormat int
+
+const (
+	YAML rulesFormat = 1
+	JSON rulesFormat = 2
+)
+
+type Reader struct {
 	logger *slog.Logger
 	reader io.Reader
+	format rulesFormat
 }
 
 type ReleaseRule struct {
-	CommitType  string `json:"type" validate:"required,oneof=build chore ci docs feat fix perf refactor revert style test"`
-	ReleaseType string `json:"release" validate:"required,oneof=major minor patch"`
+	CommitType  string `json:"type" yaml:"type" validate:"required,oneof=build chore ci docs feat fix perf refactor revert style test"`
+	ReleaseType string `json:"release" yaml:"release" validate:"required,oneof=major minor patch"`
 }
 
 type ReleaseRules struct {
-	Rules []ReleaseRule `json:"releaseRules" validate:"required"`
+	Rules []ReleaseRule `json:"rules" yaml:"rules" validate:"required"`
 }
 
 func (r *ReleaseRules) Map() map[string]string {
@@ -41,14 +50,14 @@ func (r *ReleaseRules) Map() map[string]string {
 	return m
 }
 
-func New(logger *slog.Logger) *ReleaseRuleReader {
-	return &ReleaseRuleReader{
+func New(logger *slog.Logger) *Reader {
+	return &Reader{
 		logger: logger,
 	}
 }
 
 // TODO: pass an io.Reader directly ?
-func (r *ReleaseRuleReader) Read(path string) (*ReleaseRuleReader, error) {
+func (r *Reader) Read(path string) (*Reader, error) {
 	if len(path) == 0 {
 		r.reader = strings.NewReader(DefaultRules)
 		return r, nil
@@ -59,30 +68,43 @@ func (r *ReleaseRuleReader) Read(path string) (*ReleaseRuleReader, error) {
 		return nil, fmt.Errorf("failed to open rules file: %w", err)
 	}
 
-	return r.setReader(reader), nil
-}
-
-func (r *ReleaseRuleReader) setReader(reader io.Reader) *ReleaseRuleReader {
 	r.reader = reader
-	return r
+
+	return r, nil
 }
 
-func (r *ReleaseRuleReader) Parse() (*ReleaseRules, error) {
-	var releaseRules ReleaseRules
+func (r *Reader) Parse() (*ReleaseRules, error) {
+	var rules ReleaseRules
 	existingType := make(map[string]string)
 
-	decoder := json.NewDecoder(r.reader)
-	err := decoder.Decode(&releaseRules)
+	buf, err := io.ReadAll(r.reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read rules file: %w", err)
+	}
+
+	switch {
+	case isJSON(buf):
+		decoder := json.NewDecoder(r.reader)
+		err = decoder.Decode(&rules)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode JSON into rules")
+		}
+	case isYAML(buf):
+		decoder := yaml.NewDecoder(r.reader)
+		err = decoder.Decode(&rules)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode YAML into rules")
+		}
+	default:
+		return nil, fmt.Errorf("failed to detect if rules are JSON or YAML")
 	}
 
 	validate := validator.New()
-	if err := validate.Struct(releaseRules); err != nil {
+	if err := validate.Struct(rules); err != nil {
 		return nil, fmt.Errorf("failed to validate release rules: %w", err)
 	}
 
-	for _, rule := range releaseRules.Rules {
+	for _, rule := range rules.Rules {
 
 		existingRuleType, commitTypeAlreadyAssigned := existingType[rule.CommitType]
 
@@ -96,5 +118,15 @@ func (r *ReleaseRuleReader) Parse() (*ReleaseRules, error) {
 		existingType[rule.CommitType] = rule.ReleaseType
 	}
 
-	return &releaseRules, nil
+	return &rules, nil
+}
+
+func isJSON(b []byte) bool {
+	var raw json.RawMessage
+	return json.Unmarshal(b, &raw) == nil
+}
+
+func isYAML(b []byte) bool {
+	var raw map[any]any
+	return yaml.Unmarshal(b, &raw) == nil
 }
