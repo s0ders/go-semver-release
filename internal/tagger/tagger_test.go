@@ -2,6 +2,8 @@ package tagger
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +44,8 @@ func TestTagExists(t *testing.T) {
 		}
 	}
 
-	tagger := NewTagger("")
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	tagger := New(logger, "")
 
 	tagExistsTrue, err := tagger.TagExists(r, tags[0])
 	if err != nil {
@@ -74,7 +77,8 @@ func TestAddTagToRepository(t *testing.T) {
 		t.Fatalf("failed to create semver: %s", err)
 	}
 
-	tagger := NewTagger("")
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	tagger := New(logger, "")
 	taggedRepository, err := tagger.AddTagToRepository(r, semver)
 	if err != nil {
 		t.Fatalf("failed to tag repository: %s", err)

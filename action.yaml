@@ -1,15 +1,11 @@
 name: 'Go Semver Release'
-description: 'Computes the next, if any, semver for a Git repository and push it to the repository as a Git annotated tag'
+description: 'Computes the next, if any, semver for a local or remote Git repository and add it as an annotated tag'
 branding:
   icon: 'at-sign'
   color: 'green'
 inputs:
-  repository-url:
-    description: 'The Git repository to version'
-    required: true
-    default: ''
-  token:
-    description: 'A personnal access token to log in to the Git repository in order to push tags'
+  repository-path:
+    description: 'Path to the local Git repository'
     required: true
     default: ''
   tag-prefix:
@@ -37,13 +33,11 @@ runs:
   using: 'docker'
   image: 'docker://soders/go-semver-release:latest'
   args:
-    - --url
-    - ${{ inputs.repository-url }}
-    - --token
-    - ${{ inputs.token }}
+    - "local"
+    - ${{ inputs.repository-path }}
     - --tag-prefix
     - ${{ inputs.tag-prefix }}
-    - --branch
+    - --release-branch
     - ${{ inputs.branch }}
     - --dry-run
     - ${{ inputs.dry-run }}

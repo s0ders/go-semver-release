@@ -2,7 +2,7 @@ package tagger
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -22,19 +22,18 @@ var GitSignature = object.Signature{
 }
 
 type Tagger struct {
-	logger    *log.Logger
+	logger    *slog.Logger
 	tagPrefix string
 }
 
-func NewTagger(tagPrefix string) *Tagger {
-	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[tagger]"), log.Default().Flags())
+func New(logger *slog.Logger, prefix string) *Tagger {
 	return &Tagger{
 		logger:    logger,
-		tagPrefix: tagPrefix,
+		tagPrefix: prefix,
 	}
 }
 
-func New(semver semver.Semver, hash plumbing.Hash) *object.Tag {
+func NewTagFromSemver(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
@@ -93,7 +92,7 @@ func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*
 		return nil, fmt.Errorf("failed to create tag on repository: %w", err)
 	}
 
-	t.logger.Printf("created new tag %s on repository", semver.String())
+	t.logger.Info("created new tag on repository", "tag", semver.String())
 
 	return r, nil
 }
@@ -118,7 +117,7 @@ func (t *Tagger) PushTagToRemote(r *git.Repository, token string, semver *semver
 		return fmt.Errorf("failed to push tag to remote: %w", err)
 	}
 
-	t.logger.Printf("pushed tag %s on repository", semver)
+	t.logger.Info("pushed tag on repository", "tag", semver)
 
 	return nil
 }

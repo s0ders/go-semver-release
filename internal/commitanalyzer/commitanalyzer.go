@@ -71,10 +71,10 @@ func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 			return nil, fmt.Errorf("failed to build new semver: %w", err)
 		}
 
-		return tagger.New(*version, head.Hash()), nil
+		return tagger.NewTagFromSemver(*version, head.Hash()), nil
 	}
 
-	c.logger.Info("found latest semver tag", "value", latestTag.Name)
+	c.logger.Info("found latest semver tag", "tag", latestTag.Name)
 
 	return latestTag, nil
 }
@@ -165,10 +165,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		if c.verbose {
 			c.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
 		}
-
 	}
-
-	c.logger.Info("few version", "value", semverFromTag)
 
 	return semverFromTag, newRelease, nil
 }
