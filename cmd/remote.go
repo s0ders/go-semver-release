@@ -25,12 +25,12 @@ var (
 )
 
 func init() {
-	remoteCmd.Flags().StringVarP(&rulesPath, "rules-path", "rules", "", "Path to the JSON containing the release rules")
-	remoteCmd.Flags().StringVarP(&gitURL, "git-url", "url", "", "URL of the git repository to version")
-	remoteCmd.Flags().StringVar(&token, "token", "", "Secret token to access the git repository")
-	remoteCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "tag", "v", "Prefix added to the version tag name")
-	remoteCmd.Flags().StringVarP(&releaseBranch, "release-branch", "branch", "main", "Branch to fetch commits from")
-	remoteCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Don't actually release changes")
+	remoteCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON containing the release rules")
+	remoteCmd.Flags().StringVarP(&gitURL, "git-url", "u", "", "URL of the git repository to version")
+	remoteCmd.Flags().StringVarP(&token, "token", "t", "", "Secret token to access the git repository")
+	remoteCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
+	remoteCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
+	remoteCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 	remoteCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
 	remoteCmd.MarkFlagRequired("git-url")
@@ -41,7 +41,7 @@ func init() {
 
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
-	Short: "Attempts to spoof a network interface MAC address",
+	Short: "Version a remote repository and push the semver tag back to the remote",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
