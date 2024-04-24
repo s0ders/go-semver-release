@@ -44,14 +44,16 @@ jobs:
       with:
         repository-path: .
         tag-prefix: 'v'
+        branch: 'main'
         dry-run: 'true'
+        verbose: 'true'
 
   docker-build-and-scan:
     runs-on: ubuntu-latest
     needs: pre-release-detection
     if: ${{needs.pre-release-detection.outputs.release == 'true'}}
     env:
-      PRERELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}
+      PRERELEASE_TAG: "${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}"
     steps:
     - uses: actions/checkout@v3
 
@@ -89,7 +91,7 @@ jobs:
       - pre-release-detection
     if: ${{needs.pre-release-detection.outputs.release == 'true'}}
     env:
-      PRERELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}
+      PRERELEASE_TAG: "${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}"
       RELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}
     steps:
     - uses: actions/checkout@v3
