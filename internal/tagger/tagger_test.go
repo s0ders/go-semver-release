@@ -14,7 +14,6 @@ import (
 )
 
 func TestTagExists(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -30,7 +29,7 @@ func TestTagExists(t *testing.T) {
 	tags := []string{"1.0.0", "1.0.2"}
 
 	for i, tag := range tags {
-		r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
+		_, err := r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 			Message: tag,
 			Tagger: &object.Signature{
 				Name:  "Go Semver Release",
@@ -38,6 +37,9 @@ func TestTagExists(t *testing.T) {
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
+		if err != nil {
+			t.Fatalf("failed to create tag: %s", err)
+		}
 	}
 
 	tagger := NewTagger("")
@@ -67,13 +69,13 @@ func TestAddTagToRepository(t *testing.T) {
 
 	defer os.RemoveAll(repositoryPath)
 
-	semver, err := semver.NewSemver(1, 0, 0, "")
+	semver, err := semver.New(1, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create semver: %s", err)
 	}
 
 	tagger := NewTagger("")
-	taggedRepository, err := tagger.addTagToRepository(r, semver)
+	taggedRepository, err := tagger.AddTagToRepository(r, semver)
 	if err != nil {
 		t.Fatalf("failed to tag repository: %s", err)
 	}
@@ -89,7 +91,6 @@ func TestAddTagToRepository(t *testing.T) {
 }
 
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
-
 	tempDirPath, err := os.MkdirTemp("", "tagger-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
@@ -112,7 +113,7 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 		return nil, "", fmt.Errorf("failed to create temp file: %s", err)
 	}
 
-	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to write to temp file: %s", err)
 	}
@@ -129,7 +130,6 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 			When:  time.Now(),
 		},
 	})
-
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create commit object %s", err)
 	}

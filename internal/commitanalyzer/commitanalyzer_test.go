@@ -2,6 +2,8 @@ package commitanalyzer
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,7 +59,6 @@ func TestBreakingChangeRegex(t *testing.T) {
 }
 
 func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -65,12 +66,19 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 
 	defer os.RemoveAll(repositoryPath)
 
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := releaserules.New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	commitAnalyzer := NewCommitAnalyzer(rules, true)
+	rules, err := rulesReader.Parse()
+	if err != nil {
+		t.Fatalf("failed to parse rules: %s", err)
+	}
+
+	commitAnalyzer := New(logger, rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -84,7 +92,6 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 }
 
 func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -99,7 +106,7 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 
 	tag := "1.0.0"
 
-	r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
+	_, err = r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 		Message: tag,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
@@ -107,13 +114,23 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 			When:  time.Now(),
 		},
 	})
-
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to create tag: %s", err)
 	}
 
-	commitAnalyzer := NewCommitAnalyzer(rules, true)
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := releaserules.New(logger).Read("")
+	if err != nil {
+		t.Fatalf("failed to read rules: %s", err)
+	}
+
+	rules, err := rulesReader.Parse()
+	if err != nil {
+		t.Fatalf("failed to parse rules: %s", err)
+	}
+
+	commitAnalyzer := New(logger, rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -127,7 +144,6 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 }
 
 func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -143,7 +159,7 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	tags := []string{"2.0.0", "2.0.1", "3.0.0", "2.5.0", "0.0.2", "0.0.1", "0.1.0", "1.0.0"}
 
 	for i, tag := range tags {
-		r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
+		_, err := r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 			Message: tag,
 			Tagger: &object.Signature{
 				Name:  "Go Semver Release",
@@ -151,14 +167,24 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
+		if err != nil {
+			t.Fatalf("failed to create tag: %s", err)
+		}
 	}
 
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := releaserules.New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	commitAnalyzer := NewCommitAnalyzer(rules, true)
+	rules, err := rulesReader.Parse()
+	if err != nil {
+		t.Fatalf("failed to parse rules: %s", err)
+	}
+
+	commitAnalyzer := New(logger, rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -172,7 +198,6 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -180,16 +205,19 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 
 	defer os.RemoveAll(repositoryPath)
 
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := releaserules.New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
+	rules, err := rulesReader.Parse()
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to parse rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules, true)
+	ca := New(logger, rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -204,7 +232,6 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -212,16 +239,18 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 
 	defer os.RemoveAll(repositoryPath)
 
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	rulesReader, err := releaserules.New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
+	rules, err := rulesReader.Parse()
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to parse rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules, true)
+	ca := New(logger, rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -236,7 +265,6 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -244,16 +272,19 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 
 	defer os.RemoveAll(repositoryPath)
 
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := releaserules.New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
+	rules, err := rulesReader.Parse()
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to parse rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules, true)
+	ca := New(logger, rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -268,7 +299,6 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.T) {
-
 	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
 	if err != nil {
 		t.Fatalf("failed to create git repository: %s", err)
@@ -276,18 +306,24 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 
 	defer os.RemoveAll(repositoryPath)
 
-	addCommit(r, "fix: added hello feature")
-
+	err = addCommit(r, "fix: added hello feature")
 	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
+		t.Fatalf("failed to add commit: %s", err)
 	}
 
-	rules, err := releaserules.NewReleaseRuleReader().Read("").Parse()
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	rulesReader, err := releaserules.New(logger).Read("")
 	if err != nil {
-		t.Fatalf("failed to create rules: %s", err)
+		t.Fatalf("failed to read rules: %s", err)
 	}
 
-	ca := NewCommitAnalyzer(rules, true)
+	rules, err := rulesReader.Parse()
+	if err != nil {
+		t.Fatalf("failed to parse rules: %s", err)
+	}
+
+	ca := New(logger, rules, true)
 
 	version, newRelease, err := ca.ComputeNewSemver(r)
 	if err != nil {
@@ -306,7 +342,6 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 }
 
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
-
 	tempDirPath, err := os.MkdirTemp("", "commitanalyzer-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
@@ -329,7 +364,7 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 		return nil, "", fmt.Errorf("failed to create temp file: %s", err)
 	}
 
-	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to write to temp file: %s", err)
 	}
@@ -346,7 +381,6 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 			When:  time.Now(),
 		},
 	})
-
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create commit object %s", err)
 	}
@@ -379,7 +413,7 @@ func addCommit(r *git.Repository, message string) error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 
-	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0644)
+	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
@@ -396,7 +430,6 @@ func addCommit(r *git.Repository, message string) error {
 			When:  time.Now(),
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to create commit: %w", err)
 	}

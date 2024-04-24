@@ -2,8 +2,7 @@ package commitanalyzer
 
 import (
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -15,91 +14,72 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-var (
-	conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
-)
+var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
 
 type CommitAnalyzer struct {
-	logger       *log.Logger
+	logger       *slog.Logger
 	releaseRules *releaserules.ReleaseRules
 	verbose      bool
 }
 
-func NewCommitAnalyzer(releaseRules *releaserules.ReleaseRules, verbose bool) *CommitAnalyzer {
-	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[commit-analyzer]"), log.Default().Flags())
-
+func New(logger *slog.Logger, releaseRules *releaserules.ReleaseRules, verbose bool) *CommitAnalyzer {
 	return &CommitAnalyzer{
 		logger:       logger,
 		releaseRules: releaseRules,
-		verbose: verbose,
+		verbose:      verbose,
 	}
 }
 
 func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
-
-	semverRegex := regexp.MustCompile(semver.SemverRegex)
+	semverRegex := regexp.MustCompile(semver.Regex)
 
 	tags, err := r.TagObjects()
 	if err != nil {
 		return nil, err
 	}
 
-	var semverTags []*object.Tag
+	var latestSemver *semver.Semver
+	var latestTag *object.Tag
 
-	tags.ForEach(func(tag *object.Tag) error {
+	err = tags.ForEach(func(tag *object.Tag) error {
 		if semverRegex.MatchString(tag.Name) {
-			semverTags = append(semverTags, tag)
+			currentSemver, err := semver.FromGitTag(tag)
+			if err != nil {
+				return err
+			}
+
+			if latestSemver == nil || latestSemver.Precedence(currentSemver) != 1 {
+				latestSemver = currentSemver
+				latestTag = tag
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to loop over tags: %w", err)
+	}
 
-	if len(semverTags) == 0 {
-		c.logger.Println("no previous tag, creating one")
+	if latestSemver == nil {
+		c.logger.Info("no previous tag, creating one")
 		head, err := r.Head()
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch head: %w", err)
 		}
-		version, err := semver.NewSemver(0, 0, 0, "")
+
+		version, err := semver.New(0, 0, 0, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to build new semver: %w", err)
 		}
-		return tagger.NewTag(*version, head.Hash()), nil
+
+		return tagger.New(*version, head.Hash()), nil
 	}
 
-	if len(semverTags) == 1 {
-		return semverTags[0], nil
-	}
+	c.logger.Info("found latest semver tag", "value", latestTag.Name)
 
-	var latestSemverTag *object.Tag
-
-	for i, tag := range semverTags {
-		current, err := semver.NewSemverFromGitTag(semverTags[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to build semver from tag: %w", err)
-		}
-
-		if i == 0 {
-			latestSemverTag = tag
-			continue
-		}
-
-		old, err := semver.NewSemverFromGitTag(latestSemverTag)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build semver from tag: %w", err)
-		}
-
-		if current.Precedence(*old) == 1 {
-			latestSemverTag = tag
-		}
-	}
-
-	c.logger.Printf("latest semver tag: %s\n", latestSemverTag.Name)
-
-	return latestSemverTag, nil
+	return latestTag, nil
 }
 
 func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
-
 	latestSemverTag, err := c.fetchLatestSemverTag(r)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to fetch latest semver: %w", err)
@@ -107,28 +87,31 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 
 	newRelease := false
 	newReleaseType := ""
-	semver, err := semver.NewSemverFromGitTag(latestSemverTag)
+	semverFromTag, err := semver.FromGitTag(latestSemverTag)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
 	}
 
 	logOptions := &git.LogOptions{}
 
-	if !semver.IsZero() {
+	if !semverFromTag.IsZero() {
 		logOptions.Since = &latestSemverTag.Tagger.When
 	}
 
 	commitHistory, err := r.Log(logOptions)
 	if err != nil {
-		c.logger.Fatalf("failed to fetch commit history: %s", err)
+		return nil, false, err
 	}
 
 	var history []*object.Commit
 
-	commitHistory.ForEach(func(c *object.Commit) error {
+	err = commitHistory.ForEach(func(c *object.Commit) error {
 		history = append(history, c)
 		return nil
 	})
+	if err != nil {
+		return nil, false, err
+	}
 
 	// Reverse commit history to go from oldest to most recent
 	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
@@ -150,8 +133,8 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		shortMessage := c.shortMessage(commit.Message)
 
 		if breakingChange {
-			c.logger.Printf("(%s) breaking change", shortHash)
-			semver.BumpMajor()
+			c.logger.Info("found breaking change", "commit", shortHash)
+			semverFromTag.BumpMajor()
 			newRelease = true
 			continue
 		}
@@ -164,34 +147,30 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 
 		switch releaseType {
 		case "patch":
-			semver.BumpPatch()
+			semverFromTag.BumpPatch()
 			newRelease = true
 			newReleaseType = "patch"
 		case "minor":
-			semver.BumpMinor()
+			semverFromTag.BumpMinor()
 			newRelease = true
 			newReleaseType = "minor"
 		case "major":
-			semver.BumpMajor()
+			semverFromTag.BumpMajor()
 			newRelease = true
 			newReleaseType = "major"
 		default:
-			c.logger.Fatalf("found a rule but no associated release type")
+			return nil, false, fmt.Errorf("unknown release type %s", releaseType)
 		}
 
-		if newRelease && c.verbose {
-			c.logger.Printf("(%s) %s: \"%s\"", shortHash, newReleaseType, shortMessage)
+		if c.verbose {
+			c.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
 		}
 
 	}
 
-	c.logger.Printf("version is now %s", semver)
+	c.logger.Info("few version", "value", semverFromTag)
 
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
-	}
-
-	return semver, newRelease, nil
+	return semverFromTag, newRelease, nil
 }
 
 func (c *CommitAnalyzer) shortMessage(message string) string {
@@ -199,5 +178,5 @@ func (c *CommitAnalyzer) shortMessage(message string) string {
 		return fmt.Sprintf("%s...", message[0:47])
 	}
 
-	return message[0 : len(message)-1]
+	return message
 }

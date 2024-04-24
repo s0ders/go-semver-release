@@ -15,7 +15,7 @@ import (
 	"github.com/s0ders/go-semver-release/internal/semver"
 )
 
-var TaggerGitSignature = object.Signature{
+var GitSignature = object.Signature{
 	Name:  "Go Semver Release",
 	Email: "ci@ci.ci",
 	When:  time.Now(),
@@ -34,12 +34,11 @@ func NewTagger(tagPrefix string) *Tagger {
 	}
 }
 
-func NewTag(semver semver.Semver, hash plumbing.Hash) *object.Tag {
-
+func New(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
-		Tagger: TaggerGitSignature,
+		Tagger: GitSignature,
 	}
 
 	return tag
@@ -48,12 +47,11 @@ func NewTag(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
 	tagExists := false
 	tags, err := r.Tags()
-
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch tags: %w", err)
 	}
 
-	tags.ForEach(func(tag *plumbing.Reference) error {
+	err = tags.ForEach(func(tag *plumbing.Reference) error {
 		tagRef := fmt.Sprintf("refs/tags/%s", tagName)
 		if tag.Name().String() == tagRef {
 			tagExists = true
@@ -61,13 +59,16 @@ func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return false, err
+	}
 
 	return tagExists, nil
 }
 
 // AddTagToRepository create a new annotated tag on the repository
 // with a name corresponding to the semver passed as a parameter.
-func (t *Tagger) addTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
+func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*git.Repository, error) {
 	h, err := r.Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch head: %w", err)
@@ -86,9 +87,8 @@ func (t *Tagger) addTagToRepository(r *git.Repository, semver *semver.Semver) (*
 
 	_, err = r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
 		Message: semver.NormalVersion(),
-		Tagger:  &TaggerGitSignature,
+		Tagger:  &GitSignature,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tag on repository: %w", err)
 	}
@@ -99,8 +99,7 @@ func (t *Tagger) addTagToRepository(r *git.Repository, semver *semver.Semver) (*
 }
 
 func (t *Tagger) PushTagToRemote(r *git.Repository, token string, semver *semver.Semver) error {
-
-	repo, err := t.addTagToRepository(r, semver)
+	repo, err := t.AddTagToRepository(r, semver)
 	if err != nil {
 		return fmt.Errorf("failed to add tag on repository: %w", err)
 	}

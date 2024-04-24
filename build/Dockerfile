@@ -1,12 +1,12 @@
-FROM golang:1.19 as build
+FROM golang:1.22 as build
 
 WORKDIR /go/src/app
 COPY . .
 
 RUN go mod download
-RUN CGO_ENABLED=1 go build ./cmd/go-semver-release/main.go
+RUN CGO_ENABLED=1 go build -ldflags "-w -s" -o ./main ./main.go
 
-FROM gcr.io/distroless/base-nossl-debian11
+FROM alpine:3.19
 
 COPY --from=build /go/src/app/main /go-semver-release
 

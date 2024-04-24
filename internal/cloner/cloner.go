@@ -2,7 +2,7 @@ package cloner
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/go-git/go-git/v5"
@@ -11,18 +11,16 @@ import (
 )
 
 type Cloner struct {
-	l *log.Logger
+	l *slog.Logger
 }
 
-func NewCloner() Cloner {
-	logger := log.New(os.Stdout, fmt.Sprintf("%-20s ", "[cloner]"), log.Default().Flags())
-
+func New(logger *slog.Logger) Cloner {
 	return Cloner{
 		l: logger,
 	}
 }
 
-func (c Cloner) Clone(url, branch, token string) (*git.Repository, string) {
+func (c Cloner) Clone(url, branch, token string) (*git.Repository, string, error) {
 	auth := &http.BasicAuth{
 		Username: "go-semver-release",
 		Password: token,
@@ -30,7 +28,7 @@ func (c Cloner) Clone(url, branch, token string) (*git.Repository, string) {
 
 	path, err := os.MkdirTemp("", "go-semver-release-*")
 	if err != nil {
-		c.l.Fatalf("failed to create temporary directory to clone repository in: %s", err)
+		return nil, "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
 	cloneOption := &git.CloneOptions{
@@ -44,10 +42,9 @@ func (c Cloner) Clone(url, branch, token string) (*git.Repository, string) {
 	}
 
 	repository, err := git.PlainClone(path, false, cloneOption)
-
 	if err != nil {
-		c.l.Fatalf("failed to clone repository: %s", err)
+		return nil, "", fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	return repository, path
+	return repository, path, nil
 }
