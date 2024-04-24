@@ -1,14 +1,16 @@
 FROM golang:1.22 as build
 
-WORKDIR /go/src/app
+WORKDIR /build
 COPY . .
 
 RUN go mod download
-RUN CGO_ENABLED=1 go build -ldflags "-w -s" -o ./main ./main.go
+RUN CGO_ENABLED=0 go build -ldflags "-w -s" -o ./go-semver-release ./main.go
 
 FROM alpine:3.19
 
-COPY --from=build /go/src/app/main /go-semver-release
+WORKDIR /app
 
-ENTRYPOINT ["/go-semver-release"]
+COPY --from=build /build/go-semver-release .
+
+ENTRYPOINT ["./go-semver-release"]
 CMD ["--help"]
