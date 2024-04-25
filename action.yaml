@@ -33,4 +33,13 @@ runs:
   using: 'docker'
   image: 'Dockerfile'
   args:
-    - "--help"
+    - "local"
+    - ${{ inputs.repository-path }}
+    - --tag-prefix
+    - ${{ inputs.tag-prefix }}
+    - --release-branch
+    - ${{ inputs.branch }}
+    - --dry-run
+    - ${{ inputs.dry-run }}
+    - --verbose
+    - ${{ inputs.verbose }}

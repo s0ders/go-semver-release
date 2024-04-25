@@ -36,7 +36,17 @@ jobs:
       release: ${{ steps.gosemver.outputs.NEW_RELEASE }}
       semver: ${{ steps.gosemver.outputs.SEMVER }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
+
+    - name: Go Semver Release Dryrun
+      id: gosemver
+      uses: ./
+      with:
+        repository-path: .
+        tag-prefix: 'v'
+        branch: 'main'
+        dry-run: 'true'
+        verbose: 'true'
 
   docker-build-and-scan:
     runs-on: ubuntu-latest
