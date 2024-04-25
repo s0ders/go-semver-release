@@ -6,7 +6,7 @@ on:
 
 env:
   DOCKER_REPO: docker.io/soders
-  DOCKER_IMAGE: ${{ env.DOCKER_REPO }}/go-semver-release
+  DOCKER_IMAGE: docker.io/soders/go-semver-release
   GIT_CI_USERNAME: go-semver-ci
   GIT_CI_EMAIL: go-semver@release.ci
   SBOM_FILE: sbom.spdx
