@@ -15,6 +15,9 @@ env:
 jobs:
   go-build:
     runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.gosemver.outputs.NEW_RELEASE }}
+      semver: ${{ steps.gosemver.outputs.SEMVER }}
     steps:
     - uses: actions/checkout@v4
 
@@ -23,30 +26,15 @@ jobs:
       with:
         go-version: 1.22
 
-    - name: Go Build
-      run: go build -v ./main.go
-
     - name: Go Test
       run: go test -v ./...
 
-  pre-release-detection:
-    runs-on: ubuntu-latest
-    needs: go-build
-    outputs:
-      release: ${{ steps.gosemver.outputs.NEW_RELEASE }}
-      semver: ${{ steps.gosemver.outputs.SEMVER }}
-    steps:
-    - uses: actions/checkout@v3
+    - name: Go Build
+      run: go build -v -o ./go-semver-release ./main.go
 
     - name: Go Semver Release Dryrun
       id: gosemver
-      uses: ./
-      with:
-        repository-path: .
-        tag-prefix: 'v'
-        branch: 'main'
-        dry-run: 'true'
-        verbose: 'true'
+      run: ./go-semver-release local . --release-branch main --dry-run true --verbose true --tag-prefix v
 
   docker-build-and-scan:
     runs-on: ubuntu-latest
