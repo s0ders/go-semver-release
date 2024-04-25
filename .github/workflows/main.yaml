@@ -35,7 +35,7 @@ jobs:
       release: ${{ steps.gosemver.outputs.NEW_RELEASE }}
       semver: ${{ steps.gosemver.outputs.SEMVER }}
     steps:
-      - uses: actions/checkout@v4A
+      - uses: actions/checkout@v4
 
       - name: ls
         run: ls -la
