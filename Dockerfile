@@ -4,15 +4,13 @@ WORKDIR /build
 COPY . .
 
 RUN go mod download
-RUN CGO_ENABLED=0 go build -ldflags "-w -s" -o ./go-semver-release ./main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-w -s" -o ./go-semver-release ./main.go
 
-FROM alpine:3.19
+FROM gcr.io/distroless/base-debian12
 
 WORKDIR /app
 
-COPY --from=build /build/go-semver-release .
-
-RUN echo "test"
+COPY --from=build /build/go-semver-release ./go-semver-release
 
 ENTRYPOINT ["./go-semver-release"]
 CMD ["--help"]
