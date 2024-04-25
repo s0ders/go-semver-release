@@ -101,7 +101,9 @@ jobs:
           crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} latest
 
       - name: Remove Prerelease Tag
-        run: oras manifest delete --force ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}
+        run: |
+          oras login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} docker.io
+          oras manifest delete --force ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
@@ -117,5 +119,5 @@ jobs:
 
       - name: Tag and Push
         run: |
-          git tag ${{needs.go-build.outputs.semver}}
+          git tag -a ${{needs.go-build.outputs.semver}} -m "${{needs.go-build.outputs.semver}}"
           git push origin ${{needs.go-build.outputs.semver}}
