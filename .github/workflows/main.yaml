@@ -32,6 +32,9 @@ jobs:
     - name: Go Build
       run: go build -v -o ./go-semver-release ./main.go
 
+    - name: ls
+      run: ls -la
+
     - name: Go Semver Release Dryrun
       id: gosemver
       run: ./go-semver-release local . --release-branch main --dry-run --verbose --tag-prefix v
