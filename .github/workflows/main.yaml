@@ -34,7 +34,7 @@ jobs:
 
     - name: Go Semver Release Dryrun
       id: gosemver
-      run: ./go-semver-release local . --release-branch main --dry-run true --verbose true --tag-prefix v
+      run: ./go-semver-release local . --release-branch main --dry-run --verbose --tag-prefix v
 
   docker-build-and-scan:
     runs-on: ubuntu-latest
