@@ -38,8 +38,8 @@ jobs:
 
   docker-build-and-scan:
     runs-on: ubuntu-latest
-    needs: pre-release-detection
-    if: ${{needs.pre-release-detection.outputs.release == 'true'}}
+    needs: go-build
+    if: ${{needs.go-build.outputs.release == 'true'}}
     env:
       PRERELEASE_TAG: "${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}"
     steps:
