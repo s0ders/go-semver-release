@@ -125,4 +125,4 @@ jobs:
 
       - name: Push Semver tag
         run: |
-          git push origin ${{needs.go-build.outputs.semver}}
+          git push origin ${{needs.go-builder.outputs.semver}}
