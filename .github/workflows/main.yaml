@@ -31,6 +31,9 @@ jobs:
       - name: Go Test
         run: go test -v ./...
 
+      - name: ls
+        run: ls -la
+
       - name: Go Semver Release
         id: gosemver
         run: ./go-semver-release local . --release-branch main --tag-prefix --verbose
