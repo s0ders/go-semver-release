@@ -16,14 +16,6 @@ inputs:
     description: 'The branch on which the fetch the commits used to compute the semantic version'
     required: false
     default: ''
-  dry-run:
-    description: 'Enable dry-run which prevents pushing any tag, only computes the next - if any - semantic version'
-    required: false
-    default: 'false'
-  verbose:
-    description: 'Enable verbose output showing which commit triggered a release (if any) and its type'
-    required: false
-    default: 'false'
 outputs:
   SEMVER:
     description: 'The newly computed version or the current one if no new version were computed'
@@ -39,7 +31,4 @@ runs:
     - ${{ inputs.tag-prefix }}
     - --release-branch
     - ${{ inputs.branch }}
-    - --dry-run
-    - ${{ inputs.dry-run }}
     - --verbose
-    - ${{ inputs.verbose }}

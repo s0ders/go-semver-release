@@ -1,16 +1,13 @@
-FROM golang:1.22 as build
-
-WORKDIR /build
-COPY . .
-
-RUN go mod download
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-w -s" -o ./go-semver-release ./main.go
-
-FROM gcr.io/distroless/base-debian12
+FROM golang:1.22 as builder
 
 WORKDIR /app
+COPY . /app
 
-COPY --from=build /build/go-semver-release ./go-semver-release
+RUN go mod download
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -v -o app .
 
-ENTRYPOINT ["./go-semver-release"]
-CMD ["--help"]
+FROM alpine:3.19
+
+COPY --from=builder /app/app /app
+
+ENTRYPOINT ["/app"]

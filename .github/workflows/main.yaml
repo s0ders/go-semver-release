@@ -1,4 +1,4 @@
-name: build
+name: pipeline
 
 on:
   push:
@@ -6,8 +6,7 @@ on:
 
 env:
   DOCKER_REPO: docker.io/soders
-  DOCKER_IMAGE: docker.io/soders/go-semver-release
-  SEMVER_GIT_REPO_URL: https://github.com/s0ders/go-semver-release.git
+  DOCKER_IMAGE: ${{ env.DOCKER_REPO }}/go-semver-release
   GIT_CI_USERNAME: go-semver-ci
   GIT_CI_EMAIL: go-semver@release.ci
   SBOM_FILE: sbom.spdx
@@ -15,122 +14,112 @@ env:
 jobs:
   go-build:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22
+
+      - name: Go Build
+        run: go build -v ./...
+
+      - name: Go Test
+        run: go test -v ./...
+
+  pre-release-detection:
+    runs-on: ubuntu-latest
+    needs: go-build
     outputs:
       release: ${{ steps.gosemver.outputs.NEW_RELEASE }}
       semver: ${{ steps.gosemver.outputs.SEMVER }}
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-tags: 'true'
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.22
-
-    - name: Go Test
-      run: go test -v ./...
-
-    - name: Go Build
-      run: go build -v -o ./go-semver-release ./main.go
-
-    - name: ls
-      run: ls -la
-
-    - name: Go Semver Release Dryrun
-      id: gosemver
-      run: ./go-semver-release local . --release-branch main --dry-run --verbose --tag-prefix v
+      - name: Go Semver Release
+        id: gosemver
+        uses: ./
+        with:
+          repository-path: .
+          tag-prefix: 'v'
+          branch: 'main'
 
   docker-build-and-scan:
     runs-on: ubuntu-latest
-    needs: go-build
-    if: ${{needs.go-build.outputs.release == 'true'}}
+    needs: pre-release-detection
+    if: ${{needs.pre-release-detection.outputs.release == 'true'}}
     env:
-      PRERELEASE_TAG: "${{needs.go-build.outputs.semver}}-${{ github.sha }}"
+      PRERELEASE_TAG: '${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}'
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Docker build pre-release
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: Dockerfile
-        push: true
-        tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
+      - name: Docker build pre-release
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: soders/go-semver-semver:${{ env.PRERELEASE_TAG }}
 
-    - name: Trivy Scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: '${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}'
-        format: 'table'
-        exit-code: '1'
-        ignore-unfixed: true
-        vuln-type: 'os,library'
-        severity: 'CRITICAL,HIGH,MEDIUM'
+      - name: Trivy Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM'
 
   sbom-sign-and-release-tag:
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - docker-build-and-scan
-      - go-build
-    if: ${{needs.go-build.outputs.release == 'true'}}
+      - pre-release-detection
+    if: ${{needs.pre-release-detection.outputs.release == 'true'}}
     env:
-      PRERELEASE_TAG: "${{needs.go-build.outputs.semver}}-${{ github.sha }}"
-      RELEASE_TAG: ${{needs.go-build.outputs.semver}}
+      PRERELEASE_TAG: '${{needs.pre-release-detection.outputs.semver}}-${{ github.sha }}'
+      RELEASE_TAG: ${{needs.pre-release-detection.outputs.semver}}
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Install Crane
-      uses: imjasonh/setup-crane@v0.1
-    
-    - name: Crane Add Release Tags And Remove Prerelease
-      run: |
-        crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} ${{ env.RELEASE_TAG }}
-        crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} latest
-        crane delete ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}
+      - name: Install Crane
+        uses: imjasonh/setup-crane@v0.1
 
-    - name: Generate SBOM
-      uses: anchore/sbom-action@v0
-      with:
-        image: ${{ env.DOCKER_IMAGE }}
-        artifact-name: ${{ env.SBOM_FILE }}
+      - name: Crane Add Release Tags And Remove Prerelease
+        run: |
+          crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} ${{ env.RELEASE_TAG }}
+          crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} latest
+          crane delete ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}
 
-    - name: Git configuration
-      run: |
-        git config --global user.email "${{ env.GIT_CI_EMAIL }}"
-        git config --global user.name "${{ env.GIT_CI_USERNAME }}
-        git config --global commit.gpgsign true"
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.DOCKER_IMAGE }}
+          artifact-name: ${{ env.SBOM_FILE }}
 
-    - name: Push Semver tag
-      run: |
-        git tag -a ${{needs.go-build.outputs.semver}} -m "${{needs.go-build.outputs.semver}}"
-        git push origin ${{needs.go-build.outputs.semver}}
+      - name: Git configuration
+        run: |
+          git config --global user.email "${{ env.GIT_CI_EMAIL }}"
+          git config --global user.name "${{ env.GIT_CI_USERNAME }}
+          git config --global commit.gpgsign true"
 
-    - name: Update version tag in documentation
-      run: |
-        sed -E 's/go-semver-release@v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/go-semver-release@${{ env.RELEASE_TAG }}/' -i README.md
-
-    - name: Update docker image hash
-      run: |
-        HASH=$(crane digest soders/go-semver-release:${{ env.RELEASE_TAG }} | awk 'BEGIN{FS="@"} { print $2 }')
-        sed -E 's/go-semver-release@sha256:[0-9a-f]{64}/go-semver-release@$HASH/' -i README.md
-
-    - name: Push documentation update
-      run: |
-        git commit -a -m "[ci] updated version in documentation"
-        git push origin
+      - name: Push Semver tag
+        run: |
+          git push origin ${{needs.go-build.outputs.semver}}
