@@ -1,6 +1,6 @@
 <img alt="go version badge" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"> <img alt="github actions badge" src="https://github.com/s0ders/go-semver-release/actions/workflows/main.yaml/badge.svg"> <img alt="go report card" src="http://goreportcard.com/badge/github.com/s0ders/go-semver-release"> <img alt="license badge" src="https://img.shields.io/github/license/s0ders/go-semver-release">
 
-# Go SemVer Release
+# Go Semver Release
 
 Go program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging them with the right semver number. This program can be used directly via its CLI or its corresponding [GitHub Action](https://github.com/marketplace/actions/go-semver-release).
 
