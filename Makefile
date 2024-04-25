@@ -10,4 +10,7 @@ vuln:
 docker-build:
 	docker build -f ./build/Dockerfile -t soders/go-semver-release .
 
+action-lint:
+	actionlint
+
 .PHONY: build
