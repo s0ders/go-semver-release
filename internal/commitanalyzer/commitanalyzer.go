@@ -100,7 +100,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 
 	commitHistory, err := r.Log(logOptions)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to fetch commit history: %w", err)
 	}
 
 	var history []*object.Commit
@@ -110,7 +110,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		return nil
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to loop over commit history: %w", err)
 	}
 
 	// Reverse commit history to go from oldest to most recent
