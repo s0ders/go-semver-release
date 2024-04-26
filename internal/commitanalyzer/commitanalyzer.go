@@ -74,7 +74,9 @@ func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		return tagger.NewTagFromSemver(*version, head.Hash()), nil
 	}
 
-	c.logger.Info("found latest semver tag", "tag", latestTag.Name)
+	if c.verbose {
+		c.logger.Info("found latest semver tag", "tag", latestTag.Name)
+	}
 
 	return latestTag, nil
 }
@@ -133,7 +135,9 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		shortMessage := c.shortMessage(commit.Message)
 
 		if breakingChange {
-			c.logger.Info("found breaking change", "commit", shortHash)
+			if c.verbose {
+				c.logger.Info("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
+			}
 			semverFromTag.BumpMajor()
 			newRelease = true
 			continue

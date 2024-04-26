@@ -1,10 +1,9 @@
 package cmd
 
 import (
+	"github.com/s0ders/go-semver-release/internal/ci"
 	"log/slog"
 	"os"
-
-	"github.com/s0ders/go-semver-release/internal/output"
 
 	"github.com/s0ders/go-semver-release/internal/commitanalyzer"
 	"github.com/s0ders/go-semver-release/internal/releaserules"
@@ -22,6 +21,7 @@ var (
 	releaseBranch string
 	dryRun        bool
 	verbose       bool
+	json          bool
 )
 
 func init() {
@@ -31,7 +31,8 @@ func init() {
 	remoteCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
 	remoteCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	remoteCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
-	remoteCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	remoteCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
+	remoteCmd.Flags().BoolVarP(&json, "json", "j", false, "JSON formatted output")
 
 	remoteCmd.MarkFlagRequired("git-url")
 	remoteCmd.MarkFlagRequired("token")
@@ -44,7 +45,16 @@ var remoteCmd = &cobra.Command{
 	Short: "Version a remote repository and push the semver tag back to the remote",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+		var logHandler slog.Handler
+
+		if json {
+			logHandler = slog.NewJSONHandler(os.Stdout, nil)
+		} else {
+			logHandler = slog.NewTextHandler(os.Stdout, nil)
+		}
+
+		logger := slog.New(logHandler)
 
 		repo, path, err := cloner.New(logger).Clone(gitURL, releaseBranch, token)
 		if err != nil {
@@ -73,7 +83,7 @@ var remoteCmd = &cobra.Command{
 			return err
 		}
 
-		err = output.NewOutput(logger).Generate(tagPrefix, semver, release)
+		err = ci.New(logger).GenerateGitHub(tagPrefix, semver, release)
 		if err != nil {
 			return err
 		}
@@ -86,7 +96,7 @@ var remoteCmd = &cobra.Command{
 			logger.Info("new release found, dry-run is enabled", "next-version", semver)
 			return nil
 		default:
-			err = tagger.New(logger, tagPrefix).PushTagToRemote(repo, token, semver)
+			err = tagger.New(logger, tagPrefix, verbose).PushTagToRemote(repo, token, semver)
 			if err != nil {
 				return err
 			}

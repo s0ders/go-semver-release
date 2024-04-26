@@ -1,4 +1,4 @@
-package output
+package ci
 
 import (
 	"fmt"
@@ -12,13 +12,13 @@ type Output struct {
 	logger *slog.Logger
 }
 
-func NewOutput(logger *slog.Logger) Output {
+func New(logger *slog.Logger) Output {
 	return Output{
 		logger: logger,
 	}
 }
 
-func (o Output) Generate(prefix string, semver *semver.Semver, release bool) (err error) {
+func (o Output) GenerateGitHub(prefix string, semver *semver.Semver, release bool) (err error) {
 	path, exists := os.LookupEnv("GITHUB_OUTPUT")
 
 	if !exists {
@@ -29,7 +29,7 @@ func (o Output) Generate(prefix string, semver *semver.Semver, release bool) (er
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("error opening output file: %w", err)
+		return fmt.Errorf("error opening ci file: %w", err)
 	}
 
 	defer func(f *os.File) {
@@ -41,7 +41,7 @@ func (o Output) Generate(prefix string, semver *semver.Semver, release bool) (er
 
 	_, err = f.WriteString(output)
 	if err != nil {
-		return fmt.Errorf("error writing to output file: %w", err)
+		return fmt.Errorf("error writing to ci file: %w", err)
 	}
 
 	return nil

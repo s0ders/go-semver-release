@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"github.com/go-git/go-git/v5"
+	"github.com/s0ders/go-semver-release/internal/ci"
 	"github.com/s0ders/go-semver-release/internal/commitanalyzer"
-	"github.com/s0ders/go-semver-release/internal/output"
 	"github.com/s0ders/go-semver-release/internal/releaserules"
 	"github.com/s0ders/go-semver-release/internal/tagger"
 	"github.com/spf13/cobra"
@@ -16,7 +16,8 @@ func init() {
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
-	localCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	localCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
+	localCmd.Flags().BoolVarP(&json, "json", "j", false, "JSON formatted output")
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -27,7 +28,15 @@ var localCmd = &cobra.Command{
 	Long:  "Version a local repository by adding an annotated tag named after the right semver allowing you to push it back to your remote without sharing any secret token",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		var logHandler slog.Handler
+
+		if json {
+			logHandler = slog.NewJSONHandler(os.Stdout, nil)
+		} else {
+			logHandler = slog.NewTextHandler(os.Stdout, nil)
+		}
+
+		logger := slog.New(logHandler)
 
 		repo, err := git.PlainOpen(args[0])
 		if err != nil {
@@ -49,7 +58,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		err = output.NewOutput(logger).Generate(tagPrefix, semver, release)
+		err = ci.New(logger).GenerateGitHub(tagPrefix, semver, release)
 		if err != nil {
 			return err
 		}
@@ -62,7 +71,7 @@ var localCmd = &cobra.Command{
 			logger.Info("new release found, dry-run is enabled", "next-version", semver)
 			return nil
 		default:
-			_, err = tagger.New(logger, tagPrefix).AddTagToRepository(repo, semver)
+			_, err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repo, semver)
 			if err != nil {
 				return err
 			}

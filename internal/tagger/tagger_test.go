@@ -45,7 +45,7 @@ func TestTagExists(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "")
+	tagger := New(logger, "", true)
 
 	tagExistsTrue, err := tagger.TagExists(r, tags[0])
 	if err != nil {
@@ -78,7 +78,7 @@ func TestAddTagToRepository(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "")
+	tagger := New(logger, "", true)
 	taggedRepository, err := tagger.AddTagToRepository(r, semver)
 	if err != nil {
 		t.Fatalf("failed to tag repository: %s", err)

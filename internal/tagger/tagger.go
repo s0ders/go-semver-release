@@ -24,12 +24,14 @@ var GitSignature = object.Signature{
 type Tagger struct {
 	logger    *slog.Logger
 	tagPrefix string
+	verbose   bool
 }
 
-func New(logger *slog.Logger, prefix string) *Tagger {
+func New(logger *slog.Logger, prefix string, verbose bool) *Tagger {
 	return &Tagger{
 		logger:    logger,
 		tagPrefix: prefix,
+		verbose:   verbose,
 	}
 }
 
@@ -92,7 +94,9 @@ func (t *Tagger) AddTagToRepository(r *git.Repository, semver *semver.Semver) (*
 		return nil, fmt.Errorf("failed to create tag on repository: %w", err)
 	}
 
-	t.logger.Info("created new tag on repository", "tag", semver.String())
+	if t.verbose {
+		t.logger.Info("created new tag on repository", "tag", semver.String())
+	}
 
 	return r, nil
 }
@@ -117,7 +121,9 @@ func (t *Tagger) PushTagToRemote(r *git.Repository, token string, semver *semver
 		return fmt.Errorf("failed to push tag to remote: %w", err)
 	}
 
-	t.logger.Info("pushed tag on repository", "tag", semver)
+	if t.verbose {
+		t.logger.Info("pushed tag on repository", "tag", semver)
+	}
 
 	return nil
 }
