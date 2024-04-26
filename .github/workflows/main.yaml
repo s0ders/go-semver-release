@@ -35,7 +35,7 @@ jobs:
 
       - name: Go Semver Release
         id: go-semver
-        run: ./go-semver-release local . --release-branch main --tag-prefix v --verbose
+        run: ./go-semver-release local . --release-branch main --tag-prefix v --verbose --json
 
   docker-build-and-scan:
     runs-on: ubuntu-latest

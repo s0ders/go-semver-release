@@ -32,3 +32,4 @@ runs:
     - --release-branch
     - ${{ inputs.branch }}
     - --verbose
+    - --json
