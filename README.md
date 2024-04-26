@@ -39,7 +39,7 @@ $ go-semver-release --help
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release@latest
+$ docker pull soders/go-semver-release:latest
 $ docker run --rm soders/go-semver-release --help
 ```
 
