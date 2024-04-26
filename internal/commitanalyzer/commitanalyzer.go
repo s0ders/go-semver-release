@@ -143,9 +143,9 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 			continue
 		}
 
-		releaseType, commitMatchesARule := rulesMap[commitType]
+		releaseType, ruleMatch := rulesMap[commitType]
 
-		if !commitMatchesARule {
+		if !ruleMatch {
 			continue
 		}
 

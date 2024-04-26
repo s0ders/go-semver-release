@@ -117,7 +117,7 @@ func TestIsYAML(t *testing.T) {
 		want bool
 	}
 
-	var validYAML = `foo: "ok"
+	validYAML := `foo: "ok"
 bar: true
 baz: 1.21
 obj:
