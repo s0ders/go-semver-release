@@ -2,8 +2,7 @@ build:
 	go build -o bin/go-semver-release
 
 test:
-	go test -race ./...
-
+	go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
 vuln:
 	govulncheck ./...
 
