@@ -1,4 +1,4 @@
-name: pipeline
+name: CI
 
 on:
   push:
@@ -32,6 +32,11 @@ jobs:
 
       - name: Go Test
         run: go test -v ./...
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Go Semver Release
         id: go-semver
