@@ -79,3 +79,44 @@ func TestCI_NoOutputEnvVar(t *testing.T) {
 
 	assert.NoError(err, "should not have tried to generate an output")
 }
+
+func TestCI_ReadOnlyOutput(t *testing.T) {
+	assert := assert.New(t)
+
+	outputDir, err := os.MkdirTemp("./", "output-*")
+	assert.NoError(err, "should create temp directory")
+
+	defer func(path string) {
+		err := os.RemoveAll(outputDir)
+		assert.NoError(err, "should have been able to remove temporary directory")
+	}(outputDir)
+
+	outputFilePath := filepath.Join(outputDir, "output")
+
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o444)
+	assert.NoError(err, "should have been able to create output file")
+
+	defer func(outputFile *os.File) {
+		err := outputFile.Close()
+		assert.NoError(err, "should have been able to close output file")
+	}(outputFile)
+
+	outputPath := filepath.Join(outputDir, "output")
+
+	err = os.Setenv("GITHUB_OUTPUT", outputPath)
+	assert.NoError(err, "should have been able to set GITHUB_OUTPUT")
+
+	defer func() {
+		err := os.Unsetenv("GITHUB_OUTPUT")
+		assert.NoError(err, "should have been able to unset GITHUB_OUTPUT")
+	}()
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	output := New(logger)
+
+	version, err := semver.New(1, 2, 3, "")
+	assert.NoError(err, "should have been able to create version")
+
+	err = output.GenerateGitHub("v", version, true)
+	assert.Error(err, "should have failed since output file is readonly")
+}
