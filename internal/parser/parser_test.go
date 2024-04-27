@@ -17,7 +17,7 @@ import (
 	"github.com/s0ders/go-semver-release/internal/rules"
 )
 
-func TestCommitTypeRegex(t *testing.T) {
+func TestParser_CommitTypeRegex(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
@@ -40,7 +40,7 @@ func TestCommitTypeRegex(t *testing.T) {
 	}
 }
 
-func TestBreakingChangeRegex(t *testing.T) {
+func TestParser_BreakingChangeRegex(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
@@ -62,7 +62,7 @@ func TestBreakingChangeRegex(t *testing.T) {
 	}
 }
 
-func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
+func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
@@ -90,7 +90,7 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 	assert.Equal(want, latest.Name, "latest semver tag should be equal")
 }
 
-func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
+func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
@@ -132,7 +132,7 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 	assert.Equal(tag, latest.Name, "latest semver tag should be equal")
 }
 
-func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
+func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
@@ -177,7 +177,7 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	assert.Equal(want, latest.Name, "latest semver tag should be equal")
 }
 
-func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testing.T) {
+func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
@@ -206,7 +206,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 	assert.Equal(want, version.String(), "version should be equal")
 }
 
-func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.T) {
+func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
@@ -233,7 +233,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 	assert.Equal(want, version.String(), "version should be equal")
 }
 
-func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
+func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
@@ -261,7 +261,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 	assert.Equal(want, version.String(), "version should be equal")
 }
 
-func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.T) {
+func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")

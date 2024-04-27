@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPrecedence(t *testing.T) {
+func TestSemver_Precedence(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
@@ -33,7 +33,7 @@ func TestPrecedence(t *testing.T) {
 	}
 }
 
-func TestIsZero(t *testing.T) {
+func TestSemver_IsZero(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
@@ -55,7 +55,7 @@ func TestIsZero(t *testing.T) {
 	}
 }
 
-func TestNormalVersion(t *testing.T) {
+func TestSemver_NormalVersion(t *testing.T) {
 	assert := assert.New(t)
 
 	version, err := New(1, 2, 3, "d364937ad663484d80c28485f60a91cf2af2f932")
@@ -68,14 +68,14 @@ func TestNormalVersion(t *testing.T) {
 	assert.Equal(version.NormalVersion(), want, "the strings should be equal")
 }
 
-func TestNegativeSemver(t *testing.T) {
+func TestSemver_NegativeSemver(t *testing.T) {
 	assert := assert.New(t)
 
 	_, err := New(-1, 0, 0, "")
 	assert.Error(err, "should have failed to create a negative semver")
 }
 
-func TestSemverString(t *testing.T) {
+func TestSemver_String(t *testing.T) {
 	assert := assert.New(t)
 	s, _ := New(1, 2, 3, "")
 
@@ -83,7 +83,7 @@ func TestSemverString(t *testing.T) {
 	assert.Equal(s.String(), want, "the strings should be equal")
 }
 
-func TestNewSemverFromGitTag(t *testing.T) {
+func TestSemver_FromGitTag(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
@@ -135,7 +135,7 @@ func TestNewSemverFromGitTag(t *testing.T) {
 	}
 }
 
-func TestBump(t *testing.T) {
+func TestSemver_Bump(t *testing.T) {
 	assert := assert.New(t)
 
 	s, err := New(0, 0, 0, "")

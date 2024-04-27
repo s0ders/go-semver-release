@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestReleaseRules_Map(t *testing.T) {
+func TestRules_Map(t *testing.T) {
 	assert := assert.New(t)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -30,7 +30,7 @@ func TestReleaseRules_Map(t *testing.T) {
 	assert.Equal(want, got, "rule maps should match")
 }
 
-func TestReleaseRules_ParseDefault(t *testing.T) {
+func TestRules_ParseDefault(t *testing.T) {
 	assert := assert.New(t)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -61,7 +61,7 @@ func TestReleaseRules_ParseDefault(t *testing.T) {
 	}
 }
 
-func TestReleaseRules_IncorrectRules(t *testing.T) {
+func TestRules_IncorrectRules(t *testing.T) {
 	assert := assert.New(t)
 
 	const incorrectRules = `{
@@ -83,7 +83,7 @@ func TestReleaseRules_IncorrectRules(t *testing.T) {
 	assert.Error(err, "should have detected incorrect rules")
 }
 
-func TestReleaseRules_IsJSON(t *testing.T) {
+func TestRules_IsJSON(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
@@ -103,7 +103,7 @@ func TestReleaseRules_IsJSON(t *testing.T) {
 	}
 }
 
-func TestReleaseRules_IsYAML(t *testing.T) {
+func TestRules_IsYAML(t *testing.T) {
 	assert := assert.New(t)
 
 	type test struct {
