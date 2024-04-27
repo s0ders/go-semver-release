@@ -87,8 +87,6 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 		return nil, false, fmt.Errorf("failed to fetch latest semver: %w", err)
 	}
 
-	newRelease := false
-	newReleaseType := ""
 	semverFromTag, err := semver.FromGitTag(latestSemverTag)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
@@ -120,9 +118,20 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 		history[i], history[j] = history[j], history[i]
 	}
 
+	newRelease, err := p.ParseHistory(history, semverFromTag)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
+	}
+
+	return semverFromTag, newRelease, nil
+}
+
+func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
+	newRelease := false
+	newReleaseType := ""
 	rulesMap := p.releaseRules.Map()
 
-	for _, commit := range history {
+	for _, commit := range commits {
 
 		if !conventionalCommitRegex.MatchString(commit.Message) {
 			continue
@@ -138,7 +147,7 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 			if p.verbose {
 				p.logger.Info("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
 			}
-			semverFromTag.BumpMajor()
+			latestSemver.BumpMajor()
 			newRelease = true
 			continue
 		}
@@ -151,27 +160,28 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 
 		switch releaseType {
 		case "patch":
-			semverFromTag.BumpPatch()
+			latestSemver.BumpPatch()
 			newRelease = true
 			newReleaseType = "patch"
 		case "minor":
-			semverFromTag.BumpMinor()
+			latestSemver.BumpMinor()
 			newRelease = true
 			newReleaseType = "minor"
 		case "major":
-			semverFromTag.BumpMajor()
+			latestSemver.BumpMajor()
 			newRelease = true
 			newReleaseType = "major"
 		default:
-			return nil, false, fmt.Errorf("unknown release type %s", releaseType)
+			return false, fmt.Errorf("unknown release type %s", releaseType)
 		}
 
 		if p.verbose {
 			p.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
 		}
+
 	}
 
-	return semverFromTag, newRelease, nil
+	return newRelease, nil
 }
 
 func (p *Parser) shortMessage(message string) string {
