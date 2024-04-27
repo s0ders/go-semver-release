@@ -10,12 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/s0ders/go-semver-release/internal/releaserules"
 )
 
 func TestCommitTypeRegex(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		commit     string
 		commitType string
@@ -31,13 +35,14 @@ func TestCommitTypeRegex(t *testing.T) {
 
 	for _, item := range matrix {
 		got := conventionalCommitRegex.FindStringSubmatch(item.commit)[1]
-		if got != item.commitType {
-			t.Fatalf("Got: %s Want: %s\n", got, item.commitType)
-		}
+
+		assert.Equal(item.commitType, got, "commit type should be equal")
 	}
 }
 
 func TestBreakingChangeRegex(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		commit     string
 		isBreaking bool
@@ -52,57 +57,52 @@ func TestBreakingChangeRegex(t *testing.T) {
 	for _, item := range matrix {
 		submatch := conventionalCommitRegex.FindStringSubmatch(item.commit)
 		got := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
-		if got != item.isBreaking {
-			t.Fatalf("Got: %t Want: %t with commit %s\n", got, item.isBreaking, item.commit)
-		}
+
+		assert.Equal(item.isBreaking, got, "breaking change should be equal")
 	}
 }
 
 func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
+	assert.NoError(err, "should have been able to create Git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have been able to remove Git repository")
+	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	commitAnalyzer := New(logger, rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("faild to fetch latest semver tag: %s", err)
-	}
+	assert.NoError(err, "should have been able to fetch latest semver tag")
 
 	want := "0.0.0"
-	if got := latest.Name; got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(want, latest.Name, "latest semver tag should be equal")
 }
 
 func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
+	assert.NoError(err, "should have been able to create Git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have been able to remove Git repository")
+	}(repositoryPath)
 
 	h, err := r.Head()
-	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
-	}
+	assert.NoError(err, "should have been able to get HEAD")
 
 	tag := "1.0.0"
 
@@ -114,47 +114,37 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 			When:  time.Now(),
 		},
 	})
-	if err != nil {
-		t.Fatalf("failed to create tag: %s", err)
-	}
+	assert.NoError(err, "should have been able to create tag")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	commitAnalyzer := New(logger, rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("faild to fetch latest semver tag: %s", err)
-	}
+	assert.NoError(err, "should have been able to fetch latest semver tag")
 
-	want := tag
-	if got := latest.Name; got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(tag, latest.Name, "latest semver tag should be equal")
 }
 
 func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
+	assert.NoError(err, "should have been able to create Git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have been able to remove Git repository")
+	}(repositoryPath)
 
 	h, err := r.Head()
-	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
-	}
+	assert.NoError(err, "should have been able to get HEAD")
 
 	tags := []string{"2.0.0", "2.0.1", "3.0.0", "2.5.0", "0.0.2", "0.0.1", "0.1.0", "1.0.0"}
 
@@ -167,178 +157,142 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
-		if err != nil {
-			t.Fatalf("failed to create tag: %s", err)
-		}
+		assert.NoError(err, "should have been able to create tag")
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	commitAnalyzer := New(logger, rules, true)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
-	if err != nil {
-		t.Fatalf("faild to fetch latest semver tag: %s", err)
-	}
+	assert.NoError(err, "should have been able to fetch latest semver tag")
 
 	want := "3.0.0"
-	if got := latest.Name; got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(want, latest.Name, "latest semver tag should be equal")
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
+	assert.NoError(err, "should have been able to create Git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have able to remove Git repository")
+	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	ca := New(logger, rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
-	if err != nil {
-		t.Fatalf("failed to compute new semver number: %s", err)
-	}
+	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "0.0.0"
 
-	if got := version.String(); got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(want, version.String(), "version should be equal")
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	ca := New(logger, rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
-	if err != nil {
-		t.Fatalf("failed to compute new semver number: %s", err)
-	}
+	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "0.0.1"
-
-	if got := version.String(); got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(want, version.String(), "version should be equal")
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	ca := New(logger, rules, true)
 
 	version, _, err := ca.ComputeNewSemver(r)
-	if err != nil {
-		t.Fatalf("failed to compute new semver number: %s", err)
-	}
+	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "0.1.0"
-
-	if got := version.String(); got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(want, version.String(), "version should be equal")
 }
 
 func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.T) {
-	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert := assert.New(t)
 
-	defer os.RemoveAll(repositoryPath)
+	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
 
 	err = addCommit(r, "fix: added hello feature")
-	if err != nil {
-		t.Fatalf("failed to add commit: %s", err)
-	}
+	assert.NoError(err, "should have able to add git commit")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := releaserules.New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	ca := New(logger, rules, true)
 
 	version, newRelease, err := ca.ComputeNewSemver(r)
-	if err != nil {
-		t.Fatalf("failed to compute new semver number: %s", err)
-	}
+	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "1.0.1"
 
-	if got := version.String(); got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(want, version.String(), "version should be equal")
 
-	if newRelease != true {
-		t.Fatalf("got: %t want: %t", newRelease, true)
-	}
+	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
@@ -393,7 +347,7 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 	return r, tempDirPath, nil
 }
 
-func addCommit(r *git.Repository, message string) error {
+func addCommit(r *git.Repository, message string) (err error) {
 	w, err := r.Worktree()
 	if err != nil {
 		return fmt.Errorf("could not get worktree: %w", err)
@@ -404,7 +358,10 @@ func addCommit(r *git.Repository, message string) error {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	defer os.RemoveAll(tempDirPath)
+	defer func(path string) {
+		err = os.RemoveAll(path)
+		return
+	}(tempDirPath)
 
 	tempFileName := "temp"
 	tempFilePath := filepath.Join(tempDirPath, tempFileName)

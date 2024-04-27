@@ -63,3 +63,14 @@ func TestCI_GenerateGitHub(t *testing.T) {
 
 	assert.Equal(want, got, "output should match")
 }
+
+func TestCI_NoOutputEnvVar(t *testing.T) {
+	assert := assert.New(t)
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	output := New(logger)
+
+	err := output.GenerateGitHub("", nil, false)
+
+	assert.NoError(err, "should not have tried to generate an output")
+}
