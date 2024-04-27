@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/s0ders/go-semver-release/internal/ci"
-	"github.com/s0ders/go-semver-release/internal/parser"
-	"github.com/s0ders/go-semver-release/internal/rules"
-	"github.com/s0ders/go-semver-release/internal/tagger"
+	"github.com/s0ders/go-semver-release/v2/internal/ci"
+	"github.com/s0ders/go-semver-release/v2/internal/parser"
+	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/tagger"
 	"github.com/spf13/cobra"
 )
 

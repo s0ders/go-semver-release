@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/s0ders/go-semver-release/internal/semver"
+	"github.com/s0ders/go-semver-release/v2/internal/semver"
 	"github.com/stretchr/testify/assert"
 )
 

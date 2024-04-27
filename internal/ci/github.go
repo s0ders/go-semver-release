@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/s0ders/go-semver-release/internal/semver"
+	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
 type Output struct {

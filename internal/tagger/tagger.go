@@ -12,7 +12,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 
-	"github.com/s0ders/go-semver-release/internal/semver"
+	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
 var GitSignature = object.Signature{

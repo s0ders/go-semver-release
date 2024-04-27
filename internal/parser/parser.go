@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/s0ders/go-semver-release/internal/rules"
-	"github.com/s0ders/go-semver-release/internal/semver"
-	"github.com/s0ders/go-semver-release/internal/tagger"
+	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/semver"
+	"github.com/s0ders/go-semver-release/v2/internal/tagger"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"

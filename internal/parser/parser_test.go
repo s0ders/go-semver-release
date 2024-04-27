@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/s0ders/go-semver-release/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/rules"
 )
 
 func TestParser_CommitTypeRegex(t *testing.T) {
