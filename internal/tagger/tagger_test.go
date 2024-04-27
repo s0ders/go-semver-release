@@ -10,23 +10,24 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-
 	"github.com/s0ders/go-semver-release/internal/semver"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestTagExists(t *testing.T) {
+func TestTagger_TagExists(t *testing.T) {
+	assert := assert.New(t)
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert.NoError(err, "repository creation should have succeeded")
 
-	defer os.RemoveAll(repositoryPath)
+	defer func(path string) {
+		err := os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}(repositoryPath)
 
 	h, err := r.Head()
-	if err != nil {
-		t.Fatalf("failed to fetch head: %s", err)
-	}
+	assert.NoError(err, "should have fetched HEAD")
 
 	tags := []string{"1.0.0", "1.0.2"}
 
@@ -39,61 +40,74 @@ func TestTagExists(t *testing.T) {
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
-		if err != nil {
-			t.Fatalf("failed to create tag: %s", err)
-		}
+		assert.NoError(err, "tag creation should have succeeded")
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	tagger := New(logger, "", true)
 
-	tagExistsTrue, err := tagger.TagExists(r, tags[0])
-	if err != nil {
-		t.Fatalf("failed to check if tag exists: %s", err)
-	}
-	if want := true; tagExistsTrue != want {
-		t.Fatalf("got: %t want: %t", tagExistsTrue, want)
-	}
+	tagExists, err := tagger.TagExists(r, tags[0])
+	assert.NoError(err, "should have been able to check if tag exists")
+	assert.Equal(tagExists, true, "tag should have been found")
 
-	tagExistsFalse, err := tagger.TagExists(r, "0.0.1")
-	if err != nil {
-		t.Fatalf("failed to check if tag exists: %s", err)
-	}
-	if want := false; tagExistsFalse != want {
-		t.Fatalf("got: %t want: %t", tagExistsFalse, want)
-	}
+	tagDoesNotExists, err := tagger.TagExists(r, "0.0.1")
+	assert.NoError(err, "should have been able to check if tag exists")
+	assert.Equal(tagDoesNotExists, false, "tag should not have been found")
 }
 
-func TestAddTagToRepository(t *testing.T) {
+func TestTagger_AddTagToRepository(t *testing.T) {
+	assert := assert.New(t)
+
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
-	if err != nil {
-		t.Fatalf("failed to create git repository: %s", err)
-	}
+	assert.NoError(err, "repository creation should have succeeded")
 
-	defer os.RemoveAll(repositoryPath)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "failed to remove repository")
+	}(repositoryPath)
 
-	semver, err := semver.New(1, 0, 0, "")
-	if err != nil {
-		t.Fatalf("failed to create semver: %s", err)
-	}
+	version, err := semver.New(1, 0, 0, "")
+	assert.NoError(err, "semver creation should have succeeded")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "", true)
-	taggedRepository, err := tagger.AddTagToRepository(r, semver)
-	if err != nil {
-		t.Fatalf("failed to tag repository: %s", err)
-	}
+	tagger := New(logger, "", false)
 
-	tagExists, err := tagger.TagExists(taggedRepository, semver.String())
-	if err != nil {
-		t.Fatalf("failed to check if tag exists: %s", err)
-	}
+	taggedRepository, err := tagger.AddTagToRepository(r, version)
+	assert.NoError(err, "should have been able to add tag to repository")
 
-	if want := true; tagExists != want {
-		t.Fatalf("want: %t got: %t", want, tagExists)
-	}
+	tagExists, err := tagger.TagExists(taggedRepository, version.String())
+	assert.NoError(err, "should have been able to check if tag exists")
+
+	assert.Equal(tagExists, true, "tag should have been found")
 }
 
+func TestTagger_NewTagFromServer(t *testing.T) {
+	assert := assert.New(t)
+
+	var b [20]byte
+	for i := range 20 {
+		b[i] = byte(i)
+	}
+
+	hash := plumbing.Hash(b)
+
+	version, err := semver.New(0, 0, 1, "")
+	assert.NoError(err, "semver creation should have succeeded")
+
+	gotTag := NewTagFromSemver(*version, hash)
+
+	wantTag := &object.Tag{
+		Hash:   hash,
+		Name:   version.String(),
+		Tagger: GitSignature,
+	}
+
+	assert.Equal(*gotTag, *wantTag, "tag should match")
+}
+
+// TODO: replace by a mock ?
+// createGitRepository creates an empty Git repository, adds a file to it then creates
+// a commit with the given message.
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
 	tempDirPath, err := os.MkdirTemp("", "tagger-*")
 	if err != nil {

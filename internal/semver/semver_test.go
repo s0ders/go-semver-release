@@ -5,9 +5,12 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPrecedence(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		s1, s2 *Semver
 		want   int
@@ -25,13 +28,14 @@ func TestPrecedence(t *testing.T) {
 	}
 
 	for _, test := range matrix {
-		if got := test.s1.Precedence(test.s2); got != test.want {
-			t.Fatalf("got: %d want: %d\n", got, test.want)
-		}
+		got := test.s1.Precedence(test.s2)
+		assert.Equal(got, test.want, "semver precedence is not correct")
 	}
 }
 
 func TestIsZero(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		semver Semver
 		want   bool
@@ -46,47 +50,42 @@ func TestIsZero(t *testing.T) {
 	}
 
 	for _, test := range matrix {
-		if got := test.semver.IsZero(); got != test.want {
-			t.Fatalf("got: %t want: %t", got, test.want)
-		}
+		got := test.semver.IsZero()
+		assert.Equal(got, test.want, "semver has not been correctly classified as zero")
 	}
 }
 
 func TestNormalVersion(t *testing.T) {
+	assert := assert.New(t)
+
 	version, err := New(1, 2, 3, "d364937ad663484d80c28485f60a91cf2af2f932")
-	if err != nil {
-		t.Fatalf("Failed to create semver: %s", err)
-	}
+	assert.NoError(err, "should have been able to create semver")
 
 	want := "1.2.3+d364937ad663484d80c28485f60a91cf2af2f932"
-	if got := version.String(); got != want {
-		t.Fatalf("Got: %s Want: %s", got, want)
-	}
+	assert.Equal(version.String(), want, "the strings should be equal")
 
 	want = "1.2.3"
-	if got := version.NormalVersion(); got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(version.NormalVersion(), want, "the strings should be equal")
 }
 
 func TestNegativeSemver(t *testing.T) {
-	_, err := New(-1, 0, 0, "")
+	assert := assert.New(t)
 
-	if err == nil {
-		t.Fatalf("managed to create negative semver")
-	}
+	_, err := New(-1, 0, 0, "")
+	assert.Error(err, "should have failed to create a negative semver")
 }
 
 func TestSemverString(t *testing.T) {
+	assert := assert.New(t)
 	s, _ := New(1, 2, 3, "")
 
 	want := "1.2.3"
-	if got := s.String(); got != want {
-		t.Fatalf("got: %s want: %s", got, want)
-	}
+	assert.Equal(s.String(), want, "the strings should be equal")
 }
 
 func TestNewSemverFromGitTag(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		tag  *object.Tag
 		want string
@@ -130,36 +129,26 @@ func TestNewSemverFromGitTag(t *testing.T) {
 
 	for _, test := range matrix {
 		semver, err := FromGitTag(test.tag)
-		if err != nil {
-			t.Fatalf("failed to create semver: %s", err)
-		}
+		assert.NoError(err, "should have created a semver from Git tag")
 
-		if got := semver.String(); got != test.want {
-			t.Fatalf("got: %s want: %s", got, test.want)
-		}
+		assert.Equal(test.want, semver.String(), "the strings should be equal")
 	}
 }
 
 func TestBump(t *testing.T) {
+	assert := assert.New(t)
+
 	s, err := New(0, 0, 0, "")
-	if err != nil {
-		t.Fatalf("failed to created semver: %s", err)
-	}
+	assert.NoError(err, "should have created a semver")
 
 	s.BumpPatch()
-	if got := s.String(); got != "0.0.1" {
-		t.Fatalf("got: %s want: %s", got, "0.0.1")
-	}
+	assert.Equal(s.String(), "0.0.1", "the strings should be equal")
 
 	s.BumpMinor()
-	if got := s.String(); got != "0.1.0" {
-		t.Fatalf("got: %s want: %s", got, "0.1.0")
-	}
+	assert.Equal(s.String(), "0.1.0", "the strings should be equal")
 
 	s.BumpMajor()
-	if got := s.String(); got != "1.0.0" {
-		t.Fatalf("got: %s want: %s", got, "1.0.0")
-	}
+	assert.Equal(s.String(), "1.0.0", "the strings should be equal")
 }
 
 func BenchmarkPrecedence(b *testing.B) {

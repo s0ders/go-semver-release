@@ -1,57 +1,65 @@
 package ci
 
 import (
-	"github.com/s0ders/go-semver-release/internal/semver"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/s0ders/go-semver-release/internal/semver"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestOutput_GenerateGitHub(t *testing.T) {
+func TestCI_New(t *testing.T) {
+	assert := assert.New(t)
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	output := New(logger)
+
+	assert.Equal(logger, output.logger, "logger should be equal")
+}
+
+func TestCI_GenerateGitHub(t *testing.T) {
+	assert := assert.New(t)
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
-	if err != nil {
-		t.Fatalf("failed to make temp dir: %s", err)
-	}
-	defer os.RemoveAll(outputDir)
+	assert.NoError(err, "should create temp directory")
 
-	_, err = os.OpenFile("output", os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		t.Fatalf("error creating output file: %v", err)
-	}
+	defer func(path string) {
+		err := os.RemoveAll(outputDir)
+		assert.NoError(err, "should have been able to remove temporary directory")
+	}(outputDir)
+
+	outputFilePath := filepath.Join(outputDir, "output")
+
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o666)
+	assert.NoError(err, "should have been able to create output file")
+
+	defer func(outputFile *os.File) {
+		err := outputFile.Close()
+		assert.NoError(err, "should have been able to close output file")
+	}(outputFile)
 
 	outputPath := filepath.Join(outputDir, "output")
 
 	err = os.Setenv("GITHUB_OUTPUT", outputPath)
-	if err != nil {
-		t.Fatalf("failed to set GITHUB_OUTPUT: %s", err)
-	}
+	assert.NoError(err, "should have been able to set GITHUB_OUTPUT")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	output := New(logger)
 
 	version, err := semver.New(1, 2, 3, "")
-	if err != nil {
-		t.Fatalf("failed to create version: %s", err)
-	}
+	assert.NoError(err, "should have been able to create version")
 
 	err = output.GenerateGitHub("v", version, true)
-	if err != nil {
-		t.Fatalf("failed to generate GitHub: %s", err)
-	}
+	assert.NoError(err, "should have been able to generate GitHub output")
 
 	writtenOutput, err := os.ReadFile(outputPath)
-	if err != nil {
-		t.Fatalf("failed to read output file: %s", err)
-	}
+	assert.NoError(err, "should have been able to read output file")
 
 	want := "\nSEMVER=v1.2.3\nNEW_RELEASE=true\n"
-
 	got := string(writtenOutput)
 
-	if got != want {
-		t.Fatalf("got %q, want %q", got, want)
-	}
+	assert.Equal(want, got, "output should match")
 }

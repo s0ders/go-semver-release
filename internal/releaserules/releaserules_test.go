@@ -1,25 +1,24 @@
 package releaserules
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestMap(t *testing.T) {
+func TestReleaseRules_Map(t *testing.T) {
+	assert := assert.New(t)
+
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to reed rules")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	got := rules.Map()
 	want := map[string]string{
@@ -28,23 +27,19 @@ func TestMap(t *testing.T) {
 		"fix":  "patch",
 	}
 
-	if fmt.Sprintf("%+v", got) != fmt.Sprintf("%+v", want) {
-		t.Fatalf("failed to map, got:\n %+v", got)
-	}
+	assert.Equal(want, got, "rule maps should match")
 }
 
-func TestParseDefaultReleaseRules(t *testing.T) {
+func TestReleaseRules_ParseDefault(t *testing.T) {
+	assert := assert.New(t)
+
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	rulesReader, err := New(logger).Read("")
-	if err != nil {
-		t.Fatalf("failed to read rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to reed rules")
 
 	rules, err := rulesReader.Parse()
-	if err != nil {
-		t.Fatalf("failed to parse rules: %s", err)
-	}
+	assert.NoError(err, "should have been able to parse rules")
 
 	type test struct {
 		commitType  string
@@ -61,16 +56,14 @@ func TestParseDefaultReleaseRules(t *testing.T) {
 		got := rules.Rules[i]
 		want := matrix[i]
 
-		if got.CommitType != want.commitType {
-			t.Fatalf("got: %s want: %s", got.CommitType, want.commitType)
-		}
-		if got.ReleaseType != want.releaseType {
-			t.Fatalf("got: %s want: %s", got.ReleaseType, want.releaseType)
-		}
+		assert.Equal(want.commitType, got.CommitType, "commit type should match")
+		assert.Equal(want.releaseType, got.ReleaseType, "release type should match")
 	}
 }
 
-func TestSemanticallyIncorrectRules(t *testing.T) {
+func TestReleaseRules_IncorrectRules(t *testing.T) {
+	assert := assert.New(t)
+
 	const incorrectRules = `{
 		"rules": [
 			{"type": "feat", "release": "minor"},
@@ -87,12 +80,12 @@ func TestSemanticallyIncorrectRules(t *testing.T) {
 	ruleReader.reader = reader
 	_, err := ruleReader.Parse()
 
-	if err == nil {
-		t.Fatalf("did not detect incorrect rules: %+v", ruleReader)
-	}
+	assert.Error(err, "should have detected incorrect rules")
 }
 
-func TestIsJSON(t *testing.T) {
+func TestReleaseRules_IsJSON(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		have string
 		want bool
@@ -104,14 +97,15 @@ func TestIsJSON(t *testing.T) {
 		{have: "foo: bar", want: false},
 	}
 
-	for _, testCase := range tests {
-		if got := isJSON([]byte(testCase.have)); got != testCase.want {
-			t.Errorf("got: %v, want: %v", got, testCase.want)
-		}
+	for _, test := range tests {
+		got := isJSON([]byte(test.have))
+		assert.Equal(test.want, got, "should have detected JSON")
 	}
 }
 
-func TestIsYAML(t *testing.T) {
+func TestReleaseRules_IsYAML(t *testing.T) {
+	assert := assert.New(t)
+
 	type test struct {
 		have string
 		want bool
@@ -133,9 +127,8 @@ obj:
 		{have: "{\"foo\": \"bar\"}", want: true},
 	}
 
-	for _, testCase := range tests {
-		if got := isYAML([]byte(testCase.have)); got != testCase.want {
-			t.Errorf("got: %v, want: %v with %q", got, testCase.want, testCase.have)
-		}
+	for _, test := range tests {
+		got := isYAML([]byte(test.have))
+		assert.Equal(test.want, got, "should have detected YAML")
 	}
 }
