@@ -1,4 +1,4 @@
-package commitanalyzer
+package parser
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/s0ders/go-semver-release/internal/releaserules"
+	"github.com/s0ders/go-semver-release/internal/rules"
 )
 
 func TestCommitTypeRegex(t *testing.T) {
@@ -75,7 +75,7 @@ func TestFetchLatestSemverTagWithNoTag(t *testing.T) {
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -97,7 +97,7 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 	assert.NoError(err, "should have been able to create Git repository")
 
 	defer func(path string) {
-		err := os.RemoveAll(path)
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "should have been able to remove Git repository")
 	}(repositoryPath)
 
@@ -118,7 +118,7 @@ func TestFetchLatestSemverTagWithOneTag(t *testing.T) {
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -162,7 +162,7 @@ func TestFetchLatestSemverTagWithMultipleTags(t *testing.T) {
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -184,13 +184,13 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t *testin
 	assert.NoError(err, "should have been able to create Git repository")
 
 	defer func(path string) {
-		err := os.RemoveAll(path)
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "should have able to remove Git repository")
 	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -213,12 +213,12 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.
 	assert.NoError(err, "should have been able to create git repository")
 
 	defer func(path string) {
-		err := os.RemoveAll(path)
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -240,13 +240,13 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.
 	assert.NoError(err, "should have been able to create git repository")
 
 	defer func(path string) {
-		err := os.RemoveAll(path)
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -268,7 +268,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 	assert.NoError(err, "should have been able to create git repository")
 
 	defer func(path string) {
-		err := os.RemoveAll(path)
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
@@ -277,7 +277,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
-	rulesReader, err := releaserules.New(logger).Read("")
+	rulesReader, err := rules.New(logger).Read("")
 	assert.NoError(err, "should have been able to create rules reader")
 
 	rules, err := rulesReader.Parse()
@@ -296,7 +296,7 @@ func TestComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.
 }
 
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
-	tempDirPath, err := os.MkdirTemp("", "commitanalyzer-*")
+	tempDirPath, err := os.MkdirTemp("", "parser-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -359,7 +359,7 @@ func addCommit(r *git.Repository, message string) (err error) {
 	}
 
 	defer func(path string) {
-		err = os.RemoveAll(path)
+		err = os.RemoveAll(tempDirPath)
 		return
 	}(tempDirPath)
 

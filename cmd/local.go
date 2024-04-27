@@ -1,14 +1,15 @@
 package cmd
 
 import (
-	"github.com/go-git/go-git/v5"
-	"github.com/s0ders/go-semver-release/internal/ci"
-	"github.com/s0ders/go-semver-release/internal/commitanalyzer"
-	"github.com/s0ders/go-semver-release/internal/releaserules"
-	"github.com/s0ders/go-semver-release/internal/tagger"
-	"github.com/spf13/cobra"
 	"log/slog"
 	"os"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/s0ders/go-semver-release/internal/ci"
+	"github.com/s0ders/go-semver-release/internal/parser"
+	"github.com/s0ders/go-semver-release/internal/rules"
+	"github.com/s0ders/go-semver-release/internal/tagger"
+	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -43,7 +44,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		rulesReader, err := releaserules.New(logger).Read(rulesPath)
+		rulesReader, err := rules.New(logger).Read(rulesPath)
 		if err != nil {
 			return err
 		}
@@ -53,7 +54,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := commitanalyzer.New(logger, rules, verbose).ComputeNewSemver(repo)
+		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repo)
 		if err != nil {
 			return err
 		}

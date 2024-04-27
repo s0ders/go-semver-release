@@ -1,19 +1,20 @@
-package releaserules
+package rules
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/go-playground/validator/v10"
 )
 
-const DefaultRules = `{
+const Default = `{
 	"rules": [
 		{"type": "feat", "release": "minor"},
 		{"type": "perf", "release": "minor"},
@@ -60,7 +61,7 @@ func New(logger *slog.Logger) *Reader {
 // TODO: pass an io.Reader directly ?
 func (r *Reader) Read(path string) (*Reader, error) {
 	if len(path) == 0 {
-		r.reader = strings.NewReader(DefaultRules)
+		r.reader = strings.NewReader(Default)
 		return r, nil
 	}
 

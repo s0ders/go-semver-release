@@ -1,4 +1,4 @@
-package releaserules
+package rules
 
 import (
 	"io"

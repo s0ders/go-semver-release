@@ -1,12 +1,13 @@
 package cmd
 
 import (
-	"github.com/s0ders/go-semver-release/internal/ci"
 	"log/slog"
 	"os"
 
-	"github.com/s0ders/go-semver-release/internal/commitanalyzer"
-	"github.com/s0ders/go-semver-release/internal/releaserules"
+	"github.com/s0ders/go-semver-release/internal/ci"
+
+	"github.com/s0ders/go-semver-release/internal/parser"
+	"github.com/s0ders/go-semver-release/internal/rules"
 	"github.com/s0ders/go-semver-release/internal/tagger"
 
 	"github.com/s0ders/go-semver-release/internal/cloner"
@@ -45,7 +46,6 @@ var remoteCmd = &cobra.Command{
 	Short: "Version a remote repository and push the semver tag back to the remote",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-
 		var logHandler slog.Handler
 
 		if json {
@@ -68,7 +68,7 @@ var remoteCmd = &cobra.Command{
 			}
 		}(path)
 
-		rulesReader, err := releaserules.New(logger).Read(rulesPath)
+		rulesReader, err := rules.New(logger).Read(rulesPath)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ var remoteCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := commitanalyzer.New(logger, rules, verbose).ComputeNewSemver(repo)
+		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repo)
 		if err != nil {
 			return err
 		}

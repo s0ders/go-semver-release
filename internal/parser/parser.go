@@ -1,4 +1,4 @@
-package commitanalyzer
+package parser
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/s0ders/go-semver-release/internal/releaserules"
+	"github.com/s0ders/go-semver-release/internal/rules"
 	"github.com/s0ders/go-semver-release/internal/semver"
 	"github.com/s0ders/go-semver-release/internal/tagger"
 
@@ -16,21 +16,21 @@ import (
 
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
 
-type CommitAnalyzer struct {
+type Parser struct {
 	logger       *slog.Logger
-	releaseRules *releaserules.ReleaseRules
+	releaseRules *rules.ReleaseRules
 	verbose      bool
 }
 
-func New(logger *slog.Logger, releaseRules *releaserules.ReleaseRules, verbose bool) *CommitAnalyzer {
-	return &CommitAnalyzer{
+func New(logger *slog.Logger, releaseRules *rules.ReleaseRules, verbose bool) *Parser {
+	return &Parser{
 		logger:       logger,
 		releaseRules: releaseRules,
 		verbose:      verbose,
 	}
 }
 
-func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
+func (p *Parser) fetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
 	semverRegex := regexp.MustCompile(semver.Regex)
 
 	tags, err := r.TagObjects()
@@ -60,7 +60,7 @@ func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 	}
 
 	if latestSemver == nil {
-		c.logger.Info("no previous tag, creating one")
+		p.logger.Info("no previous tag, creating one")
 		head, err := r.Head()
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch head: %w", err)
@@ -74,15 +74,15 @@ func (c *CommitAnalyzer) fetchLatestSemverTag(r *git.Repository) (*object.Tag, e
 		return tagger.NewTagFromSemver(*version, head.Hash()), nil
 	}
 
-	if c.verbose {
-		c.logger.Info("found latest semver tag", "tag", latestTag.Name)
+	if p.verbose {
+		p.logger.Info("found latest semver tag", "tag", latestTag.Name)
 	}
 
 	return latestTag, nil
 }
 
-func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
-	latestSemverTag, err := c.fetchLatestSemverTag(r)
+func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
+	latestSemverTag, err := p.fetchLatestSemverTag(r)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to fetch latest semver: %w", err)
 	}
@@ -120,7 +120,7 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		history[i], history[j] = history[j], history[i]
 	}
 
-	rulesMap := c.releaseRules.Map()
+	rulesMap := p.releaseRules.Map()
 
 	for _, commit := range history {
 
@@ -132,11 +132,11 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
 		commitType := submatch[1]
 		shortHash := commit.Hash.String()[0:7]
-		shortMessage := c.shortMessage(commit.Message)
+		shortMessage := p.shortMessage(commit.Message)
 
 		if breakingChange {
-			if c.verbose {
-				c.logger.Info("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
+			if p.verbose {
+				p.logger.Info("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
 			}
 			semverFromTag.BumpMajor()
 			newRelease = true
@@ -166,15 +166,15 @@ func (c *CommitAnalyzer) ComputeNewSemver(r *git.Repository) (*semver.Semver, bo
 			return nil, false, fmt.Errorf("unknown release type %s", releaseType)
 		}
 
-		if c.verbose {
-			c.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
+		if p.verbose {
+			p.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
 		}
 	}
 
 	return semverFromTag, newRelease, nil
 }
 
-func (c *CommitAnalyzer) shortMessage(message string) string {
+func (p *Parser) shortMessage(message string) string {
 	if len(message) > 50 {
 		return fmt.Sprintf("%s...", message[0:47])
 	}
