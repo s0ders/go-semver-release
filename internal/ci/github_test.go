@@ -46,6 +46,11 @@ func TestCI_GenerateGitHub(t *testing.T) {
 	err = os.Setenv("GITHUB_OUTPUT", outputPath)
 	assert.NoError(err, "should have been able to set GITHUB_OUTPUT")
 
+	defer func() {
+		err := os.Unsetenv("GITHUB_OUTPUT")
+		assert.NoError(err, "should have been able to unset GITHUB_OUTPUT")
+	}()
+
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	output := New(logger)
 
