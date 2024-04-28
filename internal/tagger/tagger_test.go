@@ -58,7 +58,7 @@ func TestTagger_TagExists(t *testing.T) {
 func TestTagger_AddTagToRepository(t *testing.T) {
 	assert := assert.New(t)
 
-	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	assert.NoError(err, "repository creation should have succeeded")
 
 	defer func(path string) {
@@ -72,10 +72,10 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	tagger := New(logger, "", false)
 
-	taggedRepository, err := tagger.AddTagToRepository(r, version)
+	err = tagger.AddTagToRepository(repository, version)
 	assert.NoError(err, "should have been able to add tag to repository")
 
-	tagExists, err := tagger.TagExists(taggedRepository, version.String())
+	tagExists, err := tagger.TagExists(repository, version.String())
 	assert.NoError(err, "should have been able to check if tag exists")
 
 	assert.Equal(tagExists, true, "tag should have been found")

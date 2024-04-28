@@ -72,7 +72,7 @@ var localCmd = &cobra.Command{
 			logger.Info("new release found, dry-run is enabled", "next-version", semver)
 			return nil
 		default:
-			_, err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repo, semver)
+			err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repo, semver)
 			if err != nil {
 				return err
 			}

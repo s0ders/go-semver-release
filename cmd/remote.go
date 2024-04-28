@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
-	"github.com/s0ders/go-semver-release/v2/internal/cloner"
 	"github.com/s0ders/go-semver-release/v2/internal/parser"
+	"github.com/s0ders/go-semver-release/v2/internal/remote"
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"github.com/s0ders/go-semver-release/v2/internal/tagger"
 	"github.com/spf13/cobra"
@@ -18,6 +18,7 @@ var (
 	token         string
 	tagPrefix     string
 	releaseBranch string
+	remoteName    string
 	dryRun        bool
 	verbose       bool
 	json          bool
@@ -29,6 +30,7 @@ func init() {
 	remoteCmd.Flags().StringVarP(&token, "token", "t", "", "Secret token to access the git repository")
 	remoteCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
 	remoteCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
+	remoteCmd.Flags().StringVar(&remoteName, "remote-name", "origin", "Name of the remote to push to")
 	remoteCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 	remoteCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
 	remoteCmd.Flags().BoolVarP(&json, "json", "j", false, "JSON formatted output")
@@ -54,17 +56,19 @@ var remoteCmd = &cobra.Command{
 
 		logger := slog.New(logHandler)
 
-		repo, path, err := cloner.New(logger).Clone(gitURL, releaseBranch, token)
+		remote := remote.New(logger, token, remoteName, verbose)
 		if err != nil {
 			return err
 		}
+
+		repository, repositoryPath, err := remote.Clone(gitURL, releaseBranch)
 
 		defer func(path string) {
 			err = os.RemoveAll(path)
 			if err != nil {
 				return
 			}
-		}(path)
+		}(repositoryPath)
 
 		rulesReader, err := rules.New(logger).Read(rulesPath)
 		if err != nil {
@@ -76,7 +80,7 @@ var remoteCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repo)
+		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repository)
 		if err != nil {
 			return err
 		}
@@ -94,7 +98,12 @@ var remoteCmd = &cobra.Command{
 			logger.Info("new release found, dry-run is enabled", "next-version", semver)
 			return nil
 		default:
-			err = tagger.New(logger, tagPrefix, verbose).PushTagToRemote(repo, token, semver)
+			err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repository, semver)
+			if err != nil {
+				return err
+			}
+
+			err = remote.PushTagToRemote(repository, semver)
 			if err != nil {
 				return err
 			}

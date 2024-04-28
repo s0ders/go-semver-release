@@ -14,7 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
+var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
 
 type Parser struct {
 	logger       *slog.Logger
@@ -30,10 +30,10 @@ func New(logger *slog.Logger, releaseRules *rules.ReleaseRules, verbose bool) *P
 	}
 }
 
-func (p *Parser) fetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
+func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
 	semverRegex := regexp.MustCompile(semver.Regex)
 
-	tags, err := r.TagObjects()
+	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (p *Parser) fetchLatestSemverTag(r *git.Repository) (*object.Tag, error) {
 
 	if latestSemver == nil {
 		p.logger.Info("no previous tag, creating one")
-		head, err := r.Head()
+		head, err := repository.Head()
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch head: %w", err)
 		}

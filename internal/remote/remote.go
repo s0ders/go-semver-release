@@ -1,40 +1,46 @@
-package cloner
+package remote
 
 import (
 	"fmt"
 	"log/slog"
 	"os"
 
+	"github.com/s0ders/go-semver-release/v2/internal/semver"
+
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
-type Cloner struct {
-	l *slog.Logger
+type Remote struct {
+	logger     *slog.Logger
+	auth       *http.BasicAuth
+	remoteName string
+	verbose    bool
 }
 
-func New(logger *slog.Logger) Cloner {
-	return Cloner{
-		l: logger,
+func New(logger *slog.Logger, token string, remoteName string, verbose bool) Remote {
+	return Remote{
+		logger: logger,
+		auth: &http.BasicAuth{
+			Username: "go-semver-release",
+			Password: token,
+		},
+		remoteName: remoteName,
 	}
 }
 
-func (c Cloner) Clone(url, branch, token string) (*git.Repository, string, error) {
-	auth := &http.BasicAuth{
-		Username: "go-semver-release",
-		Password: token,
-	}
-
+func (r Remote) Clone(url, branch string) (*git.Repository, string, error) {
 	path, err := os.MkdirTemp("", "go-semver-release-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
 	cloneOption := &git.CloneOptions{
-		Auth:     auth,
+		Auth:     r.auth,
 		URL:      url,
-		Progress: nil,
+		Progress: os.Stdout,
 	}
 
 	if branch != "" {
@@ -47,4 +53,23 @@ func (c Cloner) Clone(url, branch, token string) (*git.Repository, string, error
 	}
 
 	return repository, path, nil
+}
+
+func (r Remote) PushTagToRemote(repository *git.Repository, semver *semver.Semver) error {
+	po := &git.PushOptions{
+		Auth:       r.auth,
+		Progress:   os.Stdout,
+		RefSpecs:   []config.RefSpec{config.RefSpec("refs/tags/*:refs/tags/*")},
+		RemoteName: r.remoteName,
+	}
+
+	if err := repository.Push(po); err != nil {
+		return fmt.Errorf("failed to push tag to remote: %w", err)
+	}
+
+	if r.verbose {
+		r.logger.Info("pushed tag on repository", "tag", semver)
+	}
+
+	return nil
 }
