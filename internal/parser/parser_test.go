@@ -69,7 +69,7 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 	assert.NoError(err, "should have been able to create Git repository")
 
 	defer func(path string) {
-		err := os.RemoveAll(path)
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "should have been able to remove Git repository")
 	}(repositoryPath)
 
@@ -295,8 +295,8 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
-func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
-	tempDirPath, err := os.MkdirTemp("", "parser-*")
+func createGitRepository(firstCommitMessage string) (repository *git.Repository, tempDirPath string, err error) {
+	tempDirPath, err = os.MkdirTemp("", "parser-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -313,10 +313,17 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 
 	tempFileName := "temp"
 	tempFilePath := filepath.Join(tempDirPath, tempFileName)
-	_, err = os.Create(tempFilePath)
+	tempFile, err := os.Create(tempFilePath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp file: %s", err)
 	}
+
+	defer func() {
+		err = tempFile.Close()
+		if err != nil {
+			return
+		}
+	}()
 
 	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {
@@ -365,10 +372,17 @@ func addCommit(r *git.Repository, message string) (err error) {
 
 	tempFileName := "temp"
 	tempFilePath := filepath.Join(tempDirPath, tempFileName)
-	_, err = os.Create(tempFilePath)
+	tempFile, err := os.Create(tempFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
+
+	defer func() {
+		err = tempFile.Close()
+		if err != nil {
+			return
+		}
+	}()
 
 	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {
