@@ -63,8 +63,8 @@ jobs:
       - name: Docker build pre-release
         uses: docker/build-push-action@v5
         with:
-          context: ./build/
-          file: Dockerfile
+          context: .
+          file: ./build/Dockerfile
           push: true
           build-args: |
             APP_VERSION="${{ needs.go-build.outputs.semver }}"
