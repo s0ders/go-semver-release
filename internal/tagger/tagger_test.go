@@ -18,21 +18,21 @@ import (
 
 func TestTagger_TagExists(t *testing.T) {
 	assert := assert.New(t)
-	r, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	assert.NoError(err, "repository creation should have succeeded")
 
-	defer func(path string) {
+	defer func() {
 		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "failed to remove repository")
-	}(repositoryPath)
+	}()
 
-	h, err := r.Head()
+	head, err := repository.Head()
 	assert.NoError(err, "should have fetched HEAD")
 
 	tags := []string{"1.0.0", "1.0.2"}
 
 	for i, tag := range tags {
-		_, err := r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
+		_, err := repository.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
 			Message: tag,
 			Tagger: &object.Signature{
 				Name:  "Go Semver Release",
@@ -43,11 +43,11 @@ func TestTagger_TagExists(t *testing.T) {
 		assert.NoError(err, "tag creation should have succeeded")
 	}
 
-	tagExists, err := TagExists(r, tags[0])
+	tagExists, err := TagExists(repository, tags[0])
 	assert.NoError(err, "should have been able to check if tag exists")
 	assert.Equal(tagExists, true, "tag should have been found")
 
-	tagDoesNotExists, err := TagExists(r, "0.0.1")
+	tagDoesNotExists, err := TagExists(repository, "0.0.1")
 	assert.NoError(err, "should have been able to check if tag exists")
 	assert.Equal(tagDoesNotExists, false, "tag should not have been found")
 }
@@ -58,10 +58,10 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	assert.NoError(err, "repository creation should have succeeded")
 
-	defer func(path string) {
-		err := os.RemoveAll(path)
+	defer func() {
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "failed to remove repository")
-	}(repositoryPath)
+	}()
 
 	version, err := semver.New(1, 0, 0, "")
 	assert.NoError(err, "semver creation should have succeeded")
@@ -84,10 +84,10 @@ func TestTagger_AddExistingTagToRepository(t *testing.T) {
 	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	assert.NoError(err, "repository creation should have succeeded")
 
-	defer func(path string) {
-		err := os.RemoveAll(path)
+	defer func() {
+		err := os.RemoveAll(repositoryPath)
 		assert.NoError(err, "failed to remove repository")
-	}(repositoryPath)
+	}()
 
 	version, err := semver.New(1, 0, 0, "")
 	assert.NoError(err, "semver creation should have succeeded")
@@ -147,10 +147,14 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 
 	tempFileName := "temp"
 	tempFilePath := filepath.Join(tempDirPath, tempFileName)
-	_, err = os.Create(tempFilePath)
+	fileDescriptor, err := os.Create(tempFilePath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp file: %s", err)
 	}
+
+	defer func() {
+		_ = fileDescriptor.Close()
+	}()
 
 	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
 	if err != nil {

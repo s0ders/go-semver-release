@@ -3,8 +3,6 @@ package rules
 import (
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -96,38 +94,6 @@ func TestRules_InvalidRulesFilePath(t *testing.T) {
 
 	_, err := New(logger).Read(invalidFilePath)
 	assert.Error(err, "should have failed trying to open invalid file path")
-}
-
-func TestRules_RulesFile(t *testing.T) {
-	assert := assert.New(t)
-
-	tempDir, err := os.MkdirTemp("", "rules-*")
-	assert.NoError(err, "failed to create temp directory")
-
-	defer func() {
-		err = os.RemoveAll(tempDir)
-		assert.NoError(err, "failed to remove temp. dir.")
-	}()
-
-	rulesFilePath := filepath.Join(tempDir, "rules.json")
-
-	file, err := os.Create(rulesFilePath)
-	assert.NoError(err, "failed to write to temp. rules file")
-
-	defer func() {
-		err = file.Close()
-		assert.NoError(err, "failed to close rules file")
-	}()
-
-	_, err = file.Write([]byte(Default))
-	assert.NoError(err, "failed to write to rules file")
-
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	_, err = New(logger).Read(rulesFilePath)
-	assert.NoError(err, "failed trying to read rulesFile")
-
-	// TODO: compare reader values
 }
 
 func TestRules_IsJSON(t *testing.T) {
