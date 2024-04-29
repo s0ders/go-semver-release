@@ -26,7 +26,7 @@ func (o Output) GenerateGitHub(prefix string, semver *semver.Semver, release boo
 		return nil
 	}
 
-	output := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t\n", prefix, semver.NormalVersion(), release)
+	output := fmt.Sprintf("\nSEMVER=%s%s\nNEW_RELEASE=%t\n", prefix, semver.String(), release)
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {

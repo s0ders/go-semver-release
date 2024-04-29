@@ -73,7 +73,7 @@ func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.S
 		return fmt.Errorf("failed to fetch head: %w", err)
 	}
 
-	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.NormalVersion())
+	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.String())
 
 	tagExists, err := TagExists(repository, tag)
 	if err != nil {
@@ -85,7 +85,7 @@ func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.S
 	}
 
 	_, err = repository.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
-		Message: semver.NormalVersion(),
+		Message: semver.String(),
 		Tagger:  &GitSignature,
 	})
 	if err != nil {

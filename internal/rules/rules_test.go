@@ -98,56 +98,6 @@ func TestRules_InvalidRulesFilePath(t *testing.T) {
 	assert.Error(err, "should have failed trying to open invalid file path")
 }
 
-func TestRules_IsJSON(t *testing.T) {
-	assert := assert.New(t)
-
-	type test struct {
-		have string
-		want bool
-	}
-
-	tests := []test{
-		{have: "{\"foo\": \"bar\"}", want: true},
-		{have: "not a valid json", want: false},
-		{have: "foo: bar", want: false},
-	}
-
-	for _, test := range tests {
-		got := isJSON([]byte(test.have))
-		assert.Equal(test.want, got, "should have detected JSON")
-	}
-}
-
-func TestRules_IsYAML(t *testing.T) {
-	assert := assert.New(t)
-
-	type test struct {
-		have string
-		want bool
-	}
-
-	validYAML := `foo: "ok"
-bar: true
-baz: 1.21
-obj:
-  prop1: "foo"
-  prop2: "bar"
-  anArray:
-    - item1
-    - item2`
-
-	tests := []test{
-		{have: validYAML, want: true},
-		{have: "not a valid yaml", want: false},
-		{have: "{\"foo\": \"bar\"}", want: true},
-	}
-
-	for _, test := range tests {
-		got := isYAML([]byte(test.have))
-		assert.Equal(test.want, got, "should have detected YAML")
-	}
-}
-
 func TestRules_RulesFile(t *testing.T) {
 	assert := assert.New(t)
 
@@ -178,40 +128,4 @@ func TestRules_RulesFile(t *testing.T) {
 	assert.NoError(err, "failed trying to read rulesFile")
 
 	// TODO: compare reader values
-}
-
-func TestRules_YAMLFile(t *testing.T) {
-	assert := assert.New(t)
-
-	yamlRules := `rules:
-  - type: feat
-    release: minor
-  - type: refactor
-    release: patch`
-
-	yamlDir, err := os.MkdirTemp("", "rules-*")
-	assert.NoError(err, "failed to create temp. dir. for YAML rules")
-
-	defer func() {
-		err = os.RemoveAll(yamlDir)
-		assert.NoError(err, "failed to remove temp. dir.")
-	}()
-
-	yamlFilePath := filepath.Join(yamlDir, "rules.yaml")
-
-	yamlFile, err := os.Create(yamlFilePath)
-	assert.NoError(err, "failed to create temp. YAML rules file")
-
-	defer func() {
-		err = yamlFile.Close()
-		assert.NoError(err, "failed to close temp. YAML rules file")
-	}()
-
-	_, err = yamlFile.WriteString(yamlRules)
-	assert.NoError(err, "failed to write YAML rules to temp. file")
-
-	fakeLogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	_, err = New(fakeLogger).Read(yamlFilePath)
-	assert.NoError(err, "failed to read temp. YAML rules file")
 }

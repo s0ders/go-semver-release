@@ -63,7 +63,7 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 		assert.NoError(err, "failed to remove repository")
 	}()
 
-	version, err := semver.New(1, 0, 0, "")
+	version, err := semver.New(1, 0, 0)
 	assert.NoError(err, "semver creation should have succeeded")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -89,7 +89,7 @@ func TestTagger_AddExistingTagToRepository(t *testing.T) {
 		assert.NoError(err, "failed to remove repository")
 	}()
 
-	version, err := semver.New(1, 0, 0, "")
+	version, err := semver.New(1, 0, 0)
 	assert.NoError(err, "semver creation should have succeeded")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -112,7 +112,7 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 
 	hash := plumbing.Hash(b)
 
-	version, err := semver.New(0, 0, 1, "")
+	version, err := semver.New(0, 0, 1)
 	assert.NoError(err, "semver creation should have succeeded")
 
 	gotTag := NewTagFromSemver(*version, hash)

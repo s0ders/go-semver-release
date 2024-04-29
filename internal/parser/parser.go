@@ -33,57 +33,8 @@ func New(logger *slog.Logger, releaseRules *rules.ReleaseRules) *Parser {
 	}
 }
 
-func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
-	semverRegex := regexp.MustCompile(semver.Regex)
-
-	// TODO: use .Tags() to fetch all kind of tags and not just annotated ones
-	tags, err := repository.TagObjects()
-	if err != nil {
-		return nil, err
-	}
-
-	var latestSemver *semver.Semver
-	var latestTag *object.Tag
-
-	err = tags.ForEach(func(tag *object.Tag) error {
-		if semverRegex.MatchString(tag.Name) {
-			currentSemver, err := semver.FromGitTag(tag)
-			if err != nil {
-				return err
-			}
-
-			if latestSemver == nil || latestSemver.Precedence(currentSemver) != 1 {
-				latestSemver = currentSemver
-				latestTag = tag
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to loop over tags: %w", err)
-	}
-
-	if latestSemver == nil {
-		p.logger.Debug("no previous tag, creating one")
-
-		head, err := repository.Head()
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch head: %w", err)
-		}
-
-		version, err := semver.New(0, 0, 0, "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to build new semver: %w", err)
-		}
-
-		return tagger.NewTagFromSemver(*version, head.Hash()), nil
-	}
-
-	p.logger.Debug("found latest semver tag", "tag", latestTag.Name)
-
-	return latestTag, nil
-}
-
+// ComputeNewSemver returns the next, if any, semantic version number from
+// a given Git repository by parsing its commit history.
 func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
 	latestSemverTag, err := p.fetchLatestSemverTag(r)
 	if err != nil {
@@ -129,6 +80,8 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 	return semverFromTag, newRelease, nil
 }
 
+// ParseHistory parses a slice of commits and modifies the given semantic version
+// number according to the release rules provided.
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
 	newReleaseType := ""
@@ -181,6 +134,59 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 	}
 
 	return newRelease, nil
+}
+
+// fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the
+// highest semantic version number among all tags.
+func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
+	semverRegex := regexp.MustCompile(semver.Regex)
+
+	// TODO: use .Tags() to fetch all kind of tags and not just annotated ones
+	tags, err := repository.TagObjects()
+	if err != nil {
+		return nil, err
+	}
+
+	var latestSemver *semver.Semver
+	var latestTag *object.Tag
+
+	err = tags.ForEach(func(tag *object.Tag) error {
+		if semverRegex.MatchString(tag.Name) {
+			currentSemver, err := semver.FromGitTag(tag)
+			if err != nil {
+				return err
+			}
+
+			if latestSemver == nil || latestSemver.Precedence(currentSemver) != 1 {
+				latestSemver = currentSemver
+				latestTag = tag
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to loop over tags: %w", err)
+	}
+
+	if latestSemver == nil {
+		p.logger.Debug("no previous tag, creating one")
+
+		head, err := repository.Head()
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch head: %w", err)
+		}
+
+		version, err := semver.New(0, 0, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build new semver: %w", err)
+		}
+
+		return tagger.NewTagFromSemver(*version, head.Hash()), nil
+	}
+
+	p.logger.Debug("found latest semver tag", "tag", latestTag.Name)
+
+	return latestTag, nil
 }
 
 func shortMessage(message string) string {

@@ -4,17 +4,15 @@ package rules
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
-
-	"gopkg.in/yaml.v3"
-
-	"github.com/go-playground/validator/v10"
 )
 
+// TODO: make into a map or struct directly ?
 const Default = `{
 	"rules": [
 		{"type": "feat", "release": "minor"},
@@ -24,6 +22,32 @@ const Default = `{
 	]
 }`
 
+var (
+	ErrInvalidCommitType    = errors.New("invalid commit type")
+	ErrInvalidReleaseType   = errors.New("invalid release type")
+	ErrDuplicateReleaseRule = errors.New("duplicate release rule for the same commit type")
+)
+
+var validCommitTypes = map[string]struct{}{
+	"build":    {},
+	"chore":    {},
+	"ci":       {},
+	"docs":     {},
+	"feat":     {},
+	"fix":      {},
+	"perf":     {},
+	"refactor": {},
+	"revert":   {},
+	"style":    {},
+	"test":     {},
+}
+
+var validReleaseTypes = map[string]struct{}{
+	"major": {},
+	"minor": {},
+	"patch": {},
+}
+
 type Reader struct {
 	logger *slog.Logger
 	reader io.Reader
@@ -31,12 +55,12 @@ type Reader struct {
 
 // TODO: remove validator
 type ReleaseRule struct {
-	CommitType  string `json:"type" yaml:"type" validate:"required,oneof=build chore ci docs feat fix perf refactor revert style test"`
-	ReleaseType string `json:"release" yaml:"release" validate:"required,oneof=major minor patch"`
+	CommitType  string `json:"type"`
+	ReleaseType string `json:"release"`
 }
 
 type ReleaseRules struct {
-	Rules []ReleaseRule `json:"rules" yaml:"rules" validate:"required"`
+	Rules []ReleaseRule `json:"rules" validate:"required"`
 }
 
 func (r *ReleaseRules) Map() map[string]string {
@@ -86,51 +110,32 @@ func (r *Reader) Parse() (*ReleaseRules, error) {
 
 	bufReader := bytes.NewReader(buf)
 
-	switch {
-	case isJSON(buf):
-		decoder := json.NewDecoder(bufReader)
-		err = decoder.Decode(&rules)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode JSON into rules")
-		}
-	case isYAML(buf):
-		decoder := yaml.NewDecoder(bufReader)
-		err = decoder.Decode(&rules)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode YAML into rules")
-		}
-	default:
-		return nil, fmt.Errorf("failed to detect if rules are JSON or YAML")
+	decoder := json.NewDecoder(bufReader)
+	err = decoder.Decode(&rules)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode JSON into rules")
 	}
 
-	validate := validator.New()
-	if err := validate.Struct(rules); err != nil {
-		return nil, fmt.Errorf("failed to validate release rules: %w", err)
+	if len(rules.Rules) == 0 {
+		return nil, fmt.Errorf("no release rules found")
 	}
 
 	for _, rule := range rules.Rules {
 
-		existingRuleType, commitTypeAlreadyAssigned := existingType[rule.CommitType]
-
-		if commitTypeAlreadyAssigned {
-			return nil, fmt.Errorf("a release rule already exist for commit type %s (%s), remove one to avoid conflict", rule.CommitType, existingRuleType)
+		if _, ok := validCommitTypes[rule.CommitType]; !ok {
+			return nil, ErrInvalidCommitType
 		}
 
-		if err := validate.Struct(rule); err != nil {
-			return nil, fmt.Errorf("failed to validate release rules: %w", err)
+		if _, ok := validReleaseTypes[rule.ReleaseType]; !ok {
+			return nil, ErrInvalidReleaseType
 		}
+
+		if _, ok := existingType[rule.CommitType]; ok {
+			return nil, ErrDuplicateReleaseRule
+		}
+
 		existingType[rule.CommitType] = rule.ReleaseType
 	}
 
 	return &rules, nil
-}
-
-func isJSON(b []byte) bool {
-	var raw json.RawMessage
-	return json.Unmarshal(b, &raw) == nil
-}
-
-func isYAML(b []byte) bool {
-	var raw map[any]any
-	return yaml.Unmarshal(b, &raw) == nil
 }

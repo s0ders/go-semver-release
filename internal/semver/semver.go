@@ -2,23 +2,22 @@
 package semver
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-playground/validator/v10"
 )
 
 var Regex = `(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 
-// TODO: remove validator
-// TODO: check if metadata are useful, else remove them
+var ErrInvalidSemver = errors.New("invalid semver, components cannot have negative values")
+
 type Semver struct {
-	Major         int    `validate:"gte=0"`
-	Minor         int    `validate:"gte=0"`
-	Patch         int    `validate:"gte=0"`
-	BuildMetadata string `validate:"omitempty,alphanumunicode"`
+	Major int
+	Minor int
+	Patch int
 }
 
 func (s *Semver) BumpPatch() {
@@ -43,24 +42,19 @@ func (s *Semver) IsZero() bool {
 	return isZero
 }
 
-func (s *Semver) NormalVersion() string {
-	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
+func (s *Semver) Valid() bool {
+	return s.Patch >= 0 && s.Minor >= 0 && s.Major >= 0
 }
 
 func (s *Semver) String() string {
-	if s.BuildMetadata != "" {
-		return fmt.Sprintf("%d.%d.%d+%s", s.Major, s.Minor, s.Patch, s.BuildMetadata)
-	}
-
-	return s.NormalVersion()
+	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
 }
 
-func New(major, minor, patch int, metadata string) (*Semver, error) {
-	version := &Semver{major, minor, patch, metadata}
-	validate := validator.New()
+func New(major, minor, patch int) (*Semver, error) {
+	version := &Semver{major, minor, patch}
 
-	if err := validate.Struct(version); err != nil {
-		return nil, fmt.Errorf("semver: failed to validate struct: %w", err)
+	if !version.Valid() {
+		return nil, ErrInvalidSemver
 	}
 
 	return version, nil
@@ -89,7 +83,7 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 		return nil, fmt.Errorf("FromGitTag: failed to convert patch component: %w", err)
 	}
 
-	semver, err := New(major, minor, patch, "")
+	semver, err := New(major, minor, patch)
 	if err != nil {
 		return nil, fmt.Errorf("FromGitTag: failed to build SemVer: %w", err)
 	}

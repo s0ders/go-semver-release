@@ -54,7 +54,7 @@ func TestCI_GenerateGitHub(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	output := New(logger)
 
-	version, err := semver.New(1, 2, 3, "")
+	version, err := semver.New(1, 2, 3)
 	assert.NoError(err, "should have been able to create version")
 
 	err = output.GenerateGitHub("v", version, true)
@@ -114,7 +114,7 @@ func TestCI_ReadOnlyOutput(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	output := New(logger)
 
-	version, err := semver.New(1, 2, 3, "")
+	version, err := semver.New(1, 2, 3)
 	assert.NoError(err, "should have been able to create version")
 
 	err = output.GenerateGitHub("v", version, true)

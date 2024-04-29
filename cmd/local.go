@@ -85,13 +85,13 @@ var localCmd = &cobra.Command{
 
 		switch {
 		case !release:
-			logger.Info("no new release", "current-version", semver.NormalVersion(), "new-release", false)
+			logger.Info("no new release", "current-version", semver.String(), "new-release", false)
 			return nil
 		case release && dryRun:
-			logger.Info("new release found, dry-run is enabled", "next-version", semver.NormalVersion(), "new-release", true)
+			logger.Info("new release found, dry-run is enabled", "next-version", semver.String(), "new-release", true)
 			return nil
 		default:
-			logger.Info("new release found", "new-version", semver.NormalVersion(), "new-release", true)
+			logger.Info("new release found", "new-version", semver.String(), "new-release", true)
 			err = tagger.New(logger, tagPrefix).AddTagToRepository(repository, semver)
 			if err != nil {
 				return err
