@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"log/slog"
-	"os"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
@@ -14,11 +13,11 @@ import (
 
 func init() {
 	localCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
-	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
+	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "v", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 	localCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
-	localCmd.Flags().BoolVarP(&json, "json", "j", false, "JSON formatted output")
+	localCmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "JSON formatted output")
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -31,15 +30,15 @@ var localCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var logHandler slog.Handler
 
-		if json {
-			logHandler = slog.NewJSONHandler(os.Stdout, nil)
+		if jsonOutput {
+			logHandler = slog.NewJSONHandler(cmd.OutOrStdout(), nil)
 		} else {
-			logHandler = slog.NewTextHandler(os.Stdout, nil)
+			logHandler = slog.NewTextHandler(cmd.OutOrStdout(), nil)
 		}
 
 		logger := slog.New(logHandler)
 
-		repo, err := git.PlainOpen(args[0])
+		repository, err := git.PlainOpen(args[0])
 		if err != nil {
 			return err
 		}
@@ -54,7 +53,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repo)
+		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repository)
 		if err != nil {
 			return err
 		}
@@ -66,13 +65,14 @@ var localCmd = &cobra.Command{
 
 		switch {
 		case !release:
-			logger.Info("no new release", "current-version", semver.NormalVersion())
+			logger.Info("no new release", "current-version", semver.NormalVersion(), "new-release", false)
 			return nil
 		case release && dryRun:
-			logger.Info("new release found, dry-run is enabled", "next-version", semver)
+			logger.Info("new release found, dry-run is enabled", "next-version", semver.NormalVersion(), "new-release", true)
 			return nil
 		default:
-			err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repo, semver)
+			logger.Info("new release found", "new-version", semver.NormalVersion(), "new-release", true)
+			err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repository, semver)
 			if err != nil {
 				return err
 			}

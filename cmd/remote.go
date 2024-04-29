@@ -14,44 +14,41 @@ import (
 
 var (
 	rulesPath     string
-	gitURL        string
 	token         string
 	tagPrefix     string
 	releaseBranch string
 	remoteName    string
 	dryRun        bool
 	verbose       bool
-	json          bool
+	jsonOutput    bool
 )
 
 func init() {
 	remoteCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
-	remoteCmd.Flags().StringVarP(&gitURL, "git-url", "u", "", "URL of the git repository to version")
 	remoteCmd.Flags().StringVarP(&token, "token", "t", "", "Secret token to access the git repository")
 	remoteCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "p", "v", "Prefix added to the version tag name")
 	remoteCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	remoteCmd.Flags().StringVar(&remoteName, "remote-name", "origin", "Name of the remote to push to")
 	remoteCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 	remoteCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
-	remoteCmd.Flags().BoolVarP(&json, "json", "j", false, "JSON formatted output")
+	remoteCmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "JSON formatted output")
 
-	remoteCmd.MarkFlagRequired("git-url")
 	remoteCmd.MarkFlagRequired("token")
 
 	rootCmd.AddCommand(remoteCmd)
 }
 
 var remoteCmd = &cobra.Command{
-	Use:   "remote",
+	Use:   "remote <GIT_URL>",
 	Short: "Version a remote repository and push the semver tag back to the remote",
-	Args:  cobra.ExactArgs(0),
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var logHandler slog.Handler
 
-		if json {
-			logHandler = slog.NewJSONHandler(os.Stdout, nil)
+		if jsonOutput {
+			logHandler = slog.NewJSONHandler(cmd.OutOrStdout(), nil)
 		} else {
-			logHandler = slog.NewTextHandler(os.Stdout, nil)
+			logHandler = slog.NewTextHandler(cmd.OutOrStdout(), nil)
 		}
 
 		logger := slog.New(logHandler)
@@ -60,6 +57,8 @@ var remoteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		gitURL := args[0]
 
 		repository, repositoryPath, err := remote.Clone(gitURL, releaseBranch)
 
