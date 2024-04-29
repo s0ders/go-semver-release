@@ -12,7 +12,7 @@ Go program designed to automate versioning of Git repository by analyzing their 
     <li><a href="#Motivation">Motivation</a></li>
     <li><a href="#Install">Install</a></li>
     <li><a href="#Usage">Usage</a></li>
-    <li><a href="#github-actions">Github Actions</a></li>
+    <li><a href="#github-actions">GitHub Actions</a></li>
     <li><a href="#release-rules">Release Rules</a></li>
 </ul>
 
@@ -97,7 +97,7 @@ The action takes the same parameters as those defined in the <a href="#Usage">us
 
 ### Outputs
 
-The action generate a two outputs 
+The action generate two outputs 
 - `SEMVER`, the computed semver or the current one if no new were computed, prefixed with the given `tag-prefix` if any;
 - `NEW_RELEASE`, whether a new semver was computed or not.
 
@@ -108,9 +108,10 @@ Release rules define which commit type will trigger a release, and what type of 
 ```json
 {
     "rules": [
-        {"type": "feat", "release": "minor"},
-        {"type": "perf", "release": "minor"},
-        {"type": "fix", "release": "patch"}
+        {"type": "feat",   "release": "minor"},
+        {"type": "fix",    "release": "patch"},
+        {"type": "perf",   "release": "patch"},
+        {"type": "revert", "release": "patch"}
     ]
 }
 ```
@@ -121,10 +122,12 @@ You can define custom release rules to suit your needs using a JSON or YAML file
 rules:
   - type: feat
     release: minor
+  - type: fix
+    release: patch
   - type: perf
     release: patch
-  - type: fix
-  	release: patch
+  - type: refactor
+    release: patch
 ```
 
 If a commit type (e.g., `chore`) is not specified in you rule file, it won't trigger any kind of release.
@@ -132,3 +135,9 @@ If a commit type (e.g., `chore`) is not specified in you rule file, it won't tri
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 The following `release` types are supported for release rules: `major`, `minor`, `patch`.
+
+## Work in progress
+- [ ] Support non-annotated tags
+- [ ] Fix local action (Docker volumes)
+- [ ] Make "remote" command a flag
+- [ ] Support for build-tag and alpha/beta
