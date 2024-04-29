@@ -24,6 +24,7 @@ func TestSemver_Precedence(t *testing.T) {
 		{&Semver{2, 0, 0, ""}, &Semver{1, 99, 99, ""}, 1},
 		{&Semver{99, 0, 0, ""}, &Semver{2, 99, 99, ""}, 1},
 		{&Semver{1, 0, 0, ""}, &Semver{1, 0, 0, ""}, 0},
+		{&Semver{0, 2, 0, ""}, &Semver{0, 1, 0, ""}, 1},
 		{&Semver{0, 1, 0, "d364937"}, &Semver{0, 1, 0, "f61d9c2"}, 0},
 	}
 
