@@ -140,4 +140,6 @@ The following `release` types are supported for release rules: `major`, `minor`,
 - [ ] Support non-annotated tags
 - [ ] Fix local action (Docker volumes)
 - [ ] Make "remote" command a flag
-- [ ] Support for build-tag and alpha/beta
+- [ ] Create /docs/ folder for clarity
+- [ ] Create version cmd with build info (version, commit hash, builder number)
+- [ ] Centralize logging
