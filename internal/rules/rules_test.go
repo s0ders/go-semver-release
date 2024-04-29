@@ -3,6 +3,8 @@ package rules
 import (
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -144,4 +146,72 @@ obj:
 		got := isYAML([]byte(test.have))
 		assert.Equal(test.want, got, "should have detected YAML")
 	}
+}
+
+func TestRules_RulesFile(t *testing.T) {
+	assert := assert.New(t)
+
+	tempDir, err := os.MkdirTemp("", "rules-*")
+	assert.NoError(err, "failed to create temp directory")
+
+	defer func() {
+		err = os.RemoveAll(tempDir)
+		assert.NoError(err, "failed to remove temp. dir.")
+	}()
+
+	rulesFilePath := filepath.Join(tempDir, "rules.json")
+
+	file, err := os.Create(rulesFilePath)
+	assert.NoError(err, "failed to write to temp. rules file")
+
+	defer func() {
+		err = file.Close()
+		assert.NoError(err, "failed to close rules file")
+	}()
+
+	_, err = file.Write([]byte(Default))
+	assert.NoError(err, "failed to write to rules file")
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	_, err = New(logger).Read(rulesFilePath)
+	assert.NoError(err, "failed trying to read rulesFile")
+
+	// TODO: compare reader values
+}
+
+func TestRules_YAMLFile(t *testing.T) {
+	assert := assert.New(t)
+
+	yamlRules := `rules:
+  - type: feat
+    release: minor
+  - type: refactor
+    release: patch`
+
+	yamlDir, err := os.MkdirTemp("", "rules-*")
+	assert.NoError(err, "failed to create temp. dir. for YAML rules")
+
+	defer func() {
+		err = os.RemoveAll(yamlDir)
+		assert.NoError(err, "failed to remove temp. dir.")
+	}()
+
+	yamlFilePath := filepath.Join(yamlDir, "rules.yaml")
+
+	yamlFile, err := os.Create(yamlFilePath)
+	assert.NoError(err, "failed to create temp. YAML rules file")
+
+	defer func() {
+		err = yamlFile.Close()
+		assert.NoError(err, "failed to close temp. YAML rules file")
+	}()
+
+	_, err = yamlFile.WriteString(yamlRules)
+	assert.NoError(err, "failed to write YAML rules to temp. file")
+
+	fakeLogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	_, err = New(fakeLogger).Read(yamlFilePath)
+	assert.NoError(err, "failed to read temp. YAML rules file")
 }
