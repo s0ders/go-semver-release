@@ -17,13 +17,15 @@ import (
 )
 
 type cmdOutput struct {
-	Message    string `json:"msg"`
-	NewVersion string `json:"new-version"`
+	Message     string `json:"msg"`
+	NewVersion  string `json:"new-version"`
+	NextVersion string `json:"next-version"`
+	NewRelease  bool   `json:"new-release"`
 }
 
 var sampleCommitFile = "not_a_real_file.txt"
 
-func TestCmd_Local(t *testing.T) {
+func TestLocalCmd_Release(t *testing.T) {
 	assert := assert.New(t)
 
 	// Setting up sample Git repository
@@ -83,6 +85,111 @@ func TestCmd_Local(t *testing.T) {
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(true, exists, "tag should exist")
+}
+
+func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
+	assert := assert.New(t)
+
+	// Setting up sample Git repository
+	repository, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	commitTypes := []string{
+		"fix",   // 0.0.1
+		"feat!", // 1.0.0 (breaking change)
+	}
+
+	for _, commitType := range commitTypes {
+		err = sampleCommit(repository, repositoryPath, commitType)
+		assert.NoError(err, "failed to create sample commit")
+	}
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--dry-run", "--json"})
+
+	err = rootCmd.Execute()
+	assert.NoError(err, "local command executed with error")
+
+	expectedVersion := "1.0.0"
+	expectedTag := "v" + expectedVersion
+	expectedOut := cmdOutput{
+		Message:     "new release found, dry-run is enabled",
+		NextVersion: expectedVersion,
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(actual.Bytes(), &actualOut)
+	assert.NoError(err, "failed to unmarshal json")
+
+	// Check that the JSON output is correct
+	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+
+	// Check that the tag was actually created on the repository
+	exists, err := tagger.TagExists(repository, expectedTag)
+	assert.NoError(err, "failed to check if tag exists")
+
+	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
+}
+
+func TestLocalCmd_NoRelease(t *testing.T) {
+	assert := assert.New(t)
+
+	// Setting up sample Git repository
+	_, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--json"})
+
+	err = rootCmd.Execute()
+	assert.NoError(err, "local command executed with error")
+
+	expectedOut := cmdOutput{
+		Message:    "no new release",
+		NewRelease: false,
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(actual.Bytes(), &actualOut)
+	assert.NoError(err, "failed to unmarshal json")
+
+	// Check that the JSON output is correct
+	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+}
+
+func TestLocalCmd_Verbose(t *testing.T) {
+	assert := assert.New(t)
+
+	// Setting up sample Git repository
+	_, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--verbose", "--json"})
+
+	err = rootCmd.Execute()
+	assert.NoError(err, "local command executed with error")
 }
 
 func sampleRepository() (*git.Repository, string, error) {
