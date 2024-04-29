@@ -1,3 +1,4 @@
+// Package rules provides functions to deal with release rules.
 package rules
 
 import (
@@ -23,19 +24,12 @@ const Default = `{
 	]
 }`
 
-type rulesFormat int
-
-const (
-	YAML rulesFormat = 1
-	JSON rulesFormat = 2
-)
-
 type Reader struct {
 	logger *slog.Logger
 	reader io.Reader
-	format rulesFormat
 }
 
+// TODO: remove validator
 type ReleaseRule struct {
 	CommitType  string `json:"type" yaml:"type" validate:"required,oneof=build chore ci docs feat fix perf refactor revert style test"`
 	ReleaseType string `json:"release" yaml:"release" validate:"required,oneof=major minor patch"`

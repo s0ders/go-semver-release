@@ -1,3 +1,8 @@
+// Package parser provides functions to parse a Git repository commit history.
+//
+// This package is used to compute the semantic version number from a formatted
+// Git repository commit history. To do so, it expects the commit history to
+// follow the Conventional Commits specification.
 package parser
 
 import (

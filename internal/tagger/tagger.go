@@ -1,3 +1,4 @@
+// Package tagger provides function to work with Git tags.
 package tagger
 
 import (
@@ -29,6 +30,8 @@ func New(logger *slog.Logger, prefix string) *Tagger {
 	}
 }
 
+// NewTagFromSemver creates a new Git annotated tag from a semantic
+// version number.
 func NewTagFromSemver(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
@@ -39,6 +42,7 @@ func NewTagFromSemver(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 	return tag
 }
 
+// TagExists check if a given tag name exists on a given Git repository.
 func TagExists(repository *git.Repository, tagName string) (bool, error) {
 	tagExists := false
 	tags, err := repository.Tags()

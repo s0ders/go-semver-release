@@ -15,7 +15,6 @@ var (
 	rulesPath     string
 	tagPrefix     string
 	releaseBranch string
-	remoteName    string
 	dryRun        bool
 	verbose       bool
 	jsonOutput    bool
