@@ -36,10 +36,10 @@ func TestCI_GenerateGitHub(t *testing.T) {
 	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o666)
 	assert.NoError(err, "should have been able to create output file")
 
-	defer func(outputFile *os.File) {
+	defer func() {
 		err := outputFile.Close()
 		assert.NoError(err, "should have been able to close output file")
-	}(outputFile)
+	}()
 
 	outputPath := filepath.Join(outputDir, "output")
 
