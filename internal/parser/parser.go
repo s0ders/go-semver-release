@@ -33,6 +33,7 @@ func New(logger *slog.Logger, releaseRules *rules.ReleaseRules, verbose bool) *P
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
 	semverRegex := regexp.MustCompile(semver.Regex)
 
+	// TODO: use .Tags() to fetch all kind of tags and not just annotated ones
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, err
@@ -60,7 +61,10 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 	}
 
 	if latestSemver == nil {
-		p.logger.Info("no previous tag, creating one")
+		if p.verbose {
+			p.logger.Info("no previous tag, creating one")
+		}
+
 		head, err := repository.Head()
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch head: %w", err)
