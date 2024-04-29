@@ -5,10 +5,10 @@ import (
 )
 
 var (
-	version string
-	rootCmd = &cobra.Command{
+	cliVersion string
+	rootCmd    = &cobra.Command{
 		Use:     "go-semver-release",
-		Version: version,
+		Version: cliVersion,
 		Short:   "go-semver-release - CLI to automate semantic versioning of git repositories",
 		Long:    "go-semver-release - open source CLI to automate semantic versioning of git repositories using a formatted commit history",
 	}
