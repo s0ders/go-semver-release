@@ -66,6 +66,8 @@ jobs:
           context: .
           file: Dockerfile
           push: true
+          build-args: |
+            APP_VERSION="${{ needs.go-build.output.semver }}"
           tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
 
       - name: Trivy Scan
