@@ -19,14 +19,12 @@ var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix
 type Parser struct {
 	logger       *slog.Logger
 	releaseRules *rules.ReleaseRules
-	verbose      bool
 }
 
-func New(logger *slog.Logger, releaseRules *rules.ReleaseRules, verbose bool) *Parser {
+func New(logger *slog.Logger, releaseRules *rules.ReleaseRules) *Parser {
 	return &Parser{
 		logger:       logger,
 		releaseRules: releaseRules,
-		verbose:      verbose,
 	}
 }
 
@@ -61,9 +59,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 	}
 
 	if latestSemver == nil {
-		if p.verbose {
-			p.logger.Info("no previous tag, creating one")
-		}
+		p.logger.Debug("no previous tag, creating one")
 
 		head, err := repository.Head()
 		if err != nil {
@@ -78,9 +74,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 		return tagger.NewTagFromSemver(*version, head.Hash()), nil
 	}
 
-	if p.verbose {
-		p.logger.Info("found latest semver tag", "tag", latestTag.Name)
-	}
+	p.logger.Debug("found latest semver tag", "tag", latestTag.Name)
 
 	return latestTag, nil
 }
@@ -148,9 +142,8 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		shortMessage := shortMessage(commit.Message)
 
 		if breakingChange {
-			if p.verbose {
-				p.logger.Info("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
-			}
+			p.logger.Debug("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
+
 			latestSemver.BumpMajor()
 			newRelease = true
 			continue
@@ -179,10 +172,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			return false, fmt.Errorf("unknown release type %s", releaseType)
 		}
 
-		if p.verbose {
-			p.logger.Info("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
-		}
-
+		p.logger.Debug("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
 	}
 
 	return newRelease, nil

@@ -60,7 +60,7 @@ func New(logger *slog.Logger) *Reader {
 }
 
 // TODO: pass an io.Reader directly ?
-func (r *Reader) Read(path string) (*Reader, error) {
+func (r *Reader) Read(path string) (rr *Reader, err error) {
 	if len(path) == 0 {
 		r.reader = strings.NewReader(Default)
 		return r, nil
@@ -70,6 +70,11 @@ func (r *Reader) Read(path string) (*Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open rules file: %w", err)
 	}
+
+	defer func() {
+		err = reader.Close()
+		return
+	}()
 
 	r.reader = reader
 

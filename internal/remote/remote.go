@@ -17,14 +17,13 @@ type Remote struct {
 	logger     *slog.Logger
 	auth       *http.BasicAuth
 	remoteName string
-	verbose    bool
 }
 
 type Repository interface {
 	Push(o *git.PushOptions) error
 }
 
-func New(logger *slog.Logger, token string, remoteName string, verbose bool) Remote {
+func New(logger *slog.Logger, token string, remoteName string) Remote {
 	return Remote{
 		logger: logger,
 		auth: &http.BasicAuth{
@@ -32,7 +31,6 @@ func New(logger *slog.Logger, token string, remoteName string, verbose bool) Rem
 			Password: token,
 		},
 		remoteName: remoteName,
-		verbose:    verbose,
 	}
 }
 
@@ -72,9 +70,7 @@ func (r Remote) PushTagToRemote(repository Repository, semver *semver.Semver) er
 		return fmt.Errorf("failed to push tag to remote: %w", err)
 	}
 
-	if r.verbose {
-		r.logger.Info("pushed tag on repository", "tag", semver)
-	}
+	r.logger.Debug("pushed tag on repository", "tag", semver)
 
 	return nil
 }

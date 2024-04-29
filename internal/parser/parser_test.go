@@ -81,7 +81,7 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	commitAnalyzer := New(logger, rules, true)
+	commitAnalyzer := New(logger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
@@ -124,7 +124,7 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	commitAnalyzer := New(logger, rules, true)
+	commitAnalyzer := New(logger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
@@ -168,7 +168,7 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	commitAnalyzer := New(logger, rules, true)
+	commitAnalyzer := New(logger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
@@ -196,7 +196,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules, true)
+	ca := New(logger, rules)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -224,7 +224,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules, true)
+	ca := New(logger, rules)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -252,7 +252,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *t
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules, true)
+	ca := New(logger, rules)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -283,7 +283,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	rules, err := rulesReader.Parse()
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules, true)
+	ca := New(logger, rules)
 
 	version, newRelease, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -304,7 +304,6 @@ func TestParser_ShortMessage(t *testing.T) {
 	expected := "This is a very long commit message that is over..."
 
 	assert.Equal(expected, short, "short message should be equal")
-
 }
 
 func createGitRepository(firstCommitMessage string) (repository *git.Repository, tempDirPath string, err error) {

@@ -23,19 +23,17 @@ func TestRemote_New(t *testing.T) {
 	fakeLogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	token := ""
 	remoteName := "origin"
-	verbose := false
 
 	expected := Remote{
 		logger:     fakeLogger,
 		remoteName: remoteName,
-		verbose:    verbose,
 		auth: &http.BasicAuth{
 			Username: "go-semver-release",
 			Password: token,
 		},
 	}
 
-	actual := New(fakeLogger, token, remoteName, verbose)
+	actual := New(fakeLogger, token, remoteName)
 
 	assert.Equal(expected, actual)
 }
@@ -55,9 +53,8 @@ func TestRemote_PushTagToRemote(t *testing.T) {
 	fakeLogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	token := ""
 	remoteName := "origin"
-	verbose := false
 
-	remote := New(fakeLogger, token, remoteName, verbose)
+	remote := New(fakeLogger, token, remoteName)
 	version, err := semver.New(1, 0, 0, "")
 	assert.NoError(err, "failed to create semver")
 
@@ -81,9 +78,8 @@ func TestRemote_PushTagToRemoteFailure(t *testing.T) {
 	fakeLogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	token := ""
 	remoteName := "origin"
-	verbose := false
 
-	remote := New(fakeLogger, token, remoteName, verbose)
+	remote := New(fakeLogger, token, remoteName)
 	version, err := semver.New(1, 0, 0, "")
 	assert.NoError(err, "failed to create semver")
 

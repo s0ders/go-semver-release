@@ -20,14 +20,12 @@ var GitSignature = object.Signature{
 type Tagger struct {
 	logger    *slog.Logger
 	tagPrefix string
-	verbose   bool
 }
 
-func New(logger *slog.Logger, prefix string, verbose bool) *Tagger {
+func New(logger *slog.Logger, prefix string) *Tagger {
 	return &Tagger{
 		logger:    logger,
 		tagPrefix: prefix,
-		verbose:   verbose,
 	}
 }
 
@@ -90,9 +88,7 @@ func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.S
 		return fmt.Errorf("failed to create tag on repository: %w", err)
 	}
 
-	if t.verbose {
-		t.logger.Info("created new tag on repository", "tag", semver.String())
-	}
+	t.logger.Debug("created new tag on repository", "tag", semver.String())
 
 	return nil
 }

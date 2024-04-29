@@ -29,11 +29,22 @@ var localCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var logHandler slog.Handler
+		var logLevel slog.Level
+
+		if verbose {
+			logLevel = slog.LevelDebug
+		} else {
+			logLevel = slog.LevelInfo
+		}
+
+		logOpts := &slog.HandlerOptions{
+			Level: logLevel,
+		}
 
 		if jsonOutput {
-			logHandler = slog.NewJSONHandler(cmd.OutOrStdout(), nil)
+			logHandler = slog.NewJSONHandler(cmd.OutOrStdout(), logOpts)
 		} else {
-			logHandler = slog.NewTextHandler(cmd.OutOrStdout(), nil)
+			logHandler = slog.NewTextHandler(cmd.OutOrStdout(), logOpts)
 		}
 
 		logger := slog.New(logHandler)
@@ -53,7 +64,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := parser.New(logger, rules, verbose).ComputeNewSemver(repository)
+		semver, release, err := parser.New(logger, rules).ComputeNewSemver(repository)
 		if err != nil {
 			return err
 		}
@@ -72,7 +83,7 @@ var localCmd = &cobra.Command{
 			return nil
 		default:
 			logger.Info("new release found", "new-version", semver.NormalVersion(), "new-release", true)
-			err = tagger.New(logger, tagPrefix, verbose).AddTagToRepository(repository, semver)
+			err = tagger.New(logger, tagPrefix).AddTagToRepository(repository, semver)
 			if err != nil {
 				return err
 			}

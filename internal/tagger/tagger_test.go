@@ -67,7 +67,7 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	assert.NoError(err, "semver creation should have succeeded")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "", false)
+	tagger := New(logger, "")
 
 	err = tagger.AddTagToRepository(repository, version)
 	assert.NoError(err, "should have been able to add tag to repository")
@@ -93,7 +93,7 @@ func TestTagger_AddExistingTagToRepository(t *testing.T) {
 	assert.NoError(err, "semver creation should have succeeded")
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "", false)
+	tagger := New(logger, "")
 
 	err = tagger.AddTagToRepository(repository, version)
 	assert.NoError(err, "should not have been able to add tag to repository")
