@@ -20,6 +20,10 @@ type Remote struct {
 	verbose    bool
 }
 
+type Repository interface {
+	Push(o *git.PushOptions) error
+}
+
 func New(logger *slog.Logger, token string, remoteName string, verbose bool) Remote {
 	return Remote{
 		logger: logger,
@@ -28,6 +32,7 @@ func New(logger *slog.Logger, token string, remoteName string, verbose bool) Rem
 			Password: token,
 		},
 		remoteName: remoteName,
+		verbose:    verbose,
 	}
 }
 
@@ -55,7 +60,7 @@ func (r Remote) Clone(url, branch string) (*git.Repository, string, error) {
 	return repository, path, nil
 }
 
-func (r Remote) PushTagToRemote(repository *git.Repository, semver *semver.Semver) error {
+func (r Remote) PushTagToRemote(repository Repository, semver *semver.Semver) error {
 	po := &git.PushOptions{
 		Auth:       r.auth,
 		Progress:   os.Stdout,
