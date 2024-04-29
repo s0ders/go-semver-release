@@ -71,6 +71,7 @@ func TestLocalCmd_Release(t *testing.T) {
 	expectedOut := cmdOutput{
 		Message:    "new release found",
 		NewVersion: expectedVersion,
+		NewRelease: true,
 	}
 	actualOut := cmdOutput{}
 
@@ -122,6 +123,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	expectedOut := cmdOutput{
 		Message:     "new release found, dry-run is enabled",
 		NextVersion: expectedVersion,
+		NewRelease:  true,
 	}
 	actualOut := cmdOutput{}
 
