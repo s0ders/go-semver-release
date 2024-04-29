@@ -41,9 +41,9 @@ func NewTagFromSemver(semver semver.Semver, hash plumbing.Hash) *object.Tag {
 	return tag
 }
 
-func (t *Tagger) TagExists(r *git.Repository, tagName string) (bool, error) {
+func TagExists(repository *git.Repository, tagName string) (bool, error) {
 	tagExists := false
-	tags, err := r.Tags()
+	tags, err := repository.Tags()
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch tags: %w", err)
 	}
@@ -73,7 +73,7 @@ func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.S
 
 	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.NormalVersion())
 
-	tagExists, err := t.TagExists(repository, tag)
+	tagExists, err := TagExists(repository, tag)
 	if err != nil {
 		return fmt.Errorf("failed to check if tag exists: %w", err)
 	}

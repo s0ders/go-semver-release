@@ -43,14 +43,11 @@ func TestTagger_TagExists(t *testing.T) {
 		assert.NoError(err, "tag creation should have succeeded")
 	}
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "", true)
-
-	tagExists, err := tagger.TagExists(r, tags[0])
+	tagExists, err := TagExists(r, tags[0])
 	assert.NoError(err, "should have been able to check if tag exists")
 	assert.Equal(tagExists, true, "tag should have been found")
 
-	tagDoesNotExists, err := tagger.TagExists(r, "0.0.1")
+	tagDoesNotExists, err := TagExists(r, "0.0.1")
 	assert.NoError(err, "should have been able to check if tag exists")
 	assert.Equal(tagDoesNotExists, false, "tag should not have been found")
 }
@@ -75,7 +72,7 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	err = tagger.AddTagToRepository(repository, version)
 	assert.NoError(err, "should have been able to add tag to repository")
 
-	tagExists, err := tagger.TagExists(repository, version.String())
+	tagExists, err := TagExists(repository, version.String())
 	assert.NoError(err, "should have been able to check if tag exists")
 
 	assert.Equal(tagExists, true, "tag should have been found")
