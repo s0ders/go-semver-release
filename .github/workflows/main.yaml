@@ -63,7 +63,7 @@ jobs:
       - name: Docker build pre-release
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./build/
           file: Dockerfile
           push: true
           build-args: |

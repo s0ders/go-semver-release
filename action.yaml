@@ -23,7 +23,7 @@ outputs:
     description: 'Boolean that indicate whether a new semver was computed or not'
 runs:
   using: 'docker'
-  image: 'Dockerfile'
+  image: './build/Dockerfile'
   args:
     - "local"
     - ${{ inputs.repository-path }}
