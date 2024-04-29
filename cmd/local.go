@@ -11,6 +11,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	rulesPath     string
+	tagPrefix     string
+	releaseBranch string
+	remoteName    string
+	dryRun        bool
+	verbose       bool
+	jsonOutput    bool
+)
+
 func init() {
 	localCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "v", "Prefix added to the version tag name")
