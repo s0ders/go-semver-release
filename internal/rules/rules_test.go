@@ -22,9 +22,10 @@ func TestRules_Map(t *testing.T) {
 
 	got := rules.Map()
 	want := map[string]string{
-		"feat": "minor",
-		"perf": "minor",
-		"fix":  "patch",
+		"feat":   "minor",
+		"fix":    "patch",
+		"perf":   "patch",
+		"revert": "patch",
 	}
 
 	assert.Equal(want, got, "rule maps should match")
@@ -48,8 +49,9 @@ func TestRules_ParseDefault(t *testing.T) {
 
 	matrix := []test{
 		{"feat", "minor"},
-		{"perf", "minor"},
 		{"fix", "patch"},
+		{"perf", "patch"},
+		{"revert", "patch"},
 	}
 
 	for i := 0; i < len(rules.Rules); i++ {
