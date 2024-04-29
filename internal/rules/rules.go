@@ -17,8 +17,9 @@ import (
 const Default = `{
 	"rules": [
 		{"type": "feat", "release": "minor"},
-		{"type": "perf", "release": "minor"},
-		{"type": "fix", "release": "patch"}
+		{"type": "fix", "release": "patch"},
+		{"type": "perf", "release": "patch"},
+		{"type": "revert", "release": "patch"}
 	]
 }`
 
