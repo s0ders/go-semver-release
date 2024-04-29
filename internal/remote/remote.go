@@ -23,6 +23,8 @@ type Repository interface {
 	Push(o *git.PushOptions) error
 }
 
+var gitPlainClone = git.PlainClone
+
 func New(logger *slog.Logger, token string, remoteName string) Remote {
 	return Remote{
 		logger: logger,
@@ -50,7 +52,7 @@ func (r Remote) Clone(url, branch string) (*git.Repository, string, error) {
 		cloneOption.ReferenceName = plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))
 	}
 
-	repository, err := git.PlainClone(path, false, cloneOption)
+	repository, err := gitPlainClone(path, false, cloneOption)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to clone repository: %w", err)
 	}

@@ -96,3 +96,25 @@ func TestRemote_PushTagToRemoteFailure(t *testing.T) {
 	err = remote.PushTagToRemote(mockRepo, version)
 	assert.Error(err, "should have failed pushing tag to remote")
 }
+
+func TestRemote_Clone(t *testing.T) {
+	assert := assert.New(t)
+	oldGitPlainClone := gitPlainClone
+
+	defer func() {
+		gitPlainClone = oldGitPlainClone
+	}()
+
+	// Mocking function
+	gitPlainClone = func(path string, isBare bool, o *git.CloneOptions) (*git.Repository, error) {
+		return nil, nil
+	}
+
+	fakeLogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	token := ""
+	remoteName := "origin"
+
+	remote := New(fakeLogger, token, remoteName)
+	_, _, err := remote.Clone("https//example.com/repo.git", "main")
+	assert.NoError(err, "failed to clone repo")
+}
