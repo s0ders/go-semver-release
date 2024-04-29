@@ -145,7 +145,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
 		commitType := submatch[1]
 		shortHash := commit.Hash.String()[0:7]
-		shortMessage := p.shortMessage(commit.Message)
+		shortMessage := shortMessage(commit.Message)
 
 		if breakingChange {
 			if p.verbose {
@@ -188,7 +188,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 	return newRelease, nil
 }
 
-func (p *Parser) shortMessage(message string) string {
+func shortMessage(message string) string {
 	if len(message) > 50 {
 		return fmt.Sprintf("%s...", message[0:47])
 	}

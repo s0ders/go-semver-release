@@ -295,6 +295,18 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
+func TestParser_ShortMessage(t *testing.T) {
+	assert := assert.New(t)
+
+	msg := "This is a very long commit message that is over fifty character"
+	short := shortMessage(msg)
+
+	expected := "This is a very long commit message that is over..."
+
+	assert.Equal(expected, short, "short message should be equal")
+
+}
+
 func createGitRepository(firstCommitMessage string) (repository *git.Repository, tempDirPath string, err error) {
 	tempDirPath, err = os.MkdirTemp("", "parser-*")
 	if err != nil {

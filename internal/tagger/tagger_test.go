@@ -78,6 +78,30 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	assert.Equal(tagExists, true, "tag should have been found")
 }
 
+func TestTagger_AddExistingTagToRepository(t *testing.T) {
+	assert := assert.New(t)
+
+	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	assert.NoError(err, "repository creation should have succeeded")
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		assert.NoError(err, "failed to remove repository")
+	}(repositoryPath)
+
+	version, err := semver.New(1, 0, 0, "")
+	assert.NoError(err, "semver creation should have succeeded")
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	tagger := New(logger, "", false)
+
+	err = tagger.AddTagToRepository(repository, version)
+	assert.NoError(err, "should not have been able to add tag to repository")
+
+	err = tagger.AddTagToRepository(repository, version)
+	assert.Error(err, "should not have been able to add tag to repository")
+}
+
 func TestTagger_NewTagFromServer(t *testing.T) {
 	assert := assert.New(t)
 
