@@ -194,6 +194,88 @@ func TestLocalCmd_Verbose(t *testing.T) {
 	assert.NoError(err, "local command executed with error")
 }
 
+func TestLocalCmd_CustomRules(t *testing.T) {
+	assert := assert.New(t)
+
+	// Setting up sample Git repository
+	repository, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	commitTypes := []string{
+		"fix",  // 0.1.0 (with custom rules)
+		"feat", // 0.2.0
+	}
+
+	for _, commitType := range commitTypes {
+		err = sampleCommit(repository, repositoryPath, commitType)
+		assert.NoError(err, "failed to create sample commit")
+	}
+
+	tempRulesDir, err := os.MkdirTemp("", "rules-*")
+	assert.NoError(err, "failed to create temp. dir.")
+
+	defer func() {
+		err = os.RemoveAll(tempRulesDir)
+		assert.NoError(err, "failed to remove temp. dir.")
+	}()
+
+	customRulesPath := filepath.Join(tempRulesDir, "custom.json")
+
+	customRules, err := os.Create(customRulesPath)
+	assert.NoError(err, "failed to create empty rule file")
+
+	customRulesJSON := `
+{
+    "rules": [
+        {"type": "feat",   "release": "minor"},
+        {"type": "fix",    "release": "minor"}
+    ]
+}
+`
+
+	_, err = customRules.Write([]byte(customRulesJSON))
+	assert.NoError(err, "failed to write empty rule file")
+
+	defer func() {
+		err = customRules.Close()
+		assert.NoError(err, "failed to close empty rule file")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--rules-path", customRulesPath, "--release-branch", "main", "--json"})
+
+	err = rootCmd.Execute()
+	assert.NoError(err, "local command executed with error")
+
+	expectedVersion := "0.2.0"
+	expectedTag := "v" + expectedVersion
+	expectedOut := cmdOutput{
+		Message:    "new release found",
+		NewVersion: expectedVersion,
+		NewRelease: true,
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(actual.Bytes(), &actualOut)
+	assert.NoError(err, "failed to unmarshal json")
+
+	// Check that the JSON output is correct
+	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+
+	// Check that the tag was actually created on the repository
+	exists, err := tag.TagExists(repository, expectedTag)
+	assert.NoError(err, "failed to check if tag exists")
+
+	assert.Equal(true, exists, "tag should exist")
+}
+
 func sampleRepository() (*git.Repository, string, error) {
 	dir, err := os.MkdirTemp("", "localcmd-test-*")
 	if err != nil {

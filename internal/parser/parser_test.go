@@ -211,6 +211,29 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 	assert.Equal(want, version.String(), "version should be equal")
 }
 
+func TestParser_UnknownReleaseType(t *testing.T) {
+	assert := assert.New(t)
+
+	r, repositoryPath, err := createGitRepository("fix: commit that trigger an unknown release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(repositoryPath)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
+
+	rules := &rules.ReleaseRules{
+		Rules: []rules.ReleaseRule{
+			{CommitType: "fix", ReleaseType: "unknown"},
+		},
+	}
+
+	ca := New(fakeLogger, rules)
+
+	_, _, err = ca.ComputeNewSemver(r)
+	assert.Error(err, "should have been failed trying to compute semver")
+}
+
 func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
 	assert := assert.New(t)
 
