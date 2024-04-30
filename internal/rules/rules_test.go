@@ -1,8 +1,6 @@
 package rules
 
 import (
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,12 +12,9 @@ import (
 func TestRules_Map(t *testing.T) {
 	assert := assert.New(t)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	opts := &Options{}
 
-	rulesReader, err := New(logger).Read("")
-	assert.NoError(err, "should have been able to reed rules")
-
-	rules, err := rulesReader.Parse()
+	rules, err := Init(opts)
 	assert.NoError(err, "should have been able to parse rules")
 
 	got := rules.Map()
@@ -36,12 +31,9 @@ func TestRules_Map(t *testing.T) {
 func TestRules_ParseDefault(t *testing.T) {
 	assert := assert.New(t)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	opts := &Options{}
 
-	rulesReader, err := New(logger).Read("")
-	assert.NoError(err, "should have been able to reed rules")
-
-	rules, err := rulesReader.Parse()
+	rules, err := Init(opts)
 	assert.NoError(err, "should have been able to parse rules")
 
 	type test struct {
@@ -65,67 +57,96 @@ func TestRules_ParseDefault(t *testing.T) {
 	}
 }
 
-func TestRules_IncorrectRules(t *testing.T) {
+func TestRules_DuplicateType(t *testing.T) {
 	assert := assert.New(t)
 
-	const incorrectRules = `{
+	const duplicateRules = `{
 		"rules": [
 			{"type": "feat", "release": "minor"},
-			{"type": "feat", "release": "major"},
-			{"type": "fix", "release": "patch"}
+			{"type": "feat", "release": "patch"}
 		]
 	}`
 
-	reader := strings.NewReader(incorrectRules)
+	reader := strings.NewReader(duplicateRules)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	opts := &Options{
+		Reader: reader,
+	}
 
-	ruleReader := New(logger)
-	ruleReader.reader = reader
-	_, err := ruleReader.Parse()
-
-	assert.Error(err, "should have detected incorrect rules")
+	_, err := Init(opts)
+	assert.ErrorIs(err, ErrDuplicateReleaseRule, "should have detected incorrect rules")
 }
 
-func TestRules_InvalidRulesFilePath(t *testing.T) {
+func TestRules_InvalidType(t *testing.T) {
 	assert := assert.New(t)
 
-	invalidFilePath := "./foo/bar/baz"
+	const duplicateRules = `{
+		"rules": [
+			{"type": "feat", "release": "minor"},
+			{"type": "unknown", "release": "patch"}
+		]
+	}`
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	reader := strings.NewReader(duplicateRules)
 
-	_, err := New(logger).Read(invalidFilePath)
-	assert.Error(err, "should have failed trying to open invalid file path")
+	opts := &Options{
+		Reader: reader,
+	}
+
+	_, err := Init(opts)
+	assert.ErrorIs(err, ErrInvalidCommitType, "should have detected incorrect rules")
 }
 
-func TestRules_RulesFile(t *testing.T) {
+func TestRules_InvalidRelease(t *testing.T) {
+	assert := assert.New(t)
+
+	// Using a "release" of type major is forbidden since they are
+	// reserved for breaking changes.
+	const duplicateRules = `{
+		"rules": [
+			{"type": "feat", "release": "minor"},
+			{"type": "fix", "release": "major"}
+		]
+	}`
+
+	reader := strings.NewReader(duplicateRules)
+
+	opts := &Options{
+		Reader: reader,
+	}
+
+	_, err := Init(opts)
+	assert.ErrorIs(err, ErrInvalidReleaseType, "should have detected incorrect rules")
+}
+
+func TestRules_EmptyFile(t *testing.T) {
 	assert := assert.New(t)
 
 	tempDir, err := os.MkdirTemp("", "rules-*")
-	assert.NoError(err, "failed to create temp directory")
+	assert.NoError(err, "failed to create temp. dir.")
 
 	defer func() {
 		err = os.RemoveAll(tempDir)
 		assert.NoError(err, "failed to remove temp. dir.")
 	}()
 
-	rulesFilePath := filepath.Join(tempDir, "rules.json")
+	emptyFilePath := filepath.Join(tempDir, "empty.json")
 
-	file, err := os.Create(rulesFilePath)
-	assert.NoError(err, "failed to write to temp. rules file")
+	emptyFile, err := os.Create(emptyFilePath)
+	assert.NoError(err, "failed to create empty rule file")
+
+	_, err = emptyFile.Write([]byte("{}"))
+	assert.NoError(err, "failed to write empty rule file")
 
 	defer func() {
-		err = file.Close()
-		assert.NoError(err, "failed to close rules file")
+		err = emptyFile.Close()
+		assert.NoError(err, "failed to close empty rule file")
 	}()
 
-	_, err = file.Write([]byte(Default))
-	assert.NoError(err, "failed to write to rules file")
+	opts := &Options{
+		Reader: emptyFile,
+	}
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	_, err = New(logger).Read(rulesFilePath)
-	assert.NoError(err, "failed trying to read rulesFile")
-
-	// TODO: compare reader values
+	_, err = Init(opts)
+	assert.Error(err, "should have failed to decode JSON")
 }
