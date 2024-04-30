@@ -17,6 +17,8 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
 )
 
+var fakeLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
+
 func TestParser_CommitTypeRegex(t *testing.T) {
 	assert := assert.New(t)
 
@@ -73,15 +75,10 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 		assert.NoError(err, "should have been able to remove Git repository")
 	}(repositoryPath)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	rulesReader, err := rules.New(logger).Read("")
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to create rules reader")
 
-	rules, err := rulesReader.Parse()
-	assert.NoError(err, "should have been able to parse rules")
-
-	commitAnalyzer := New(logger, rules)
+	commitAnalyzer := New(fakeLogger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
@@ -116,15 +113,10 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	})
 	assert.NoError(err, "should have been able to create tag")
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	rulesReader, err := rules.New(logger).Read("")
-	assert.NoError(err, "should have been able to create rules reader")
-
-	rules, err := rulesReader.Parse()
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to parse rules")
 
-	commitAnalyzer := New(logger, rules)
+	commitAnalyzer := New(fakeLogger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
@@ -160,15 +152,10 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		assert.NoError(err, "should have been able to create tag")
 	}
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	rulesReader, err := rules.New(logger).Read("")
-	assert.NoError(err, "should have been able to create rules reader")
-
-	rules, err := rulesReader.Parse()
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to parse rules")
 
-	commitAnalyzer := New(logger, rules)
+	commitAnalyzer := New(fakeLogger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
@@ -188,15 +175,10 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 		assert.NoError(err, "should have able to remove Git repository")
 	}(repositoryPath)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	rulesReader, err := rules.New(logger).Read("")
-	assert.NoError(err, "should have been able to create rules reader")
-
-	rules, err := rulesReader.Parse()
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules)
+	ca := New(fakeLogger, rules)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -217,14 +199,10 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	rulesReader, err := rules.New(logger).Read("")
-	assert.NoError(err, "should have been able to create rules reader")
-
-	rules, err := rulesReader.Parse()
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules)
+	ca := New(fakeLogger, rules)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -244,15 +222,10 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *t
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	rulesReader, err := rules.New(logger).Read("")
-	assert.NoError(err, "should have been able to create rules reader")
-
-	rules, err := rulesReader.Parse()
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules)
+	ca := New(fakeLogger, rules)
 
 	version, _, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -275,15 +248,10 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	err = addCommit(r, "fix: added hello feature")
 	assert.NoError(err, "should have able to add git commit")
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-
-	rulesReader, err := rules.New(logger).Read("")
-	assert.NoError(err, "should have been able to create rules reader")
-
-	rules, err := rulesReader.Parse()
+	rules, err := rules.Init(nil)
 	assert.NoError(err, "should have been able to parse rules")
 
-	ca := New(logger, rules)
+	ca := New(fakeLogger, rules)
 
 	version, newRelease, err := ca.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
