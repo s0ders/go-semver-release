@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"log/slog"
+	"os"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/spf13/cobra"
+
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
 	"github.com/s0ders/go-semver-release/v2/internal/parser"
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
-	"github.com/s0ders/go-semver-release/v2/internal/tagger"
-	"github.com/spf13/cobra"
+	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
 var (
@@ -38,22 +40,19 @@ var localCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var logHandler slog.Handler
-		var logLevel slog.Level
+		var logOpts slog.HandlerOptions
+		var rulesOpts rules.Options
 
 		if verbose {
-			logLevel = slog.LevelDebug
+			logOpts.Level = slog.LevelDebug
 		} else {
-			logLevel = slog.LevelInfo
-		}
-
-		logOpts := &slog.HandlerOptions{
-			Level: logLevel,
+			logOpts.Level = slog.LevelInfo
 		}
 
 		if jsonOutput {
-			logHandler = slog.NewJSONHandler(cmd.OutOrStdout(), logOpts)
+			logHandler = slog.NewJSONHandler(cmd.OutOrStdout(), &logOpts)
 		} else {
-			logHandler = slog.NewTextHandler(cmd.OutOrStdout(), logOpts)
+			logHandler = slog.NewTextHandler(cmd.OutOrStdout(), &logOpts)
 		}
 
 		logger := slog.New(logHandler)
@@ -63,12 +62,21 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		rulesReader, err := rules.New(logger).Read(rulesPath)
-		if err != nil {
-			return err
+		if rulesPath != "" {
+			file, err := os.Open(rulesPath)
+			if err != nil {
+				return err
+			}
+
+			rulesOpts.Reader = file
+
+			defer func() {
+				err = file.Close()
+				return
+			}()
 		}
 
-		rules, err := rulesReader.Parse()
+		rules, err := rules.Init(&rulesOpts)
 		if err != nil {
 			return err
 		}
@@ -78,7 +86,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		err = ci.New(logger).GenerateGitHub(tagPrefix, semver, release)
+		err = ci.GenerateGitHubOutput(tagPrefix, semver, release)
 		if err != nil {
 			return err
 		}
@@ -92,10 +100,13 @@ var localCmd = &cobra.Command{
 			return nil
 		default:
 			logger.Info("new release found", "new-version", semver.String(), "new-release", true)
-			err = tagger.New(logger, tagPrefix).AddTagToRepository(repository, semver)
+
+			err = tag.AddTagToRepository(repository, semver, tagPrefix)
 			if err != nil {
 				return err
 			}
+
+			logger.Debug("added tag to repository", "tag", tagPrefix+semver.String())
 		}
 
 		return nil

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/s0ders/go-semver-release/v2/internal/tagger"
+	"github.com/s0ders/go-semver-release/v2/internal/tag"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -82,7 +82,7 @@ func TestLocalCmd_Release(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	// Check that the tag was actually created on the repository
-	exists, err := tagger.TagExists(repository, expectedTag)
+	exists, err := tag.TagExists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(true, exists, "tag should exist")
@@ -134,7 +134,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	// Check that the tag was actually created on the repository
-	exists, err := tagger.TagExists(repository, expectedTag)
+	exists, err := tag.TagExists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
