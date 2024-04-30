@@ -3,23 +3,12 @@ package ci
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
-type Output struct {
-	logger *slog.Logger
-}
-
-func New(logger *slog.Logger) Output {
-	return Output{
-		logger: logger,
-	}
-}
-
-func (o Output) GenerateGitHub(prefix string, semver *semver.Semver, release bool) (err error) {
+func GenerateGitHubOutput(prefix string, semver *semver.Semver, release bool) (err error) {
 	path, exists := os.LookupEnv("GITHUB_OUTPUT")
 
 	if !exists {

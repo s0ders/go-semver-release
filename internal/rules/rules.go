@@ -7,12 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
-	"os"
 	"strings"
 )
 
-// TODO: make into a map or struct directly ?
 const Default = `{
 	"rules": [
 		{"type": "feat", "release": "minor"},
@@ -26,6 +23,7 @@ var (
 	ErrInvalidCommitType    = errors.New("invalid commit type")
 	ErrInvalidReleaseType   = errors.New("invalid release type")
 	ErrDuplicateReleaseRule = errors.New("duplicate release rule for the same commit type")
+	ErrNoRules              = errors.New("no rules found")
 )
 
 var validCommitTypes = map[string]struct{}{
@@ -43,24 +41,21 @@ var validCommitTypes = map[string]struct{}{
 }
 
 var validReleaseTypes = map[string]struct{}{
-	"major": {},
 	"minor": {},
 	"patch": {},
 }
 
-type Reader struct {
-	logger *slog.Logger
-	reader io.Reader
-}
-
-// TODO: remove validator
 type ReleaseRule struct {
 	CommitType  string `json:"type"`
 	ReleaseType string `json:"release"`
 }
 
 type ReleaseRules struct {
-	Rules []ReleaseRule `json:"rules" validate:"required"`
+	Rules []ReleaseRule `json:"rules"`
+}
+
+type Options struct {
+	Reader io.Reader
 }
 
 func (r *ReleaseRules) Map() map[string]string {
@@ -71,39 +66,23 @@ func (r *ReleaseRules) Map() map[string]string {
 	return m
 }
 
-func New(logger *slog.Logger) *Reader {
-	return &Reader{
-		logger: logger,
+func Init(opts *Options) (rr *ReleaseRules, err error) {
+	if opts == nil || opts.Reader == nil {
+		reader := strings.NewReader(Default)
+		rr, err = Parse(reader)
+		return rr, err
 	}
+
+	rr, err = Parse(opts.Reader)
+
+	return rr, err
 }
 
-// TODO: pass an io.Reader directly ?
-func (r *Reader) Read(path string) (rr *Reader, err error) {
-	if len(path) == 0 {
-		r.reader = strings.NewReader(Default)
-		return r, nil
-	}
-
-	reader, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open rules file: %w", err)
-	}
-
-	defer func() {
-		err = reader.Close()
-		return
-	}()
-
-	r.reader = reader
-
-	return r, nil
-}
-
-func (r *Reader) Parse() (*ReleaseRules, error) {
+func Parse(reader io.Reader) (*ReleaseRules, error) {
 	var rules ReleaseRules
 	existingType := make(map[string]string)
 
-	buf, err := io.ReadAll(r.reader)
+	buf, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read rules file: %w", err)
 	}
@@ -113,15 +92,10 @@ func (r *Reader) Parse() (*ReleaseRules, error) {
 	decoder := json.NewDecoder(bufReader)
 	err = decoder.Decode(&rules)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode JSON into rules")
-	}
-
-	if len(rules.Rules) == 0 {
-		return nil, fmt.Errorf("no release rules found")
+		return nil, fmt.Errorf("failed to decode JSON into rules: %w", err)
 	}
 
 	for _, rule := range rules.Rules {
-
 		if _, ok := validCommitTypes[rule.CommitType]; !ok {
 			return nil, ErrInvalidCommitType
 		}

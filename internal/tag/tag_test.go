@@ -1,9 +1,7 @@
-package tagger
+package tag
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -66,10 +64,7 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	version, err := semver.New(1, 0, 0)
 	assert.NoError(err, "semver creation should have succeeded")
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "")
-
-	err = tagger.AddTagToRepository(repository, version)
+	err = AddTagToRepository(repository, version, "")
 	assert.NoError(err, "should have been able to add tag to repository")
 
 	tagExists, err := TagExists(repository, version.String())
@@ -92,13 +87,10 @@ func TestTagger_AddExistingTagToRepository(t *testing.T) {
 	version, err := semver.New(1, 0, 0)
 	assert.NoError(err, "semver creation should have succeeded")
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	tagger := New(logger, "")
-
-	err = tagger.AddTagToRepository(repository, version)
+	err = AddTagToRepository(repository, version, "v")
 	assert.NoError(err, "should not have been able to add tag to repository")
 
-	err = tagger.AddTagToRepository(repository, version)
+	err = AddTagToRepository(repository, version, "v")
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
@@ -115,7 +107,7 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 	version, err := semver.New(0, 0, 1)
 	assert.NoError(err, "semver creation should have succeeded")
 
-	gotTag := NewTagFromSemver(*version, hash)
+	gotTag := NewTagFromSemver(version, hash)
 
 	wantTag := &object.Tag{
 		Hash:   hash,
@@ -130,7 +122,7 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 // createGitRepository creates an empty Git repository, adds a file to it then creates
 // a commit with the given message.
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
-	tempDirPath, err := os.MkdirTemp("", "tagger-*")
+	tempDirPath, err := os.MkdirTemp("", "tag-*")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
 	}

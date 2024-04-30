@@ -1,8 +1,6 @@
 package ci
 
 import (
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,15 +8,6 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestCI_New(t *testing.T) {
-	assert := assert.New(t)
-
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	output := New(logger)
-
-	assert.Equal(logger, output.logger, "logger should be equal")
-}
 
 func TestCI_GenerateGitHub(t *testing.T) {
 	assert := assert.New(t)
@@ -51,13 +40,10 @@ func TestCI_GenerateGitHub(t *testing.T) {
 		assert.NoError(err, "should have been able to unset GITHUB_OUTPUT")
 	}()
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	output := New(logger)
-
 	version, err := semver.New(1, 2, 3)
 	assert.NoError(err, "should have been able to create version")
 
-	err = output.GenerateGitHub("v", version, true)
+	err = GenerateGitHubOutput("v", version, true)
 	assert.NoError(err, "should have been able to generate GitHub output")
 
 	writtenOutput, err := os.ReadFile(outputPath)
@@ -72,11 +58,7 @@ func TestCI_GenerateGitHub(t *testing.T) {
 func TestCI_NoOutputEnvVar(t *testing.T) {
 	assert := assert.New(t)
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	output := New(logger)
-
-	err := output.GenerateGitHub("", nil, false)
-
+	err := GenerateGitHubOutput("", nil, false)
 	assert.NoError(err, "should not have tried to generate an output")
 }
 
@@ -111,12 +93,9 @@ func TestCI_ReadOnlyOutput(t *testing.T) {
 		assert.NoError(err, "should have been able to unset GITHUB_OUTPUT")
 	}()
 
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	output := New(logger)
-
 	version, err := semver.New(1, 2, 3)
 	assert.NoError(err, "should have been able to create version")
 
-	err = output.GenerateGitHub("v", version, true)
+	err = GenerateGitHubOutput("v", version, true)
 	assert.Error(err, "should have failed since output file is readonly")
 }

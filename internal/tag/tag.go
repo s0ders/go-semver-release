@@ -1,9 +1,8 @@
-// Package tagger provides function to work with Git tags.
-package tagger
+// Package tag provides function to work with Git tags.
+package tag
 
 import (
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -18,21 +17,9 @@ var GitSignature = object.Signature{
 	When:  time.Now(),
 }
 
-type Tagger struct {
-	logger    *slog.Logger
-	tagPrefix string
-}
-
-func New(logger *slog.Logger, prefix string) *Tagger {
-	return &Tagger{
-		logger:    logger,
-		tagPrefix: prefix,
-	}
-}
-
 // NewTagFromSemver creates a new Git annotated tag from a semantic
 // version number.
-func NewTagFromSemver(semver semver.Semver, hash plumbing.Hash) *object.Tag {
+func NewTagFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
@@ -67,13 +54,13 @@ func TagExists(repository *git.Repository, tagName string) (bool, error) {
 
 // AddTagToRepository create a new annotated tag on the repository
 // with a name corresponding to the semver passed as a parameter.
-func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.Semver) error {
+func AddTagToRepository(repository *git.Repository, semver *semver.Semver, prefix string) error {
 	head, err := repository.Head()
 	if err != nil {
 		return fmt.Errorf("failed to fetch head: %w", err)
 	}
 
-	tag := fmt.Sprintf("%s%s", t.tagPrefix, semver.String())
+	tag := fmt.Sprintf("%s%s", prefix, semver.String())
 
 	tagExists, err := TagExists(repository, tag)
 	if err != nil {
@@ -91,8 +78,6 @@ func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.S
 	if err != nil {
 		return fmt.Errorf("failed to create tag on repository: %w", err)
 	}
-
-	t.logger.Debug("created new tag on repository", "tag", semver.String())
 
 	return nil
 }
