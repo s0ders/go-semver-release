@@ -9,32 +9,42 @@ env:
   DOCKER_IMAGE: docker.io/soders/go-semver-release
   GIT_CI_USERNAME: go-semver-ci
   GIT_CI_EMAIL: go-semver@release.ci
-  SBOM_FILE: sbom.spdx
+  ACTION_CHECKOUT_HASH: 0ad4b8fadaa221de15dcec353f45205ec38ea70b #  v4.1.4
+  ACTION_SETUP_GO_HASH: 0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+  ACTION_CODECOV_HASH: 84508663e988701840491b86de86b666e8a86bed # v4.3.0
+  ACTION_SETUP_BUILX_HASH: d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
+  ACTION_DOCKER_LOGIN_HASH: e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
+  ACTION_BUILD_PUSH_HASH: 2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5.3.0
+  ACTION_TRIVY_HASH: d710430a6722f083d3b36b8339ff66b32f22ee55 # v0.19.0
+  ACTION_SETUP_CRANE_HASH: 00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c # v0.3.0
+  ACTION_IMPORT_GPG_HASH: 01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6.1.0
 
 jobs:
   go-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       release: ${{ steps.go-semver.outputs.NEW_RELEASE }}
       semver: ${{ steps.go-semver.outputs.SEMVER }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@${{ env.ACTION_CHECKOUT_HASH }}
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@${{ env.ACTION_SETUP_GO_HASH }}
         with:
           go-version: 1.22
 
       - name: Go Build
-        run: go build -v -o go-semver-release ./main.go
+        run: go build -v -o go-semver-release main.go
 
       - name: Go Test
         run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@${{ env.ACTION_CODECOV_HASH }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -42,26 +52,28 @@ jobs:
         id: go-semver
         run: ./go-semver-release local . --release-branch main --tag-prefix v --verbose --json
 
-  docker-build-and-scan:
+  docker-build-scan-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: go-build
     if: ${{needs.go-build.outputs.release == 'true'}}
     env:
       PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@${{ env.ACTION_CHECKOUT_HASH }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@${{ env.ACTION_SETUP_BUILX_HASH }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@${{ env.ACTION_DOCKER_LOGIN_HASH }}
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker build pre-release
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@${{ env.ACTION_BUILD_PUSH_HASH }}
         with:
           context: .
           file: ./build/Dockerfile
@@ -73,7 +85,7 @@ jobs:
           tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
 
       - name: Trivy Scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@${{ env.ACTION_TRIVY_HASH }}
         with:
           image-ref: '${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}'
           format: 'table'
@@ -82,46 +94,44 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH,MEDIUM'
 
-  sbom-sign-and-release-tag:
-    runs-on: ubuntu-latest
-    needs:
-      - docker-build-and-scan
-      - go-build
-    if: ${{needs.go-build.outputs.release == 'true'}}
-    env:
-      PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
-      RELEASE_TAG: ${{needs.go-build.outputs.semver}}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Install Crane
-        uses: imjasonh/setup-crane@v0.1
+        uses: imjasonh/setup-crane@${{ env.ACTION_SETUP_CRANE_HASH }}
 
       - name: Crane Add Release Tags
         run: |
           crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} ${{ env.RELEASE_TAG }}
           crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} latest
 
+  release-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs:
+      - docker-build-scan-push
+      - go-build
+    if: ${{needs.go-build.outputs.release == 'true'}}
+    env:
+      PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
+      RELEASE_TAG: ${{needs.go-build.outputs.semver}}
+    steps:
+      - uses: actions/checkout@${{ env.ACTION_CHECKOUT_HASH }}
 
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+      - name: Import GPG Key
+        uses: crazy-max/ghaction-import-gpg@${{ env.ACTION_IMPORT_GPG_HASH }}
         with:
-          image: ${{ env.DOCKER_IMAGE }}
-          artifact-name: ${{ env.SBOM_FILE }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_tag_gpgsign: true
 
       - name: Git Configuration
         run: |
           git config --global user.email "${{ env.GIT_CI_EMAIL }}"
-          git config --global user.name "${{ env.GIT_CI_USERNAME }}
-          git config --global commit.gpgsign true"
+          git config --global user.name "${{ env.GIT_CI_USERNAME }}"
+          git config --global commit.gpgsign true
 
       - name: Tag and Push
         run: |
           git tag -a ${{needs.go-build.outputs.semver}} -m "${{needs.go-build.outputs.semver}}"
+          git tag -s ${{needs.go-build.outputs.semver}}
           git push origin ${{needs.go-build.outputs.semver}}
