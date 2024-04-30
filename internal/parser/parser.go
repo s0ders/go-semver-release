@@ -13,7 +13,7 @@ import (
 
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
-	"github.com/s0ders/go-semver-release/v2/internal/tagger"
+	"github.com/s0ders/go-semver-release/v2/internal/tag"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -122,10 +122,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			latestSemver.BumpMinor()
 			newRelease = true
 			newReleaseType = "minor"
-		case "major":
-			latestSemver.BumpMajor()
-			newRelease = true
-			newReleaseType = "major"
 		default:
 			return false, fmt.Errorf("unknown release type %s", releaseType)
 		}
@@ -181,7 +177,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 			return nil, fmt.Errorf("failed to build new semver: %w", err)
 		}
 
-		return tagger.NewTagFromSemver(*version, head.Hash()), nil
+		return tag.NewTagFromSemver(version, head.Hash()), nil
 	}
 
 	p.logger.Debug("found latest semver tag", "tag", latestTag.Name)
