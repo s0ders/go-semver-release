@@ -1,8 +1,7 @@
 // Package parser provides functions to parse a Git repository commit history.
 //
-// This package is used to compute the semantic version number from a formatted
-// Git repository commit history. To do so, it expects the commit history to
-// follow the Conventional Commits specification.
+// This package is used to compute the semantic version number from a formatted Git repository commit history. To do so,
+// it expects the commit history to follow the Conventional Commits specification.
 package parser
 
 import (
@@ -33,8 +32,8 @@ func New(logger zerolog.Logger, releaseRules *rules.ReleaseRules) *Parser {
 	}
 }
 
-// ComputeNewSemver returns the next, if any, semantic version number from
-// a given Git repository by parsing its commit history.
+// ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
+// history.
 func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
 	latestSemverTag, err := p.fetchLatestSemverTag(r)
 	if err != nil {
@@ -80,8 +79,8 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 	return semverFromTag, newRelease, nil
 }
 
-// ParseHistory parses a slice of commits and modifies the given semantic version
-// number according to the release rules provided.
+// ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rules
+// provided.
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
 	newReleaseType := ""
@@ -132,8 +131,8 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 	return newRelease, nil
 }
 
-// fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the
-// highest semantic version number among all tags.
+// fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
+// among all tags.
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
 	semverRegex := regexp.MustCompile(semver.Regex)
 

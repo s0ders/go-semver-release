@@ -58,6 +58,7 @@ type Options struct {
 	Reader io.Reader
 }
 
+// Map returns a flat map corresponding to the release rules with commit types as keys and release types as values.
 func (r *ReleaseRules) Map() map[string]string {
 	m := make(map[string]string)
 	for _, rule := range r.Rules {
@@ -66,6 +67,7 @@ func (r *ReleaseRules) Map() map[string]string {
 	return m
 }
 
+// Init initalize a new set of release rules with the given options if any.
 func Init(opts *Options) (rr *ReleaseRules, err error) {
 	if opts == nil || opts.Reader == nil {
 		reader := strings.NewReader(Default)
@@ -78,6 +80,7 @@ func Init(opts *Options) (rr *ReleaseRules, err error) {
 	return rr, err
 }
 
+// Parse reads a buffer a returns the corresponding release rules.
 func Parse(reader io.Reader) (*ReleaseRules, error) {
 	var rules ReleaseRules
 	existingType := make(map[string]string)
