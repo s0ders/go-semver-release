@@ -9,7 +9,7 @@ else
 endif
 
 build:
-	go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.cliVersion=v0.0.0+local" -o bin/go-semver-release$(EXT) .
+	go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=v0.0.0+local" -o bin/go-semver-release$(EXT) .
 
 clean:
 	$(RM) bin/go-semver-release$(EXT)
