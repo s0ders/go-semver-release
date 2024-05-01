@@ -83,9 +83,10 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 		return nil, fmt.Errorf("failed to convert patch component: %w", err)
 	}
 
-	semver, err := New(major, minor, patch)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build semver: %w", err)
+	semver := &Semver{
+		Major: major,
+		Minor: minor,
+		Patch: patch,
 	}
 
 	return semver, nil
