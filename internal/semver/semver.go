@@ -35,8 +35,7 @@ func (s *Semver) BumpMajor() {
 	s.Major++
 }
 
-// IsZero checks if all component of a semantic version number are
-// equal to zero.
+// IsZero checks if all component of a semantic version number are equal to zero.
 func (s *Semver) IsZero() bool {
 	isZero := s.Major == s.Minor && s.Minor == s.Patch && s.Patch == 0
 	return isZero
@@ -60,8 +59,7 @@ func New(major, minor, patch int) (*Semver, error) {
 	return version, nil
 }
 
-// FromGitTag returns a semver struct corresponding to the Git annotated
-// tag used as an input.
+// FromGitTag returns a semver struct corresponding to the Git annotated tag used as an input.
 func FromGitTag(tag *object.Tag) (*Semver, error) {
 	regex := regexp.MustCompile(Regex)
 	submatch := regex.FindStringSubmatch(tag.Name)
@@ -92,9 +90,8 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 	return semver, nil
 }
 
-// Precedence returns an integer representing which of the two versions
-// s or s2 is the most recent. 1 meaning s1 is the most recent, -1 that
-// it is s2 and 0 that they are equal.
+// Precedence returns an integer representing which of the two versions s or s2 is the most recent. 1 meaning s1 is the
+// most recent, -1 that it is s2 and 0 that they are equal.
 func (s *Semver) Precedence(s2 *Semver) int {
 	switch {
 	case s.Major > s2.Major:

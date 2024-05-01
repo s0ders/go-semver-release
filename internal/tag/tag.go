@@ -23,8 +23,7 @@ type Options struct {
 	Prefix string
 }
 
-// NewFromSemver creates a new Git annotated tag from a semantic
-// version number.
+// NewFromSemver creates a new Git annotated tag from a semantic version number.
 func NewFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
@@ -50,8 +49,8 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 	return exists, nil
 }
 
-// AddToRepository create a new annotated tag on the repository
-// with a name corresponding to the semver passed as a parameter.
+// AddToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
+// parameter.
 func AddToRepository(repository *git.Repository, semver *semver.Semver, opts *Options) error {
 	head, err := repository.Head()
 	if err != nil {
