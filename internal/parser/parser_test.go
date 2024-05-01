@@ -287,11 +287,42 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
+func TestParser_FetchLatestSemverTagUnitializedRepository(t *testing.T) {
+	assert := assert.New(t)
+
+	dir, err := os.MkdirTemp("", "parser-*")
+	if !assert.NoError(err, "failed to create temp. dir.") {
+		return
+	}
+
+	defer func() {
+		err = os.RemoveAll(dir)
+		if !assert.NoError(err, "failed to remove temp. dir.") {
+			return
+		}
+	}()
+
+	repository, err := git.PlainInit(dir, false)
+	if !assert.NoError(err, "failed to initialize Git repository") {
+		return
+	}
+
+	rules, err := rules.Init(nil)
+	if !assert.NoError(err, "failed to initialize rules") {
+		return
+	}
+
+	parser := New(fakeLogger, rules)
+
+	_, err = parser.fetchLatestSemverTag(repository)
+	assert.Error(err, "should have been failed trying to fetch latest semver tag from unitialized repository")
+}
+
 func TestParser_ShortMessage(t *testing.T) {
 	assert := assert.New(t)
 
 	msg := "This is a very long commit message that is over fifty character"
-	short := shortMessage(msg)
+	short := shortenMessage(msg)
 
 	expected := "This is a very long commit message that is over..."
 

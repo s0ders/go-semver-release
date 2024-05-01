@@ -97,7 +97,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
 		commitType := submatch[1]
 		shortHash := commit.Hash.String()[0:7]
-		shortMessage := shortMessage(commit.Message)
+		shortMessage := shortenMessage(commit.Message)
 
 		if breakingChange {
 			p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Msg("breaking change found")
@@ -137,7 +137,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
 	semverRegex := regexp.MustCompile(semver.Regex)
 
-	// TODO: use .Tags() to fetch all kind of tags and not just annotated ones
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, err
@@ -185,7 +184,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 	return latestTag, nil
 }
 
-func shortMessage(message string) string {
+func shortenMessage(message string) string {
 	if len(message) > 50 {
 		return fmt.Sprintf("%s...", message[0:47])
 	}
