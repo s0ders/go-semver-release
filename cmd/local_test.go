@@ -306,7 +306,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.NoError(err, "local command executed with error")
 
 	expectedVersion := "0.2.0"
-	expectedTag := "v" + expectedVersion
+	expectedTag := expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
 		NewVersion: expectedVersion,

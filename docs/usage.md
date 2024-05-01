@@ -1,4 +1,4 @@
-## Usage
+# Usage
 
 The program only supports a local mode of execution. This means that it requires that the repository to version is
 already present on the local file system.
@@ -10,8 +10,7 @@ access management since it does not require any access token.
 Example:
 
 ```bash
-$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> \
-                                            --release-branch <NAME> --dry-run --verbose
+$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
 ```
 
 > [!TIP]
@@ -21,14 +20,35 @@ $ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PR
 For more informations about available flags and their default values, run:
 
 ```bash
-$ go-semver-release <COMMAND> --help
+$ go-semver-release local --help
 ```
 
-## Tag prefix
+## Flags
+### Tag prefix
 
-## Release branch
+The `--tag-prefix` flags allows to custom what will prefix the semantic version number in the Git tag. The default value
+is nothing. For instance, if the next version detected is `2.0.1`, with the default tag prefix, the tag will be `2.0.1`.
 
-## Release rules
+
+A classic prefix is `v`. For instance, Go requires that your repository is versioned using the following tag format 
+`vX.Y.Z`.
+
+Example:
+```bash
+$ go-semver-release local <PATH> --tag-prefix v
+```
+
+### Release branch
+
+The `--release-branch` flags defines from which Git branch of your repository the commit history will be read and parsed
+to compute the next semantic version number. The default value is `main`.
+
+Example:
+```bash
+$ go-semver-release local <PATH> --release-branch master
+```
+
+### Release rules
 
 Release rules define which commit type will trigger a release, and which type of release (i.e., `minor` or `patch`).
 
@@ -59,6 +79,34 @@ If a commit type (e.g., `chore`) is not specified in you rule file, it will not 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
 `revert`, `style`, `test`.
 
-## Dry-run
+### Dry-run
 
-## Signing tag
+The `--dry-run` flag controls if the repository is actually tagged after computing the next semantic version, if any.
+If enabled and a new release is detected, the command JSON output will include a `next-version` key that contains the 
+next semantic version (without the tag prefix) that would have been applied if ran in regular mode.
+
+Example:
+```bash
+$ go-semver-release local . --dry-run
+```
+
+### Verbose
+
+The `--verbose` defines the level of verbosity that will be printed out by the command. By default, the command is not
+verbose and will only print a single JSON output informing if a new was found or not, and if so, what the new (or next,
+in case of dry-run mode) release is.
+
+If enabled, the command will print whenever it finds a commit that triggers a bump in the semantic version with
+information about each commit (e.g., hash, message). It will also prints if it tagged the repository.
+
+Example:
+```bash
+$ go-semver-release local . --verbose
+```
+
+
+## Command output
+
+The `local` command output is JSON formatted so that it can be piped into tool such as `jq`.
+To do so, it is advised to use the command in non-verbose mode so that you only get the message informing if a new
+release was found (`new-release` key) and if so, what is associated the semantic version (`next-version` or `new-version` key).
