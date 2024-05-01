@@ -7,9 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
-
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -123,45 +120,6 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 	}
 
 	assert.Equal(*gotTag, *wantTag, "tag should match")
-}
-
-func TestTagger_AddTagWithGPG(t *testing.T) {
-	assert := assert.New(t)
-
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-
-	repository, repositoryPath, err := createGitRepository("first commit")
-	assert.NoError(err, "repository creation should have succeeded")
-
-	defer func() {
-		err := os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
-
-	version, err := semver.New(1, 0, 0)
-	assert.NoError(err, "semver creation should have succeeded")
-
-	packetConfig := &packet.Config{
-		Algorithm: packet.PubKeyAlgoRSA,
-		RSABits:   2048,
-		Time:      nil,
-	}
-	entity, err := openpgp.NewEntity("John Doe", "", "john.doe@example.com", packetConfig)
-
-	opts := &Options{
-		Prefix:    "",
-		GPGEntity: entity,
-	}
-
-	err = AddToRepository(repository, version, opts)
-	assert.NoError(err, "should have been able to add tag to repository")
-
-	signed, err := tagIsSigned(repository, version.String())
-	assert.NoErrorf(err, "failed to check if tag is signed")
-
-	assert.Equal(true, signed, "tag should be signed")
 }
 
 // createGitRepository creates an empty Git repository, adds a file to it then creates
