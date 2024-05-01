@@ -177,7 +177,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 			return nil, fmt.Errorf("failed to build new semver: %w", err)
 		}
 
-		return tag.NewTagFromSemver(version, head.Hash()), nil
+		return tag.NewFromSemver(version, head.Hash()), nil
 	}
 
 	p.logger.Debug().Str("tag", latestTag.Name).Msg("latest semver tag found")

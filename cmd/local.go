@@ -89,7 +89,11 @@ var localCmd = &cobra.Command{
 		default:
 			logger.Info().Str("new-version", semver.String()).Bool("new-release", true).Msg("new release found")
 
-			err = tag.AddTagToRepository(repository, semver, tagPrefix)
+			tagOpts := &tag.Options{
+				Prefix: tagPrefix,
+			}
+
+			err = tag.AddToRepository(repository, semver, tagOpts)
 			if err != nil {
 				return err
 			}

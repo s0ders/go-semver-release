@@ -16,25 +16,24 @@ them with the right semver number. This program can be used directly via its CLI
     <li><a href="#Motivation">Motivation</a></li>
     <li><a href="#Install">Install</a></li>
     <li><a href="#Usage">Usage</a></li>
-    <li><a href="#github-actions">GitHub Actions</a></li>
-    <li><a href="#release-rules">Release Rules</a></li>
+    <li><a href="#ci-workflow-examples">CI workflow examples</a></li>
 </ul>
 
 ## Motivation
 
 This project was built to create a lightweight and simple tool to seamlessly automate the semantic versioning on your 
-Git repository.
+Git repository in a language and CI agnostic way.
+
 Following the UNIX philosophy of "make each program do one thing well", it only handles publishing semver tags to your 
 Git repository, no package publishing or any other features. 
 
-All you need to do is choose a release branch (e.g., `main`) and take care to format commits on that branch by following
-the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification, which many IDEs plugins offers 
-to do seamlessly (e.g., [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit))
+All you need have is an initialized Git repository, a release branch (e.g., `main`) and a formatted commit history on 
+that branch following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification. Many IDEs
+support plugins to help in formatting your commit messages (e.g., [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit)).
 
 > [!IMPORTANT]
-> `go-semver-release` can only read **annotated** Git tags, so if you plan on only using it in dry-run mode to then use 
-> its output to tag your repository with an other action, make sure the tag you are pushing is annotated, otherwise the
-> program will not be able to detect it during its next execution.
+> `go-semver-release` can only read **annotated** Git tags. If at some point you need to manually add a semver tag your
+> repository, make sure it is annotated, otherwise the program will not be able to detect it.
 
 ## Install
 
@@ -52,80 +51,10 @@ $ docker pull soders/go-semver-release:latest
 $ docker run --rm soders/go-semver-release --help
 ```
 
-## Prerequisites
-
-- The commits of the Git repository to version must follow the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) convention.
-- The Git repository must already be initialized (i.e., Git `HEAD` does not point to nothing)
-
 ## Usage
 
-The program only supports a local mode of execution. This means that it requires the repository to version to be already
-present 
-The program takes the path of the already present Git repository, computes the next semver, tags the local repository 
-with it and stops. This mode is a good option security-wise since it lets you use the program without having to 
-configure any kind of right management because it does not require any access token.
+Documentation about the CLI usage can be found [here](docs/usage.md).
 
-Remote mode example:
+## CI workflow examples
 
-Local mode example:
-
-```bash
-$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> \
-                                            --release-branch <NAME> --dry-run --verbose
-```
-
-> [!TIP]
-> You can change your tag prefix during the lifetime of your repository (e.g., going from no prefix to `v`), this will 
-> **not** affect your semver tags history, the program will still be able to recognize previous semver tags.
-
-For more informations about commands and flags usage as well as the default value, simply run:
-
-```bash
-$ go-semver-release <COMMAND> --help
-```
-
-## GitHub Actions
-
-### Inputs
-
-The action takes the same parameters as those defined in the <a href="#Usage">usage</a> section. Note that the boolean 
-flags (e.g., `--dry-run`, `--verbose`) need to be passed as a string inside your YAML work-flow due to how Github 
-Actions works.
-
-### Outputs
-
-The action generate two outputs 
-- `SEMVER`, the computed semver or the current one if no new were computed, prefixed with the given `tag-prefix` if any;
-- `NEW_RELEASE`, whether a new semver was computed or not.
-
-## Release Rules
-
-Release rules define which commit type will trigger a release, and what type of release (i.e., `minor` or `patch`). 
-
-> [!WARNING]
-> Release type can only be `minor` or `patch`, `major` is reserved for breaking change only.
-
-By default, the program applies the following release rules:
-```json
-{
-    "rules": [
-        {"type": "feat",   "release": "minor"},
-        {"type": "fix",    "release": "patch"},
-        {"type": "perf",   "release": "patch"},
-        {"type": "revert", "release": "patch"}
-    ]
-}
-```
-
-You can define custom release rules to suit your needs using a JSON file and by passing it to the program as 
-bellow. 
-
-If a commit type (e.g., `chore`) is not specified in you rule file, it will not trigger any kind of release.
-
-The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
-`revert`, `style`, `test`.
-
-## Work in progress
-- [ ] Support non-annotated tags
-- [ ] Fix local action (Docker volumes)
-- [ ] Create /docs/ folder for clarity
+This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](docs/workflows.md).
