@@ -94,7 +94,7 @@ func TestLocalCmd_Release(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	// Check that the tag was actually created on the repository
-	exists, err := tag.TagExists(repository, expectedTag)
+	exists, err := tag.Exists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(true, exists, "tag should exist")
@@ -158,7 +158,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	// Check that the tag was actually created on the repository
-	exists, err := tag.TagExists(repository, expectedTag)
+	exists, err := tag.Exists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
@@ -321,7 +321,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	// Check that the tag was actually created on the repository
-	exists, err := tag.TagExists(repository, expectedTag)
+	exists, err := tag.Exists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(true, exists, "tag should exist")

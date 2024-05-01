@@ -7,11 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/s0ders/go-semver-release/v2/internal/semver"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
 func TestTagger_TagExists(t *testing.T) {
@@ -41,11 +45,11 @@ func TestTagger_TagExists(t *testing.T) {
 		assert.NoError(err, "tag creation should have succeeded")
 	}
 
-	tagExists, err := TagExists(repository, tags[0])
+	tagExists, err := Exists(repository, tags[0])
 	assert.NoError(err, "should have been able to check if tag exists")
 	assert.Equal(tagExists, true, "tag should have been found")
 
-	tagDoesNotExists, err := TagExists(repository, "0.0.1")
+	tagDoesNotExists, err := Exists(repository, "0.0.1")
 	assert.NoError(err, "should have been able to check if tag exists")
 	assert.Equal(tagDoesNotExists, false, "tag should not have been found")
 }
@@ -64,10 +68,10 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	version, err := semver.New(1, 0, 0)
 	assert.NoError(err, "semver creation should have succeeded")
 
-	err = AddTagToRepository(repository, version, "")
+	err = AddToRepository(repository, version, nil)
 	assert.NoError(err, "should have been able to add tag to repository")
 
-	tagExists, err := TagExists(repository, version.String())
+	tagExists, err := Exists(repository, version.String())
 	assert.NoError(err, "should have been able to check if tag exists")
 
 	assert.Equal(tagExists, true, "tag should have been found")
@@ -87,10 +91,13 @@ func TestTagger_AddExistingTagToRepository(t *testing.T) {
 	version, err := semver.New(1, 0, 0)
 	assert.NoError(err, "semver creation should have succeeded")
 
-	err = AddTagToRepository(repository, version, "v")
+	opts := &Options{
+		Prefix: "v",
+	}
+	err = AddToRepository(repository, version, opts)
 	assert.NoError(err, "should not have been able to add tag to repository")
 
-	err = AddTagToRepository(repository, version, "v")
+	err = AddToRepository(repository, version, opts)
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
@@ -107,7 +114,7 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 	version, err := semver.New(0, 0, 1)
 	assert.NoError(err, "semver creation should have succeeded")
 
-	gotTag := NewTagFromSemver(version, hash)
+	gotTag := NewFromSemver(version, hash)
 
 	wantTag := &object.Tag{
 		Hash:   hash,
@@ -118,7 +125,45 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 	assert.Equal(*gotTag, *wantTag, "tag should match")
 }
 
-// TODO: replace by a mock ?
+func TestTagger_AddTagWithGPG(t *testing.T) {
+	assert := assert.New(t)
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	repository, repositoryPath, err := createGitRepository("first commit")
+	assert.NoError(err, "repository creation should have succeeded")
+
+	defer func() {
+		err := os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	version, err := semver.New(1, 0, 0)
+	assert.NoError(err, "semver creation should have succeeded")
+
+	packetConfig := &packet.Config{
+		Algorithm: packet.PubKeyAlgoRSA,
+		RSABits:   2048,
+		Time:      nil,
+	}
+	entity, err := openpgp.NewEntity("John Doe", "", "john.doe@example.com", packetConfig)
+
+	opts := &Options{
+		Prefix:    "",
+		GPGEntity: entity,
+	}
+
+	err = AddToRepository(repository, version, opts)
+	assert.NoError(err, "should have been able to add tag to repository")
+
+	signed, err := tagIsSigned(repository, version.String())
+	assert.NoErrorf(err, "failed to check if tag is signed")
+
+	assert.Equal(true, signed, "tag should be signed")
+}
+
 // createGitRepository creates an empty Git repository, adds a file to it then creates
 // a commit with the given message.
 func createGitRepository(firstCommitMessage string) (*git.Repository, string, error) {
@@ -174,4 +219,23 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 	}
 
 	return r, tempDirPath, nil
+}
+
+func tagIsSigned(repository *git.Repository, tagName string) (bool, error) {
+	tagRef, err := repository.Reference(plumbing.NewTagReferenceName(tagName), true)
+	if err != nil {
+		return false, err
+	}
+
+	tagID := tagRef.Hash()
+
+	// Get the tag object
+	tagObj, err := repository.TagObject(tagID)
+	if err != nil {
+		return false, err
+	}
+
+	signed := tagObj.PGPSignature != ""
+
+	return signed, nil
 }
