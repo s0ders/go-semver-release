@@ -124,5 +124,4 @@ jobs:
 
       - name: Sign Tag and Push
         run: |
-          git tag -s ${{needs.go-build.outputs.semver}}
           git push origin ${{needs.go-build.outputs.semver}}
