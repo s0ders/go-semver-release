@@ -113,7 +113,7 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           git_user_signingkey: true
-          ggit_tag_gpgsign: true
+          git_tag_gpgsign: true
           trust_level: 5
 
       - name: Git Configuration
