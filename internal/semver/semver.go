@@ -67,25 +67,25 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 	submatch := regex.FindStringSubmatch(tag.Name)
 
 	if len(submatch) < 4 {
-		return nil, fmt.Errorf("FromGitTag: tag cannot be converted to a valid semver")
+		return nil, fmt.Errorf("tag cannot be converted to a valid semver")
 	}
 
 	major, err := strconv.Atoi(submatch[1])
 	if err != nil {
-		return nil, fmt.Errorf("FromGitTag: failed to convert major component: %w", err)
+		return nil, fmt.Errorf("failed to convert major component: %w", err)
 	}
 	minor, err := strconv.Atoi(submatch[2])
 	if err != nil {
-		return nil, fmt.Errorf("FromGitTag: failed to convert minor component: %w", err)
+		return nil, fmt.Errorf("failed to convert minor component: %w", err)
 	}
 	patch, err := strconv.Atoi(submatch[3])
 	if err != nil {
-		return nil, fmt.Errorf("FromGitTag: failed to convert patch component: %w", err)
+		return nil, fmt.Errorf("failed to convert patch component: %w", err)
 	}
 
 	semver, err := New(major, minor, patch)
 	if err != nil {
-		return nil, fmt.Errorf("FromGitTag: failed to build SemVer: %w", err)
+		return nil, fmt.Errorf("failed to build semver: %w", err)
 	}
 
 	return semver, nil
