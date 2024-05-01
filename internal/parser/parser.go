@@ -7,26 +7,26 @@ package parser
 
 import (
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strings"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/rs/zerolog"
 
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
-
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
 
 type Parser struct {
-	logger       *slog.Logger
+	logger       zerolog.Logger
 	releaseRules *rules.ReleaseRules
 }
 
-func New(logger *slog.Logger, releaseRules *rules.ReleaseRules) *Parser {
+func New(logger zerolog.Logger, releaseRules *rules.ReleaseRules) *Parser {
 	return &Parser{
 		logger:       logger,
 		releaseRules: releaseRules,
@@ -100,7 +100,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		shortMessage := shortMessage(commit.Message)
 
 		if breakingChange {
-			p.logger.Debug("found breaking change", "commit-hash", shortHash, "commit-message", shortMessage)
+			p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Msg("breaking change found")
 
 			latestSemver.BumpMajor()
 			newRelease = true
@@ -126,7 +126,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			return false, fmt.Errorf("unknown release type %s", releaseType)
 		}
 
-		p.logger.Debug("new release found", "commit-hash", shortHash, "commit-message", shortMessage, "release-type", newReleaseType)
+		p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Str("release-type", newReleaseType).Msg("new release found")
 	}
 
 	return newRelease, nil
@@ -165,7 +165,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 	}
 
 	if latestSemver == nil {
-		p.logger.Debug("no previous tag, creating one")
+		p.logger.Debug().Msg("no previous tag, creating one")
 
 		head, err := repository.Head()
 		if err != nil {
@@ -180,7 +180,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 		return tag.NewTagFromSemver(version, head.Hash()), nil
 	}
 
-	p.logger.Debug("found latest semver tag", "tag", latestTag.Name)
+	p.logger.Debug().Str("tag", latestTag.Name).Msg("latest semver tag found")
 
 	return latestTag, nil
 }

@@ -3,12 +3,13 @@ package parser
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/stretchr/testify/assert"
 
@@ -17,7 +18,7 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
 )
 
-var fakeLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
+var fakeLogger = zerolog.New(io.Discard)
 
 func TestParser_CommitTypeRegex(t *testing.T) {
 	assert := assert.New(t)
