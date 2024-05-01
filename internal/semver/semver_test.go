@@ -122,6 +122,23 @@ func TestSemver_FromGitTag(t *testing.T) {
 	}
 }
 
+func TestSemver_FromGitTagInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	notSemverTag := &object.Tag{
+		Name:    "foo",
+		Message: "foo",
+		Tagger: object.Signature{
+			Name:  "Go Semver Release",
+			Email: "ci@ci.ci",
+			When:  time.Now(),
+		},
+	}
+
+	_, err := FromGitTag(notSemverTag)
+	assert.Error(err, "should have failed to create a semver from invalid tag")
+}
+
 func TestSemver_Bump(t *testing.T) {
 	assert := assert.New(t)
 
