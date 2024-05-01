@@ -122,8 +122,7 @@ jobs:
           git config --global user.name "${{ env.GIT_CI_USERNAME }}"
           git config --global commit.gpgsign true
 
-      - name: Tag and Push
+      - name: Sign Tag and Push
         run: |
-          git tag -a ${{needs.go-build.outputs.semver}} -m "${{needs.go-build.outputs.semver}}"
           git tag -s ${{needs.go-build.outputs.semver}}
           git push origin ${{needs.go-build.outputs.semver}}
