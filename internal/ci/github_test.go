@@ -13,41 +13,59 @@ func TestCI_GenerateGitHub(t *testing.T) {
 	assert := assert.New(t)
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
-	assert.NoError(err, "should create temp directory")
+	if err != nil {
+		t.Fatalf("failed to create temporary directory: %s", err)
+	}
 
 	defer func(path string) {
-		err := os.RemoveAll(outputDir)
-		assert.NoError(err, "should have been able to remove temporary directory")
+		err = os.RemoveAll(outputDir)
+		if err != nil {
+			t.Fatalf("failed to remove temporary directory: %s", err)
+		}
 	}(outputDir)
 
 	outputFilePath := filepath.Join(outputDir, "output")
 
-	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o666)
-	assert.NoError(err, "should have been able to create output file")
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o644)
+	if err != nil {
+		t.Fatalf("failed to create output file: %s", err)
+	}
 
 	defer func() {
-		err := outputFile.Close()
-		assert.NoError(err, "should have been able to close output file")
+		err = outputFile.Close()
+		if err != nil {
+			t.Fatalf("failed to create temporary directory: %s", err)
+		}
 	}()
 
 	outputPath := filepath.Join(outputDir, "output")
 
 	err = os.Setenv("GITHUB_OUTPUT", outputPath)
-	assert.NoError(err, "should have been able to set GITHUB_OUTPUT")
+	if err != nil {
+		t.Fatalf("failed to set GITHUB_OUTPUT env. var.: %s", err)
+	}
 
 	defer func() {
-		err := os.Unsetenv("GITHUB_OUTPUT")
-		assert.NoError(err, "should have been able to unset GITHUB_OUTPUT")
+		err = os.Unsetenv("GITHUB_OUTPUT")
+		if err != nil {
+			t.Fatalf("failed unset GITHUB_OUTPUT env. var.: %s", err)
+		}
 	}()
 
 	version, err := semver.New(1, 2, 3)
-	assert.NoError(err, "should have been able to create version")
+	if err != nil {
+		t.Fatalf("failed to create version: %s", err)
+	}
 
 	err = GenerateGitHubOutput("v", version, true)
-	assert.NoError(err, "should have been able to generate GitHub output")
+	if err != nil {
+		t.Fatalf("failed to create github output: %s", err)
+	}
 
 	writtenOutput, err := os.ReadFile(outputPath)
-	assert.NoError(err, "should have been able to read output file")
+	if err != nil {
+		t.Fatalf("failed to read output file: %s", err)
+	}
 
 	want := "\nSEMVER=v1.2.3\nNEW_RELEASE=true\n"
 	got := string(writtenOutput)
