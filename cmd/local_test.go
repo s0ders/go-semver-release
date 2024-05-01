@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 
 	"github.com/go-git/go-git/v5"
@@ -17,7 +20,7 @@ import (
 )
 
 type cmdOutput struct {
-	Message     string `json:"msg"`
+	Message     string `json:"message"`
 	NewVersion  string `json:"new-version"`
 	NextVersion string `json:"next-version"`
 	NewRelease  bool   `json:"new-release"`
@@ -61,7 +64,16 @@ func TestLocalCmd_Release(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--json"})
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("tag-prefix", "v")
+	assert.NoError(err, "failed to set --tag-prefix")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
@@ -113,7 +125,19 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--dry-run", "--json"})
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("dry-run", "true")
+	assert.NoError(err, "failed to set --dry-run")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("tag-prefix", "v")
+	assert.NoError(err, "failed to set --tag-prefix")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
@@ -155,7 +179,16 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--json"})
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("tag-prefix", "v")
+	assert.NoError(err, "failed to set --tag-prefix")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
@@ -188,7 +221,19 @@ func TestLocalCmd_Verbose(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--release-branch", "main", "--verbose", "--json"})
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = rootCmd.PersistentFlags().Set("verbose", "true")
+	assert.NoError(err, "failed to set --verbose")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("tag-prefix", "v")
+	assert.NoError(err, "failed to set --tag-prefix")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
@@ -249,7 +294,13 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath, "--tag-prefix", "v", "--rules-path", customRulesPath, "--release-branch", "main", "--json"})
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("rules-path", customRulesPath)
+	assert.NoError(err, "failed to set --rules-path")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
@@ -360,4 +411,15 @@ func sampleCommit(repository *git.Repository, repositoryPath string, commitType 
 	}
 
 	return nil
+}
+
+func resetFlags(cmd *cobra.Command) (err error) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		err = f.Value.Set(f.DefValue)
+		if err != nil {
+			return
+		}
+	})
+
+	return err
 }
