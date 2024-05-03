@@ -59,7 +59,4 @@ Documentation about the CLI usage can be found [here](docs/usage.md).
 This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](docs/workflows.md).
 
 ## WIP
-- [ ] Fix Parser ErrNoRule
-- [ ] Improve test coverage in Parser
 - [ ] PGP signing flag
-- [ ] Pre-release flag (tag + timestamp + commit hash)
