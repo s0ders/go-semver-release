@@ -15,7 +15,7 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
-func TestTagger_TagExists(t *testing.T) {
+func TestTag_TagExists(t *testing.T) {
 	assert := assert.New(t)
 	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
 	assert.NoError(err, "repository creation should have succeeded")
@@ -51,7 +51,7 @@ func TestTagger_TagExists(t *testing.T) {
 	assert.Equal(tagDoesNotExists, false, "tag should not have been found")
 }
 
-func TestTagger_AddTagToRepository(t *testing.T) {
+func TestTag_AddTagToRepository(t *testing.T) {
 	assert := assert.New(t)
 
 	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
@@ -73,7 +73,7 @@ func TestTagger_AddTagToRepository(t *testing.T) {
 	assert.Equal(tagExists, true, "tag should have been found")
 }
 
-func TestTagger_AddExistingTagToRepository(t *testing.T) {
+func TestTag_AddExistingTagToRepository(t *testing.T) {
 	assert := assert.New(t)
 
 	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
@@ -96,7 +96,7 @@ func TestTagger_AddExistingTagToRepository(t *testing.T) {
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
-func TestTagger_NewTagFromServer(t *testing.T) {
+func TestTag_NewTagFromServer(t *testing.T) {
 	assert := assert.New(t)
 
 	var b [20]byte
@@ -117,6 +117,30 @@ func TestTagger_NewTagFromServer(t *testing.T) {
 	}
 
 	assert.Equal(*gotTag, *wantTag, "tag should match")
+}
+
+func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
+	assert := assert.New(t)
+
+	tempDirPath, err := os.MkdirTemp("", "tag-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(tempDirPath)
+		if err != nil {
+			t.Fatalf("failed to remove temp dir: %v", err)
+		}
+	}()
+
+	repository, err := git.PlainInit(tempDirPath, false)
+	if err != nil {
+		t.Fatalf("failed to init repository: %v", err)
+	}
+
+	err = AddToRepository(repository, nil, nil)
+	assert.Error(err, "should have failed trying to fetch unitialized repo. HEAD")
 }
 
 // createGitRepository creates an empty Git repository, adds a file to it then creates
@@ -174,23 +198,4 @@ func createGitRepository(firstCommitMessage string) (*git.Repository, string, er
 	}
 
 	return r, tempDirPath, nil
-}
-
-func tagIsSigned(repository *git.Repository, tagName string) (bool, error) {
-	tagRef, err := repository.Reference(plumbing.NewTagReferenceName(tagName), true)
-	if err != nil {
-		return false, err
-	}
-
-	tagID := tagRef.Hash()
-
-	// Get the tag object
-	tagObj, err := repository.TagObject(tagID)
-	if err != nil {
-		return false, err
-	}
-
-	signed := tagObj.PGPSignature != ""
-
-	return signed, nil
 }

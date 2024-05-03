@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,7 +32,6 @@ var sampleCommitFile = "not_a_real_file.txt"
 func TestLocalCmd_Release(t *testing.T) {
 	assert := assert.New(t)
 
-	// Setting up sample Git repository
 	repository, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
 
@@ -90,10 +90,8 @@ func TestLocalCmd_Release(t *testing.T) {
 	err = json.Unmarshal(actual.Bytes(), &actualOut)
 	assert.NoError(err, "failed to unmarshal json")
 
-	// Check that the JSON output is correct
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
-	// Check that the tag was actually created on the repository
 	exists, err := tag.Exists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
@@ -103,7 +101,6 @@ func TestLocalCmd_Release(t *testing.T) {
 func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	assert := assert.New(t)
 
-	// Setting up sample Git repository
 	repository, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
 
@@ -154,10 +151,8 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	err = json.Unmarshal(actual.Bytes(), &actualOut)
 	assert.NoError(err, "failed to unmarshal json")
 
-	// Check that the JSON output is correct
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
-	// Check that the tag was actually created on the repository
 	exists, err := tag.Exists(repository, expectedTag)
 	assert.NoError(err, "failed to check if tag exists")
 
@@ -167,7 +162,6 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 func TestLocalCmd_NoRelease(t *testing.T) {
 	assert := assert.New(t)
 
-	// Setting up sample Git repository
 	_, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
 
@@ -202,14 +196,12 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	err = json.Unmarshal(actual.Bytes(), &actualOut)
 	assert.NoError(err, "failed to unmarshal json")
 
-	// Check that the JSON output is correct
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 }
 
 func TestLocalCmd_Verbose(t *testing.T) {
 	assert := assert.New(t)
 
-	// Setting up sample Git repository
 	_, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
 
@@ -239,10 +231,210 @@ func TestLocalCmd_Verbose(t *testing.T) {
 	assert.NoError(err, "local command executed with error")
 }
 
+func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
+	assert := assert.New(t)
+
+	outputDir, err := os.MkdirTemp("./", "output-*")
+	if err != nil {
+		t.Fatalf("failed to create temporary directory: %s", err)
+	}
+
+	defer func(path string) {
+		err = os.RemoveAll(outputDir)
+		if err != nil {
+			t.Fatalf("failed to remove temporary directory: %s", err)
+		}
+	}(outputDir)
+
+	outputFilePath := filepath.Join(outputDir, "output")
+
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o444)
+	if err != nil {
+		t.Fatalf("failed to create output file: %s", err)
+	}
+
+	defer func() {
+		err = outputFile.Close()
+		if err != nil {
+			t.Fatalf("failed to create temporary directory: %s", err)
+		}
+	}()
+
+	outputPath := filepath.Join(outputDir, "output")
+
+	err = os.Setenv("GITHUB_OUTPUT", outputPath)
+	if err != nil {
+		t.Fatalf("failed to set GITHUB_OUTPUT env. var.: %s", err)
+	}
+
+	defer func() {
+		err = os.Unsetenv("GITHUB_OUTPUT")
+		if err != nil {
+			t.Fatalf("failed unset GITHUB_OUTPUT env. var.: %s", err)
+		}
+	}()
+
+	_, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = rootCmd.PersistentFlags().Set("verbose", "true")
+	assert.NoError(err, "failed to set --verbose")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("tag-prefix", "v")
+	assert.NoError(err, "failed to set --tag-prefix")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to write GitHub ouput to read-only file")
+}
+
+func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
+	assert := assert.New(t)
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", "./does/not/exist"})
+
+	err := resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to open inexisting Git repository")
+}
+
+func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
+	assert := assert.New(t)
+
+	tempDirPath, err := os.MkdirTemp("", "tag-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(tempDirPath)
+		if err != nil {
+			t.Fatalf("failed to remove temp dir: %v", err)
+		}
+	}()
+
+	_, err = git.PlainInit(tempDirPath, false)
+	if err != nil {
+		t.Fatalf("failed to init repository: %v", err)
+	}
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", tempDirPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to compute new semver of repository with no HEAD")
+}
+
+func TestLocalCmd_InvalidRulesPath(t *testing.T) {
+	assert := assert.New(t)
+
+	_, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("rules-path", "./does/no/exist.json")
+	assert.NoError(err, "failed to set --rules-path")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to open inexisting rules file")
+}
+
+func TestLocalCmd_InvalidCustomRules(t *testing.T) {
+	assert := assert.New(t)
+
+	_, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	tempRulesDir, err := os.MkdirTemp("", "rules-*")
+	assert.NoError(err, "failed to create temp. dir.")
+
+	defer func() {
+		err = os.RemoveAll(tempRulesDir)
+		assert.NoError(err, "failed to remove temp. dir.")
+	}()
+
+	customRulesPath := filepath.Join(tempRulesDir, "custom.json")
+
+	customRules, err := os.Create(customRulesPath)
+	assert.NoError(err, "failed to create empty rule file")
+
+	customRulesJSON := `
+{
+    "rules": [
+        {"type": "feat",   "release": "minor"},
+        {"type": "feat",   "release": "patch"}
+    ]
+}
+`
+
+	_, err = customRules.Write([]byte(customRulesJSON))
+	assert.NoError(err, "failed to write empty rule file")
+
+	defer func() {
+		err = customRules.Close()
+		assert.NoError(err, "failed to close empty rule file")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("rules-path", customRulesPath)
+	assert.NoError(err, "failed to set --rules-path")
+
+	err = rootCmd.Execute()
+	assert.ErrorIs(err, rules.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rules")
+}
+
 func TestLocalCmd_CustomRules(t *testing.T) {
 	assert := assert.New(t)
 
-	// Setting up sample Git repository
 	repository, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
 

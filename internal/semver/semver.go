@@ -2,7 +2,6 @@
 package semver
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -11,8 +10,6 @@ import (
 )
 
 var Regex = `(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
-
-var ErrInvalidSemver = errors.New("invalid semver, components cannot have negative values")
 
 type Semver struct {
 	Major int
