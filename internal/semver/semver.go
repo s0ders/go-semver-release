@@ -49,16 +49,6 @@ func (s *Semver) String() string {
 	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
 }
 
-func New(major, minor, patch int) (*Semver, error) {
-	version := &Semver{major, minor, patch}
-
-	if !version.Valid() {
-		return nil, ErrInvalidSemver
-	}
-
-	return version, nil
-}
-
 // FromGitTag returns a semver struct corresponding to the Git annotated tag used as an input.
 func FromGitTag(tag *object.Tag) (*Semver, error) {
 	regex := regexp.MustCompile(Regex)
@@ -81,11 +71,7 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 		return nil, fmt.Errorf("failed to convert patch component: %w", err)
 	}
 
-	semver := &Semver{
-		Major: major,
-		Minor: minor,
-		Patch: patch,
-	}
+	semver := &Semver{major, minor, patch}
 
 	return semver, nil
 }

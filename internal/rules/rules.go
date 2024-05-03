@@ -60,7 +60,7 @@ type Options struct {
 
 // Map returns a flat map corresponding to the release rules with commit types as keys and release types as values.
 func (r *ReleaseRules) Map() map[string]string {
-	m := make(map[string]string)
+	m := make(map[string]string, len(r.Rules))
 	for _, rule := range r.Rules {
 		m[rule.CommitType] = rule.ReleaseType
 	}

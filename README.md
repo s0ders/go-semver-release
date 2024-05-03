@@ -46,8 +46,8 @@ $ go-semver-release --help
 For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
 
 ```bash
-$ docker pull soders/go-semver-release:latest
-$ docker run --rm soders/go-semver-release --help
+$ docker pull s0ders/go-semver-release:latest
+$ docker run --rm s0ders/go-semver-release --help
 ```
 
 ## Usage
@@ -57,3 +57,9 @@ Documentation about the CLI usage can be found [here](docs/usage.md).
 ## CI workflow examples
 
 This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](docs/workflows.md).
+
+## WIP
+- [ ] Fix Parser ErrNoRule
+- [ ] Improve test coverage in Parser
+- [ ] PGP signing flag
+- [ ] Pre-release flag (tag + timestamp + commit hash)
