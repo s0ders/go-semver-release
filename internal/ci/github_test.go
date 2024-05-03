@@ -52,10 +52,7 @@ func TestCI_GenerateGitHub(t *testing.T) {
 		}
 	}()
 
-	version, err := semver.New(1, 2, 3)
-	if err != nil {
-		t.Fatalf("failed to create version: %s", err)
-	}
+	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput("v", version, true)
 	if err != nil {
@@ -111,8 +108,7 @@ func TestCI_ReadOnlyOutput(t *testing.T) {
 		assert.NoError(err, "should have been able to unset GITHUB_OUTPUT")
 	}()
 
-	version, err := semver.New(1, 2, 3)
-	assert.NoError(err, "should have been able to create version")
+	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput("v", version, true)
 	assert.Error(err, "should have failed since output file is readonly")

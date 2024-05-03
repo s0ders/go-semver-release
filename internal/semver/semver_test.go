@@ -55,16 +55,9 @@ func TestSemver_IsZero(t *testing.T) {
 	}
 }
 
-func TestSemver_NegativeSemver(t *testing.T) {
-	assert := assert.New(t)
-
-	_, err := New(-1, 0, 0)
-	assert.Error(err, "should have failed to create a negative semver")
-}
-
 func TestSemver_String(t *testing.T) {
 	assert := assert.New(t)
-	s, _ := New(1, 2, 3)
+	s := Semver{1, 2, 3}
 
 	want := "1.2.3"
 	assert.Equal(s.String(), want, "the strings should be equal")
@@ -142,8 +135,7 @@ func TestSemver_FromGitTagInvalid(t *testing.T) {
 func TestSemver_Bump(t *testing.T) {
 	assert := assert.New(t)
 
-	s, err := New(0, 0, 0)
-	assert.NoError(err, "should have created a semver")
+	s := Semver{0, 0, 0}
 
 	s.BumpPatch()
 	assert.Equal(s.String(), "0.0.1", "the strings should be equal")
