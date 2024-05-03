@@ -17,10 +17,19 @@ jobs:
 
       # Insert your build process and unit tests here
 
+      # Install Go Semver Release
+      - name: Set up Go
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: 1.22
+
+      - name: Install Go Semver Release
+        run: go install github.com/s0ders/go-semver-release@latest
+
       # If build and unit tests are green, check if there is a new release
       - name: Go Semver Release
         id: go-semver
-        run: ./go-semver-release local . --release-branch main --tag-prefix v --verbose --dry-run
+        run: go-semver-release local . --release-branch main --tag-prefix v --verbose --dry-run
 
   docker-build-and-push:
     runs-on: ubuntu-latest
