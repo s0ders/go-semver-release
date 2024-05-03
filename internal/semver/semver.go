@@ -38,10 +38,6 @@ func (s *Semver) IsZero() bool {
 	return isZero
 }
 
-func (s *Semver) Valid() bool {
-	return s.Patch >= 0 && s.Minor >= 0 && s.Major >= 0
-}
-
 func (s *Semver) String() string {
 	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
 }
