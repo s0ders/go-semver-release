@@ -300,7 +300,7 @@ func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert.NoError(err, "failed to set --tag-prefix")
 
 	err = rootCmd.Execute()
-	assert.Error(err, "should have failed trying to write GitHub ouput to read-only file")
+	assert.Error(err, "should have failed trying to write GitHub output to read-only file")
 }
 
 func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {

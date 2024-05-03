@@ -67,7 +67,7 @@ func (r *ReleaseRules) Map() map[string]string {
 	return m
 }
 
-// Init initalize a new set of release rules with the given options if any.
+// Init initialize a new set of release rules with the given options if any.
 func Init(opts *Options) (rr *ReleaseRules, err error) {
 	if opts == nil || opts.Reader == nil {
 		reader := strings.NewReader(Default)
