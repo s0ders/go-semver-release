@@ -108,5 +108,11 @@ $ go-semver-release local . --verbose
 ## Command output
 
 The `local` command output is JSON formatted so that it can be piped into tool such as `jq`.
-To do so, it is advised to use the command in non-verbose mode so that you only get the message informing if a new
-release was found (`new-release` key) and if so, what is associated the semantic version (`next-version` or `new-version` key).
+Without the verbose flag, a single message will be printed out which keys and values depend on the scenario:
+
+| Scenario                          | Output                                               |
+| --------------------------------- | ---------------------------------------------------- |
+| A new release is found            | `{"new-release": true, "new-version": "1.2.3"}`      |
+| A new release is found in dry-run | `{"new-release": true, "next-version": "1.2.3"}`     |
+| No new release is found           | `{"new-release": false, "current-version": "1.2.0"}` |
+
