@@ -5,8 +5,8 @@ on:
     branches: [ "main" ]
 
 env:
-  DOCKER_REPO: docker.io/soders
-  DOCKER_IMAGE: docker.io/soders/go-semver-release
+  DOCKER_REPO: docker.io/s0ders
+  DOCKER_IMAGE: docker.io/s0ders/go-semver-release
   GIT_CI_USERNAME: go-semver-ci
   GIT_CI_EMAIL: go-semver@release.ci
 
