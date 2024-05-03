@@ -74,7 +74,7 @@ jobs:
             APP_VERSION="${{ needs.go-build.outputs.semver }}"
             APP_BUILD_NUMBER="${{ github.run_id }}"
             APP_COMMIT_HASH="${{ github.sha }}"
-          tags: soders/go-semver-release:${{ env.PRERELEASE_TAG }}
+          tags: s0ders/go-semver-release:${{ env.PRERELEASE_TAG }}
 
       - name: Trivy Scan
         uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # v0.19.0
