@@ -77,6 +77,17 @@ func TestRules_DuplicateType(t *testing.T) {
 	assert.ErrorIs(err, ErrDuplicateReleaseRule, "should have detected incorrect rules")
 }
 
+func TestRules_NoRules(t *testing.T) {
+	assert := assert.New(t)
+
+	opts := &Options{
+		Reader: strings.NewReader(`{"rules": []}`),
+	}
+
+	_, err := Init(opts)
+	assert.ErrorIs(err, ErrNoRules, "should have detected empty rules")
+}
+
 func TestRules_InvalidType(t *testing.T) {
 	assert := assert.New(t)
 
