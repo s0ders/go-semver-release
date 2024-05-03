@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"os"
 
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
 	"github.com/s0ders/go-semver-release/v2/internal/parser"
@@ -31,8 +30,8 @@ func init() {
 
 var localCmd = &cobra.Command{
 	Use:   "local <REPOSITORY_PATH>",
-	Short: "Version a local repository",
-	Long:  "Version a local repository by adding an annotated tag named after the right semver allowing you to push it back to your remote without sharing any secret token",
+	Short: "Version a local Git repository",
+	Long:  "Tag a Git repository with the new semantic version number if a new release is found",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var rulesOpts rules.Options
