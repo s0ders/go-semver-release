@@ -51,6 +51,7 @@ jobs:
     if: ${{needs.go-build.outputs.release == 'true'}}
     env:
       PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
+      RELEASE_TAG: ${{needs.go-build.outputs.semver}}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
