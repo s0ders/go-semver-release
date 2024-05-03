@@ -57,6 +57,3 @@ Documentation about the CLI usage can be found [here](docs/usage.md).
 ## CI workflow examples
 
 This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](docs/workflows.md).
-
-## WIP
-- [ ] PGP signing flag
