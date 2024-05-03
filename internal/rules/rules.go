@@ -114,5 +114,9 @@ func Parse(reader io.Reader) (*ReleaseRules, error) {
 		existingType[rule.CommitType] = rule.ReleaseType
 	}
 
+	if len(rules.Rules) == 0 {
+		return nil, ErrNoRules
+	}
+
 	return &rules, nil
 }
