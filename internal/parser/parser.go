@@ -18,17 +18,17 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
-var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-\.\\\/]+\))?(!)?: ([\w ])+([\s\S]*)`)
+var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
-	logger       zerolog.Logger
 	releaseRules *rules.ReleaseRules
+	logger       zerolog.Logger
 }
 
 func New(logger zerolog.Logger, releaseRules *rules.ReleaseRules) *Parser {
 	return &Parser{
-		logger:       logger,
 		releaseRules: releaseRules,
+		logger:       logger,
 	}
 }
 
@@ -83,7 +83,6 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 // provided.
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
-	newReleaseType := ""
 	rulesMap := p.releaseRules.Map()
 
 	for _, commit := range commits {
@@ -92,15 +91,14 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			continue
 		}
 
-		submatch := conventionalCommitRegex.FindStringSubmatch(commit.Message)
-		breakingChange := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
-		commitType := submatch[1]
+		match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
+		breakingChange := match[3] == "!" || strings.Contains(match[0], "BREAKING CHANGE")
+		commitType := match[1]
 		shortHash := commit.Hash.String()[0:7]
 		shortMessage := shortenMessage(commit.Message)
 
 		if breakingChange {
 			p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Msg("breaking change found")
-
 			latestSemver.BumpMajor()
 			newRelease = true
 			continue
@@ -115,17 +113,14 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		switch releaseType {
 		case "patch":
 			latestSemver.BumpPatch()
-			newRelease = true
-			newReleaseType = "patch"
 		case "minor":
 			latestSemver.BumpMinor()
-			newRelease = true
-			newReleaseType = "minor"
 		default:
 			return false, fmt.Errorf("unknown release type %s", releaseType)
 		}
 
-		p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Str("release-type", newReleaseType).Msg("new release found")
+		newRelease = true
+		p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Str("release-type", releaseType).Msg("new release found")
 	}
 
 	return newRelease, nil
@@ -145,16 +140,18 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 	var latestTag *object.Tag
 
 	err = tags.ForEach(func(tag *object.Tag) error {
-		if semverRegex.MatchString(tag.Name) {
-			currentSemver, err := semver.FromGitTag(tag)
-			if err != nil {
-				return err
-			}
+		if !semverRegex.MatchString(tag.Name) {
+			return nil
+		}
 
-			if latestSemver == nil || latestSemver.Precedence(currentSemver) != 1 {
-				latestSemver = currentSemver
-				latestTag = tag
-			}
+		currentSemver, err := semver.FromGitTag(tag)
+		if err != nil {
+			return err
+		}
+
+		if latestSemver == nil || latestSemver.Precedence(currentSemver) != 1 {
+			latestSemver = currentSemver
+			latestTag = tag
 		}
 		return nil
 	})
@@ -170,10 +167,8 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 			return nil, fmt.Errorf("failed to fetch head: %w", err)
 		}
 
-		version, err := semver.New(0, 0, 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build new semver: %w", err)
-		}
+		// Default zero semver, 0.0.0
+		version := semver.Semver{}
 
 		return tag.NewFromSemver(version, head.Hash()), nil
 	}
