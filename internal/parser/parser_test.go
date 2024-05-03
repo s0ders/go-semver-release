@@ -318,6 +318,54 @@ func TestParser_FetchLatestSemverTagUnitializedRepository(t *testing.T) {
 	assert.Error(err, "should have been failed trying to fetch latest semver tag from unitialized repository")
 }
 
+func TestParser_FetchLatestSemverTagOnRepositoryWithNoHead(t *testing.T) {
+	assert := assert.New(t)
+
+	tempDirPath, err := os.MkdirTemp("", "tag-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	repository, err := git.PlainInit(tempDirPath, false)
+	if err != nil {
+		t.Fatalf("failed to init repository: %v", err)
+	}
+
+	defaultRules, err := rules.Init(nil)
+	if err != nil {
+		t.Fatalf("failed to initialize rules: %v", err)
+	}
+
+	parser := New(fakeLogger, defaultRules)
+
+	_, err = parser.fetchLatestSemverTag(repository)
+	assert.Error(err, "should have been failed trying to fetch latest semver tag from repository with no HEAD")
+}
+
+func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
+	assert := assert.New(t)
+
+	tempDirPath, err := os.MkdirTemp("", "tag-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	repository, err := git.PlainInit(tempDirPath, false)
+	if err != nil {
+		t.Fatalf("failed to init repository: %v", err)
+	}
+
+	defaultRules, err := rules.Init(nil)
+	if err != nil {
+		t.Fatalf("failed to initialize rules: %v", err)
+	}
+
+	parser := New(fakeLogger, defaultRules)
+
+	_, _, err = parser.ComputeNewSemver(repository)
+	assert.Error(err, "should have been failed trying to compute new semver from repository with no HEAD")
+}
+
 func TestParser_ShortMessage(t *testing.T) {
 	assert := assert.New(t)
 
