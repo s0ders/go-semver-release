@@ -22,5 +22,15 @@ jobs:
       - name: Go Build
         run: go build -v -o go-semver-release main.go
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@d9c9b53e53fa63215cdd19637cd95fbc34fdf4a1 # v5.2.0
+        with:
+          version: v1.2.3
+
       - name: Go Test
-        run: go test -race -v ./...
+        run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@84508663e988701840491b86de86b666e8a86bed # v4.3.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

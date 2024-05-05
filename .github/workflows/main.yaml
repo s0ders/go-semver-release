@@ -31,6 +31,11 @@ jobs:
       - name: Go Build
         run: go build -v -o go-semver-release main.go
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@d9c9b53e53fa63215cdd19637cd95fbc34fdf4a1 # v5.2.0
+        with:
+          version: v1.2.3
+
       - name: Go Test
         run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
 
