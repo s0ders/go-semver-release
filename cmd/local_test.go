@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
-	"github.com/s0ders/go-semver-release/v2/internal/tag"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
 type cmdOutput struct {
