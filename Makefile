@@ -17,13 +17,16 @@ clean:
 test:
 	go test -failfast -race -v -covermode=atomic ./...
 
+lint:
+	@staticcheck ./...
+
 vuln:
-	govulncheck ./...
+	@govulncheck ./...
 
 docker-build:
 	docker build -f ./build/Dockerfile --build-arg="APP_VERSION=v0.0.0+local"  -t soders/go-semver-release .
 
 action-lint:
-	actionlint
+	@actionlint
 
 .PHONY: build clean
