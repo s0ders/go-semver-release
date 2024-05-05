@@ -448,7 +448,6 @@ func addCommit(r *git.Repository, message string) (err error) {
 
 	defer func(path string) {
 		err = os.RemoveAll(tempDirPath)
-		return
 	}(tempDirPath)
 
 	tempFileName := "temp"
@@ -460,9 +459,6 @@ func addCommit(r *git.Repository, message string) (err error) {
 
 	defer func() {
 		err = tempFile.Close()
-		if err != nil {
-			return
-		}
 	}()
 
 	err = os.WriteFile(tempFilePath, []byte("Hello world"), 0o644)
@@ -486,5 +482,5 @@ func addCommit(r *git.Repository, message string) (err error) {
 		return fmt.Errorf("failed to create commit: %w", err)
 	}
 
-	return nil
+	return
 }

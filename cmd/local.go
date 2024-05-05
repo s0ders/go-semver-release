@@ -80,7 +80,6 @@ var localCmd = &cobra.Command{
 
 			defer func() {
 				err = file.Close()
-				return
 			}()
 		}
 
@@ -125,6 +124,6 @@ var localCmd = &cobra.Command{
 			logger.Debug().Str("tag", tagPrefix+semver.String()).Msg("new tag added to repository")
 		}
 
-		return nil
+		return
 	},
 }
