@@ -1,28 +1,36 @@
 package cmd
 
 import (
+	"bytes"
+	"os"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"os"
 
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
+	"github.com/s0ders/go-semver-release/v2/internal/gpg"
 	"github.com/s0ders/go-semver-release/v2/internal/parser"
 	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
 var (
-	rulesPath     string
-	tagPrefix     string
-	releaseBranch string
-	dryRun        bool
+	rulesPath      string
+	tagPrefix      string
+	releaseBranch  string
+	armoredKeyPath string
+	keyPassphrase  string
+	dryRun         bool
 )
 
 func init() {
 	localCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
+	localCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
+	localCmd.Flags().StringVar(&keyPassphrase, "gpg-key-passphrase", "", "Passphrase, if any, of the GPG private key used to sign tags")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 
 	rootCmd.AddCommand(localCmd)
@@ -35,6 +43,7 @@ var localCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var rulesOpts rules.Options
+		var entity *openpgp.Entity
 
 		logger := zerolog.New(cmd.OutOrStdout())
 
@@ -42,6 +51,18 @@ var localCmd = &cobra.Command{
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		} else {
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		}
+
+		if armoredKeyPath != "" {
+			armoredKeyFile, err := os.ReadFile(armoredKeyPath)
+			if err != nil {
+				return err
+			}
+
+			entity, err = gpg.FromArmored(bytes.NewReader(armoredKeyFile), &gpg.Options{Passphrase: keyPassphrase})
+			if err != nil {
+				return err
+			}
 		}
 
 		repository, err := git.PlainOpen(args[0])
@@ -90,6 +111,10 @@ var localCmd = &cobra.Command{
 
 			tagOpts := &tag.Options{
 				Prefix: tagPrefix,
+			}
+
+			if entity != nil {
+				tagOpts.SignKey = entity
 			}
 
 			err = tag.AddToRepository(repository, semver, tagOpts)

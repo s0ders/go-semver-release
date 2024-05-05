@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -21,7 +23,7 @@ func TestTag_TagExists(t *testing.T) {
 	assert.NoError(err, "repository creation should have succeeded")
 
 	defer func() {
-		err := os.RemoveAll(repositoryPath)
+		err = os.RemoveAll(repositoryPath)
 		assert.NoError(err, "failed to remove repository")
 	}()
 
@@ -31,7 +33,7 @@ func TestTag_TagExists(t *testing.T) {
 	tags := []string{"1.0.0", "1.0.2"}
 
 	for i, tag := range tags {
-		_, err := repository.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
+		_, err = repository.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
 			Message: tag,
 			Tagger: &object.Signature{
 				Name:  "Go Semver Release",
@@ -80,7 +82,7 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 	assert.NoError(err, "repository creation should have succeeded")
 
 	defer func() {
-		err := os.RemoveAll(repositoryPath)
+		err = os.RemoveAll(repositoryPath)
 		assert.NoError(err, "failed to remove repository")
 	}()
 
@@ -141,6 +143,48 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 
 	err = AddToRepository(repository, nil, nil)
 	assert.Error(err, "should have failed trying to fetch unitialized repo. HEAD")
+}
+
+func TestTag_SignKey(t *testing.T) {
+	assert := assert.New(t)
+
+	config := &packet.Config{
+		Algorithm: packet.PubKeyAlgoRSA,
+	}
+
+	entity, err := openpgp.NewEntity("John Doe", "", "john.doe@example.com", config)
+	if err != nil {
+		t.Fatalf("failed to generate entity: %s", err)
+	}
+
+	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	assert.NoError(err, "repository creation should have succeeded")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	version := &semver.Semver{Major: 1}
+
+	opts := &Options{SignKey: entity}
+
+	err = AddToRepository(repository, version, opts)
+	if err != nil {
+		t.Fatalf("failed to add tag to repository: %s", err)
+	}
+
+	reference, err := repository.Reference(plumbing.NewTagReferenceName(version.String()), true)
+	if err != nil {
+		t.Fatalf("failed to get tag ref.: %s", err)
+	}
+
+	actualTag, err := repository.TagObject(reference.Hash())
+	if err != nil {
+		t.Fatalf("failed to get tag object from ref.: %s", err)
+	}
+
+	assert.NotEqual("", actualTag.PGPSignature, "PGP signature should not be empty")
 }
 
 // createGitRepository creates an empty Git repository, adds a file to it then creates

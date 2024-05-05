@@ -4,6 +4,7 @@ package tag
 import (
 	"errors"
 	"fmt"
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -13,14 +14,17 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
+var ErrTagAlreadyExists = errors.New("tag already exists")
+
 var GitSignature = object.Signature{
 	Name:  "Go Semver Release",
-	Email: "ci@ci.ci",
+	Email: "go-semver@release.ci",
 	When:  time.Now(),
 }
 
 type Options struct {
-	Prefix string
+	SignKey *openpgp.Entity
+	Prefix  string
 }
 
 // NewFromSemver creates a new Git annotated tag from a semantic version number.
@@ -63,15 +67,12 @@ func AddToRepository(repository *git.Repository, semver *semver.Semver, opts *Op
 		prefix = opts.Prefix
 	}
 
-	tag := fmt.Sprintf("%s%s", prefix, semver.String())
+	tag := prefix + semver.String()
 
-	tagExists, err := Exists(repository, tag)
-	if err != nil {
+	if exists, err := Exists(repository, tag); err != nil {
 		return fmt.Errorf("failed to check if tag exists: %w", err)
-	}
-
-	if tagExists {
-		return fmt.Errorf("tag already exists")
+	} else if exists {
+		return ErrTagAlreadyExists
 	}
 
 	createTagOptions := git.CreateTagOptions{
@@ -79,8 +80,11 @@ func AddToRepository(repository *git.Repository, semver *semver.Semver, opts *Op
 		Tagger:  &GitSignature,
 	}
 
-	_, err = repository.CreateTag(tag, head.Hash(), &createTagOptions)
-	if err != nil {
+	if opts != nil && opts.SignKey != nil {
+		createTagOptions.SignKey = opts.SignKey
+	}
+
+	if _, err = repository.CreateTag(tag, head.Hash(), &createTagOptions); err != nil {
 		return fmt.Errorf("failed to create tag on repository: %w", err)
 	}
 
