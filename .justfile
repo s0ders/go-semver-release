@@ -1,3 +1,5 @@
+alias tc := test-coverage
+
 ext := if os_family() == "windows" { ".exe" } else { "" }
 outPath := "./bin/go-semver-release"
 
@@ -11,6 +13,13 @@ ldFlags := "-X " + importPath + "cmd.version=" + appVersion + " -X " + importPat
 
 test-all:
 	go test -failfast -race -v -covermode=atomic ./...
+
+test-coverage: clean-coverage
+    go test -coverprofile cover.out ./...
+    go tool cover -html cover.out -o cover.html
+
+clean-coverage:
+    rm -f cover.out cover.html
 
 test name:
     go test '-run=^{{name}}$' -race ./...
