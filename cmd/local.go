@@ -21,7 +21,6 @@ var (
 	tagPrefix      string
 	releaseBranch  string
 	armoredKeyPath string
-	keyPassphrase  string
 	dryRun         bool
 )
 
@@ -30,7 +29,6 @@ func init() {
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	localCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
-	localCmd.Flags().StringVar(&keyPassphrase, "gpg-key-passphrase", "", "Passphrase, if any, of the GPG private key used to sign tags")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 
 	rootCmd.AddCommand(localCmd)
@@ -59,7 +57,7 @@ var localCmd = &cobra.Command{
 				return err
 			}
 
-			entity, err = gpg.FromArmored(bytes.NewReader(armoredKeyFile), &gpg.Options{Passphrase: keyPassphrase})
+			entity, err = gpg.FromArmored(bytes.NewReader(armoredKeyFile))
 			if err != nil {
 				return err
 			}
@@ -109,11 +107,8 @@ var localCmd = &cobra.Command{
 			logger.Info().Str("new-version", semver.String()).Bool("new-release", true).Msg("new release found")
 
 			tagOpts := &tag.Options{
-				Prefix: tagPrefix,
-			}
-
-			if entity != nil {
-				tagOpts.SignKey = entity
+				Prefix:  tagPrefix,
+				SignKey: entity,
 			}
 
 			err = tag.AddToRepository(repository, semver, tagOpts)
