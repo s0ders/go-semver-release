@@ -164,7 +164,6 @@ jobs:
     if: ${{needs.go-build.outputs.release == 'true'}}
     env:
       SEMVER: ${{needs.go-build.outputs.semver}}
-      SEMVER_TAG: v${{needs.go-build.outputs.semver}}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
@@ -182,8 +181,7 @@ jobs:
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ env.SEMVER_TAG }}
-          tag_name: ${{ env.SEMVER_TAG }}
+          name: Release ${{ env.SEMVER }}
           files: |
             output/go-semver-release-amd64-linux
             output/go-semver-release-arm64-linux
