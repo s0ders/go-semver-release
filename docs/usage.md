@@ -79,6 +79,22 @@ If a commit type (e.g., `chore`) is not specified in you rule file, it will not 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
 `revert`, `style`, `test`.
 
+
+### GPG Signed Tags
+
+The `--gpg-key-path` allows to pass an armored GPG signing key so that the produced tags, if any, are signed with that
+key.
+> [!CAUTION]
+> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that 
+> this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key 
+> specifically generated for the purpose of signing tags. Please do not use your personal key, that way you can easily 
+> revoke the key if any action in your workflow came to be compromised.
+
+Example:
+```bash
+$ go-semver-release local . --gpg-key-path ./path/to/key.asc
+```
+
 ### Dry-run
 
 The `--dry-run` flag controls if the repository is actually tagged after computing the next semantic version, if any.
