@@ -29,7 +29,12 @@ jobs:
           go-version: 1.22
 
       - name: Go Build
-        run: go build -v -o go-semver-release main.go
+        run: go build -v -o output/go-semver-release main.go
+
+      - name: Staticcheck
+        uses: dominikh/staticcheck-action@fe1dd0c3658873b46f8c9bb3291096a617310ca6 # v1.3.1
+        with:
+          version: latest
 
       - name: Go Test
         run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
@@ -42,6 +47,13 @@ jobs:
       - name: Go Semver Release
         id: go-semver
         run: ./go-semver-release local . --release-branch main --tag-prefix v --verbose --dry-run
+
+      - name: Archive Go Binary For Release
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: go-semver-release-${{ steps.go-semver.outputs.SEMVER }}-${{ github.sha }}
+          path: output/go-semver-release
+          if-no-files-found: error
 
   docker-build-scan-push:
     runs-on: ubuntu-latest

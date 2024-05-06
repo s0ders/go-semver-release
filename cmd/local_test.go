@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/s0ders/go-semver-release/v2/internal/rules"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
-	"github.com/s0ders/go-semver-release/v2/internal/tag"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
 type cmdOutput struct {
@@ -316,6 +315,62 @@ func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to open inexisting Git repository")
+}
+
+func TestLocalCmd_InvalidArmoredKeyPath(t *testing.T) {
+	assert := assert.New(t)
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", ".", "--gpg-key-path", "./fake.asc"})
+
+	err := resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to open inexisting armored GPG key")
+}
+
+func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
+	assert := assert.New(t)
+
+	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
+	if err != nil {
+		t.Fatalf("failed to create temporary directory: %s", err)
+	}
+
+	defer func(path string) {
+		err = os.RemoveAll(gpgKeyDir)
+		if err != nil {
+			t.Fatalf("failed to remove temporary directory: %s", err)
+		}
+	}(gpgKeyDir)
+
+	keyFilePath := filepath.Join(gpgKeyDir, "key.asc")
+
+	keyFile, err := os.Create(keyFilePath)
+	if err != nil {
+		t.Fatalf("failed to create output file: %s", err)
+	}
+
+	defer func() {
+		err = keyFile.Close()
+		if err != nil {
+			t.Fatalf("failed to create temporary directory: %s", err)
+		}
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", ".", "--gpg-key-path", keyFilePath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to read armored key ring from empty file")
 }
 
 func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
