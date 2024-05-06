@@ -93,37 +93,6 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH,MEDIUM'
 
-  github-release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    needs:
-      - go-build
-      - docker-scan-build-push-prerelease
-    if: ${{needs.go-build.outputs.release == 'true'}}
-    env:
-      SEMVER: ${{needs.go-build.outputs.semver}}
-    steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-
-      - name: Set up Go
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Go Build
-        run: |
-          GOOS=linux GOARCH=amd64 go build  -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-amd64-linux .
-          GOOS=linux GOARCH=arm64 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-arm64-linux .
-          GOOS=windows GOARCH=amd64 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-amd64-win.exe .
-
-      - name: GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            output/go-semver-release-amd64-linux
-            output/go-semver-release-arm64-linux
-            output/go-semver-release-amd64-win.exe
 
   update-docker-prerelease-tag:
     runs-on: ubuntu-latest
@@ -158,8 +127,7 @@ jobs:
       contents: write
     needs:
       - go-build
-      - github-release
-      - update-docker-prerelease-tag
+      - docker-scan-build-push-prerelease
     if: ${{needs.go-build.outputs.release == 'true'}}
     env:
       RELEASE_TAG: ${{needs.go-build.outputs.semver}}
@@ -184,3 +152,39 @@ jobs:
         run: |
           git tag --sign --annotate ${{ env.RELEASE_TAG }} --message "${{ env.RELEASE_TAG }}"
           git push origin ${{ env.RELEASE_TAG }}
+
+  github-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs:
+      - go-build
+      - push-tag
+      - update-docker-prerelease-tag
+    if: ${{needs.go-build.outputs.release == 'true'}}
+    env:
+      SEMVER: ${{needs.go-build.outputs.semver}}
+      SEMVER_TAG: v${{needs.go-build.outputs.semver}}
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - name: Set up Go
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Go Build
+        run: |
+          GOOS=linux GOARCH=amd64 go build  -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-amd64-linux .
+          GOOS=linux GOARCH=arm64 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-arm64-linux .
+          GOOS=windows GOARCH=amd64 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-amd64-win.exe .
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ env.SEMVER_TAG }}
+          tag_name: ${{ env.SEMVER_TAG }}
+          files: |
+            output/go-semver-release-amd64-linux
+            output/go-semver-release-arm64-linux
+            output/go-semver-release-amd64-win.exe
