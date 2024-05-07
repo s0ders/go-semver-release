@@ -182,6 +182,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ env.SEMVER }}
+          tag_name: ${{ env.SEMVER }}
           files: |
             output/go-semver-release-amd64-linux
             output/go-semver-release-arm64-linux
