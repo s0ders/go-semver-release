@@ -22,9 +22,18 @@ var GitSignature = object.Signature{
 	When:  time.Now(),
 }
 
-type Options struct {
-	SignKey *openpgp.Entity
-	Prefix  string
+type OptionFunc func(options *git.CreateTagOptions)
+
+func WithPrefix(prefix string) OptionFunc {
+	return func(c *git.CreateTagOptions) {
+		c.Message = prefix + c.Message
+	}
+}
+
+func WithSignKey(key *openpgp.Entity) OptionFunc {
+	return func(c *git.CreateTagOptions) {
+		c.SignKey = key
+	}
 }
 
 // NewFromSemver creates a new Git annotated tag from a semantic version number.
@@ -55,36 +64,28 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 
 // AddToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
-func AddToRepository(repository *git.Repository, semver *semver.Semver, opts *Options) error {
+func AddToRepository(repository *git.Repository, semver *semver.Semver, options ...OptionFunc) error {
 	head, err := repository.Head()
 	if err != nil {
 		return fmt.Errorf("failed to fetch head: %w", err)
 	}
 
-	var prefix string
-
-	if opts != nil {
-		prefix = opts.Prefix
+	tagOpts := &git.CreateTagOptions{
+		Message: semver.String(),
+		Tagger:  &GitSignature,
 	}
 
-	tag := prefix + semver.String()
+	for _, option := range options {
+		option(tagOpts)
+	}
 
-	if exists, err := Exists(repository, tag); err != nil {
+	if exists, err := Exists(repository, tagOpts.Message); err != nil {
 		return fmt.Errorf("failed to check if tag exists: %w", err)
 	} else if exists {
 		return ErrTagAlreadyExists
 	}
 
-	createTagOptions := git.CreateTagOptions{
-		Message: semver.String(),
-		Tagger:  &GitSignature,
-	}
-
-	if opts != nil && opts.SignKey != nil {
-		createTagOptions.SignKey = opts.SignKey
-	}
-
-	if _, err = repository.CreateTag(tag, head.Hash(), &createTagOptions); err != nil {
+	if _, err = repository.CreateTag(tagOpts.Message, head.Hash(), tagOpts); err != nil {
 		return fmt.Errorf("failed to create tag on repository: %w", err)
 	}
 

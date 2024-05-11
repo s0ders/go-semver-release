@@ -66,7 +66,7 @@ func TestTag_AddTagToRepository(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	err = AddToRepository(repository, version, nil)
+	err = AddToRepository(repository, version)
 	assert.NoError(err, "should have been able to add tag to repository")
 
 	tagExists, err := Exists(repository, version.String())
@@ -88,13 +88,10 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	opts := &Options{
-		Prefix: "v",
-	}
-	err = AddToRepository(repository, version, opts)
+	err = AddToRepository(repository, version, WithPrefix("v"))
 	assert.NoError(err, "should not have been able to add tag to repository")
 
-	err = AddToRepository(repository, version, opts)
+	err = AddToRepository(repository, version, WithPrefix("v"))
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
@@ -141,7 +138,7 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 		t.Fatalf("failed to init repository: %v", err)
 	}
 
-	err = AddToRepository(repository, nil, nil)
+	err = AddToRepository(repository, nil)
 	assert.Error(err, "should have failed trying to fetch unitialized repo. HEAD")
 }
 
@@ -167,9 +164,7 @@ func TestTag_SignKey(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	opts := &Options{SignKey: entity}
-
-	err = AddToRepository(repository, version, opts)
+	err = AddToRepository(repository, version, WithSignKey(entity))
 	if err != nil {
 		t.Fatalf("failed to add tag to repository: %s", err)
 	}

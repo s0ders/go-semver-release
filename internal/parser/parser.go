@@ -13,7 +13,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
 
-	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
@@ -21,11 +21,11 @@ import (
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
-	releaseRules *rules.ReleaseRules
+	releaseRules rule.ReleaseRules
 	logger       zerolog.Logger
 }
 
-func New(logger zerolog.Logger, releaseRules *rules.ReleaseRules) *Parser {
+func New(logger zerolog.Logger, releaseRules rule.ReleaseRules) *Parser {
 	return &Parser{
 		releaseRules: releaseRules,
 		logger:       logger,
@@ -79,7 +79,7 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 	return semverFromTag, newRelease, nil
 }
 
-// ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rules
+// ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rule
 // provided.
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
