@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/rule"
 )
 
 var fakeLogger = zerolog.New(io.Discard)
@@ -75,8 +75,8 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 		assert.NoError(err, "should have been able to remove Git repository")
 	}(repositoryPath)
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to create rules reader")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to create rule reader")
 
 	commitAnalyzer := New(fakeLogger, rules)
 
@@ -113,8 +113,8 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	})
 	assert.NoError(err, "should have been able to create tag")
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	commitAnalyzer := New(fakeLogger, rules)
 
@@ -152,8 +152,8 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		assert.NoError(err, "should have been able to create tag")
 	}
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	commitAnalyzer := New(fakeLogger, rules)
 
@@ -175,8 +175,8 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 		assert.NoError(err, "should have able to remove Git repository")
 	}(repositoryPath)
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	ca := New(fakeLogger, rules)
 
@@ -199,8 +199,8 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	ca := New(fakeLogger, rules)
 
@@ -222,8 +222,8 @@ func TestParser_UnknownReleaseType(t *testing.T) {
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	rules := &rules.ReleaseRules{
-		Rules: []rules.ReleaseRule{
+	rules := rule.ReleaseRules{
+		Rules: []rule.ReleaseRule{
 			{CommitType: "fix", ReleaseType: "unknown"},
 		},
 	}
@@ -245,8 +245,8 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *t
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	ca := New(fakeLogger, rules)
 
@@ -271,8 +271,8 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	err = addCommit(r, "fix: added hello feature")
 	assert.NoError(err, "should have able to add git commit")
 
-	rules, err := rules.Init(nil)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	ca := New(fakeLogger, rules)
 
@@ -306,8 +306,8 @@ func TestParser_FetchLatestSemverTagUnitializedRepository(t *testing.T) {
 		return
 	}
 
-	rules, err := rules.Init(nil)
-	if !assert.NoError(err, "failed to initialize rules") {
+	rules, err := rule.Init()
+	if !assert.NoError(err, "failed to initialize rule") {
 		return
 	}
 
@@ -330,9 +330,9 @@ func TestParser_FetchLatestSemverTagOnRepositoryWithNoHead(t *testing.T) {
 		t.Fatalf("failed to init repository: %v", err)
 	}
 
-	defaultRules, err := rules.Init(nil)
+	defaultRules, err := rule.Init()
 	if err != nil {
-		t.Fatalf("failed to initialize rules: %v", err)
+		t.Fatalf("failed to initialize rule: %v", err)
 	}
 
 	parser := New(fakeLogger, defaultRules)
@@ -354,9 +354,9 @@ func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
 		t.Fatalf("failed to init repository: %v", err)
 	}
 
-	defaultRules, err := rules.Init(nil)
+	defaultRules, err := rule.Init()
 	if err != nil {
-		t.Fatalf("failed to initialize rules: %v", err)
+		t.Fatalf("failed to initialize rule: %v", err)
 	}
 
 	parser := New(fakeLogger, defaultRules)

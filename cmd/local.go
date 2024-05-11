@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"io"
 	"os"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
@@ -12,7 +13,7 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
 	"github.com/s0ders/go-semver-release/v2/internal/gpg"
 	"github.com/s0ders/go-semver-release/v2/internal/parser"
-	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
@@ -25,7 +26,7 @@ var (
 )
 
 func init() {
-	localCmd.Flags().StringVarP(&rulesPath, "rules-path", "r", "", "Path to the JSON or YAML file containing the release rules")
+	localCmd.Flags().StringVarP(&rulesPath, "rule-path", "r", "", "Path to the JSON or YAML file containing the release rule")
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	localCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
@@ -40,7 +41,7 @@ var localCmd = &cobra.Command{
 	Long:  "Tag a Git repository with the new semantic version number if a new release is found",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		var rulesOpts rules.Options
+		var rulesReader io.Reader
 		var entity *openpgp.Entity
 
 		logger := zerolog.New(cmd.OutOrStdout())
@@ -74,14 +75,14 @@ var localCmd = &cobra.Command{
 				return err
 			}
 
-			rulesOpts.Reader = file
+			rulesReader = file
 
 			defer func() {
 				err = file.Close()
 			}()
 		}
 
-		rules, err := rules.Init(&rulesOpts)
+		rules, err := rule.Init(rule.WithReader(rulesReader))
 		if err != nil {
 			return err
 		}
@@ -106,12 +107,7 @@ var localCmd = &cobra.Command{
 		default:
 			logger.Info().Str("new-version", semver.String()).Bool("new-release", true).Msg("new release found")
 
-			tagOpts := &tag.Options{
-				Prefix:  tagPrefix,
-				SignKey: entity,
-			}
-
-			err = tag.AddToRepository(repository, semver, tagOpts)
+			err = tag.AddToRepository(repository, semver, tag.WithPrefix(tagPrefix), tag.WithSignKey(entity))
 			if err != nil {
 				return err
 			}

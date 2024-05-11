@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v2/internal/rules"
+	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
@@ -424,11 +424,11 @@ func TestLocalCmd_InvalidRulesPath(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("rules-path", "./does/no/exist.json")
-	assert.NoError(err, "failed to set --rules-path")
+	err = localCmd.Flags().Set("rule-path", "./does/no/exist.json")
+	assert.NoError(err, "failed to set --rule-path")
 
 	err = rootCmd.Execute()
-	assert.Error(err, "should have failed trying to open inexisting rules file")
+	assert.Error(err, "should have failed trying to open inexisting rule file")
 }
 
 func TestLocalCmd_InvalidCustomRules(t *testing.T) {
@@ -442,7 +442,7 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 		assert.NoError(err, "failed to remove repository")
 	}()
 
-	tempRulesDir, err := os.MkdirTemp("", "rules-*")
+	tempRulesDir, err := os.MkdirTemp("", "rule-*")
 	assert.NoError(err, "failed to create temp. dir.")
 
 	defer func() {
@@ -457,7 +457,7 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 
 	customRulesJSON := `
 {
-    "rules": [
+    "rule": [
         {"type": "feat",   "release": "minor"},
         {"type": "feat",   "release": "patch"}
     ]
@@ -480,11 +480,11 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("rules-path", customRulesPath)
-	assert.NoError(err, "failed to set --rules-path")
+	err = localCmd.Flags().Set("rule-path", customRulesPath)
+	assert.NoError(err, "failed to set --rule-path")
 
 	err = rootCmd.Execute()
-	assert.ErrorIs(err, rules.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rules")
+	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
 }
 
 func TestLocalCmd_CustomRules(t *testing.T) {
@@ -499,7 +499,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	}()
 
 	commitTypes := []string{
-		"fix",  // 0.1.0 (with custom rules)
+		"fix",  // 0.1.0 (with custom rule)
 		"feat", // 0.2.0
 	}
 
@@ -508,7 +508,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 		assert.NoError(err, "failed to create sample commit")
 	}
 
-	tempRulesDir, err := os.MkdirTemp("", "rules-*")
+	tempRulesDir, err := os.MkdirTemp("", "rule-*")
 	assert.NoError(err, "failed to create temp. dir.")
 
 	defer func() {
@@ -523,7 +523,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 
 	customRulesJSON := `
 {
-    "rules": [
+    "rule": [
         {"type": "feat",   "release": "minor"},
         {"type": "fix",    "release": "minor"}
     ]
@@ -546,8 +546,8 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("rules-path", customRulesPath)
-	assert.NoError(err, "failed to set --rules-path")
+	err = localCmd.Flags().Set("rule-path", customRulesPath)
+	assert.NoError(err, "failed to set --rule-path")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
