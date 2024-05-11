@@ -1,4 +1,4 @@
-package rules
+package rule
 
 import (
 	"os"
@@ -12,10 +12,8 @@ import (
 func TestRules_Map(t *testing.T) {
 	assert := assert.New(t)
 
-	opts := &Options{}
-
-	rules, err := Init(opts)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	got := rules.Map()
 	want := map[string]string{
@@ -31,10 +29,8 @@ func TestRules_Map(t *testing.T) {
 func TestRules_ParseDefault(t *testing.T) {
 	assert := assert.New(t)
 
-	opts := &Options{}
-
-	rules, err := Init(opts)
-	assert.NoError(err, "should have been able to parse rules")
+	rules, err := Init()
+	assert.NoError(err, "should have been able to parse rule")
 
 	type test struct {
 		commitType  string
@@ -61,7 +57,7 @@ func TestRules_DuplicateType(t *testing.T) {
 	assert := assert.New(t)
 
 	const duplicateRules = `{
-		"rules": [
+		"rule": [
 			{"type": "feat", "release": "minor"},
 			{"type": "feat", "release": "patch"}
 		]
@@ -69,30 +65,24 @@ func TestRules_DuplicateType(t *testing.T) {
 
 	reader := strings.NewReader(duplicateRules)
 
-	opts := &Options{
-		Reader: reader,
-	}
-
-	_, err := Init(opts)
-	assert.ErrorIs(err, ErrDuplicateReleaseRule, "should have detected incorrect rules")
+	_, err := Init(WithReader(reader))
+	assert.ErrorIs(err, ErrDuplicateReleaseRule, "should have detected incorrect rule")
 }
 
 func TestRules_NoRules(t *testing.T) {
 	assert := assert.New(t)
 
-	opts := &Options{
-		Reader: strings.NewReader(`{"rules": []}`),
-	}
+	reader := strings.NewReader(`{"rule": []}`)
 
-	_, err := Init(opts)
-	assert.ErrorIs(err, ErrNoRules, "should have detected empty rules")
+	_, err := Init(WithReader(reader))
+	assert.ErrorIs(err, ErrNoRules, "should have detected empty rule")
 }
 
 func TestRules_InvalidType(t *testing.T) {
 	assert := assert.New(t)
 
 	const duplicateRules = `{
-		"rules": [
+		"rule": [
 			{"type": "feat", "release": "minor"},
 			{"type": "unknown", "release": "patch"}
 		]
@@ -100,12 +90,8 @@ func TestRules_InvalidType(t *testing.T) {
 
 	reader := strings.NewReader(duplicateRules)
 
-	opts := &Options{
-		Reader: reader,
-	}
-
-	_, err := Init(opts)
-	assert.ErrorIs(err, ErrInvalidCommitType, "should have detected incorrect rules")
+	_, err := Init(WithReader(reader))
+	assert.ErrorIs(err, ErrInvalidCommitType, "should have detected incorrect rule")
 }
 
 func TestRules_InvalidRelease(t *testing.T) {
@@ -114,7 +100,7 @@ func TestRules_InvalidRelease(t *testing.T) {
 	// Using a "release" of type major is forbidden since they are
 	// reserved for breaking changes.
 	const duplicateRules = `{
-		"rules": [
+		"rule": [
 			{"type": "feat", "release": "minor"},
 			{"type": "fix", "release": "major"}
 		]
@@ -122,18 +108,14 @@ func TestRules_InvalidRelease(t *testing.T) {
 
 	reader := strings.NewReader(duplicateRules)
 
-	opts := &Options{
-		Reader: reader,
-	}
-
-	_, err := Init(opts)
-	assert.ErrorIs(err, ErrInvalidReleaseType, "should have detected incorrect rules")
+	_, err := Init(WithReader(reader))
+	assert.ErrorIs(err, ErrInvalidReleaseType, "should have detected incorrect rule")
 }
 
 func TestRules_EmptyFile(t *testing.T) {
 	assert := assert.New(t)
 
-	tempDir, err := os.MkdirTemp("", "rules-*")
+	tempDir, err := os.MkdirTemp("", "rule-*")
 	assert.NoError(err, "failed to create temp. dir.")
 
 	defer func() {
@@ -154,10 +136,6 @@ func TestRules_EmptyFile(t *testing.T) {
 		assert.NoError(err, "failed to close empty rule file")
 	}()
 
-	opts := &Options{
-		Reader: emptyFile,
-	}
-
-	_, err = Init(opts)
+	_, err = Init(WithReader(emptyFile))
 	assert.Error(err, "should have failed to decode JSON")
 }
