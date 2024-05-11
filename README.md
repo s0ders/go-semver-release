@@ -1,4 +1,5 @@
-![GitHub Tag](https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff) 
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
+![GitHub Tag](https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release)
 [![Go Reference](https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg)](https://pkg.go.dev/github.com/s0ders/go-semver-release/v2)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI)
@@ -6,10 +7,11 @@
 ![Codecov](https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage) 
 ![GitHub License](https://img.shields.io/github/license/s0ders/go-semver-release?label=License)
 
+
 # Go Semver Release
 
 Go program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging 
-them with the right semver number. 
+them with the right [semver](https://semver.org/spec/v2.0.0.html) number. 
 
 <ul>
     <li><a href="#Motivation">Motivation</a></li>
@@ -20,8 +22,8 @@ them with the right semver number.
 
 ## Motivation
 
-This project was built to create a lightweight and simple tool to seamlessly automate the semantic versioning on your 
-Git repository in a language and CI agnostic way.
+This project was built to create a lightweight and simple tool to automate the semantic versioning on your Git 
+repository in a language and CI agnostic way by following strictly the Semantic Versioning convention.
 
 Following the UNIX philosophy of "make each program do one thing well", it only handles publishing semver tags to your 
 Git repository, no package publishing or any other features. 
@@ -56,4 +58,5 @@ Documentation about the CLI usage can be found [here](docs/usage.md).
 
 ## CI workflow examples
 
-This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](docs/workflows.md).
+This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be 
+found [here](docs/workflows.md).`
