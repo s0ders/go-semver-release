@@ -105,7 +105,7 @@ func TestTag_NewTagFromServer(t *testing.T) {
 
 	hash := plumbing.Hash(b)
 
-	version := semver.Semver{Patch: 1}
+	version := &semver.Semver{Patch: 1}
 
 	gotTag := NewFromSemver(version, hash)
 
