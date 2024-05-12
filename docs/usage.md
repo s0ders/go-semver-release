@@ -2,7 +2,7 @@
 
 The program only supports a local mode of execution. This means that it requires that the repository to version is
 already present on the local file system.
-The program takes the path of local Git repository, computes the next semver and tags the repository.
+The program takes the path of local Git repository, computes the next SemVer and tags the repository.
 
 This mode is a good option security-wise since it lets you use the program without having to configure any kind of
 access management since it does not require any access token.
@@ -15,9 +15,9 @@ $ go-semver-release local <REPOSITORY_PATH> --rule-path <PATH> --tag-prefix <PRE
 
 > [!TIP]
 > Tag prefix can be changed during the lifetime of a repository (e.g., going from no prefix to `v`), this will
-> **not** affect the semver tags history, the program will still be able to recognize previous semver tags.
+> **not** affect the SemVer tags history, the program will still be able to recognize previous SemVer tags.
 
-For more informations about available flags and their default values, run:
+For more information about available flags and their default values, run:
 
 ```bash
 $ go-semver-release local --help
@@ -30,7 +30,7 @@ The `--tag-prefix` flags allows to custom what will prefix the semantic version 
 is nothing. For instance, if the next version detected is `2.0.1`, with the default tag prefix, the tag will be `2.0.1`.
 
 
-A classic prefix is `v`. For instance, Go requires that your repository is versioned using the following tag format 
+A classic prefix is `v`. For instance, Go requires that your repository is versioned using the following tag format
 `vX.Y.Z`.
 
 Example:
@@ -68,7 +68,7 @@ The following release rules are applied by default:
 ```
 
 You can define custom release rules to suit your needs using a JSON file and by passing it to the program as
-bellow.
+below.
 
 ```bash
 $ go-semver-release local <REPOSITORY_PATH> --rule-path ./path/to/custom/rule.json
@@ -109,12 +109,12 @@ $ go-semver-release local . --build-metadata $CI_JOB_ID
 
 ### GPG Signed Tags
 
-The `--gpg-key-path` allows to pass an armored GPG signing key so that the produced tags, if any, are signed with that
+The `--gpg-key-path` allows passing an armored GPG signing key so that the produced tags, if any, are signed with that
 key.
 > [!CAUTION]
-> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that 
-> this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key 
-> specifically generated for the purpose of signing tags. Please do not use your personal key, that way you can easily 
+> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that
+> this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key
+> specifically generated for the purpose of signing tags. Please do not use your personal key, that way you can easily
 > revoke the key if any action in your workflow came to be compromised.
 
 Example:
@@ -125,7 +125,7 @@ $ go-semver-release local . --gpg-key-path ./path/to/key.asc
 ### Dry-run
 
 The `--dry-run` flag controls if the repository is actually tagged after computing the next semantic version, if any.
-If enabled and a new release is detected, the command JSON output will include a `next-version` key that contains the 
+If enabled and a new release is detected, the command JSON output will include a `next-version` key that contains the
 next semantic version (without the tag prefix) that would have been applied if ran in regular mode.
 
 Example:
@@ -140,7 +140,7 @@ verbose and will only print a single JSON output informing if a new was found or
 in case of dry-run mode) release is.
 
 If enabled, the command will print whenever it finds a commit that triggers a bump in the semantic version with
-information about each commit (e.g., hash, message). It will also prints if it tagged the repository.
+information about each commit (e.g., hash, message). It will also print if it tagged the repository.
 
 Example:
 ```bash

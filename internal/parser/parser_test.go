@@ -286,7 +286,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
-func TestParser_FetchLatestSemverTagUnitializedRepository(t *testing.T) {
+func TestParser_FetchLatestSemverTagUninitializedRepository(t *testing.T) {
 	assert := assert.New(t)
 
 	dir, err := os.MkdirTemp("", "parser-*")
@@ -314,7 +314,7 @@ func TestParser_FetchLatestSemverTagUnitializedRepository(t *testing.T) {
 	parser := New(fakeLogger, rules)
 
 	_, err = parser.fetchLatestSemverTag(repository)
-	assert.Error(err, "should have been failed trying to fetch latest semver tag from unitialized repository")
+	assert.Error(err, "should have been failed trying to fetch latest semver tag from uninitialized repository")
 }
 
 func TestParser_FetchLatestSemverTagOnRepositoryWithNoHead(t *testing.T) {
