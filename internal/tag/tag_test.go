@@ -139,7 +139,7 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 	}
 
 	err = AddToRepository(repository, nil)
-	assert.Error(err, "should have failed trying to fetch unitialized repo. HEAD")
+	assert.Error(err, "should have failed trying to fetch uninitialized repo. HEAD")
 }
 
 func TestTag_SignKey(t *testing.T) {
