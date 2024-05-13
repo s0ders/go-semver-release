@@ -65,7 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: go-build
+    needs:
+     - go-build
+     - golangci
     if: ${{needs.go-build.outputs.release == 'true'}}
     env:
       PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
