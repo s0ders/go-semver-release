@@ -10,7 +10,7 @@ access management since it does not require any access token.
 Example:
 
 ```bash
-$ go-semver-release local <REPOSITORY_PATH> --rules-path <PATH> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
+$ go-semver-release local <REPOSITORY_PATH> --rule-path <PATH> --tag-prefix <PREFIX> --release-branch <NAME> --dry-run --verbose
 ```
 
 > [!TIP]
@@ -71,7 +71,7 @@ You can define custom release rules to suit your needs using a JSON file and by 
 below.
 
 ```bash
-$ go-semver-release local <REPOSITORY_PATH> --rules-path ./path/to/custom/rules.json
+$ go-semver-release local <REPOSITORY_PATH> --rule-path ./path/to/custom/rule.json
 ```
 
 If a commit type (e.g., `chore`) is not specified in you rule file, it will not trigger any kind of release.
@@ -79,6 +79,33 @@ If a commit type (e.g., `chore`) is not specified in you rule file, it will not 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
 `revert`, `style`, `test`.
 
+### Prerelease
+
+A Semantic Version number can include prerelease informations such as `X.Y.Z-alpha.1` or `X.Y.Z-rc`.
+
+The `--prerelease` flag allows to specify that the generated semver tag, if any, is a prerelease tag and will be marked
+as such by append a `rc` to the semantic version.
+
+Example:
+```bash
+# Will create a tag such as "X.Y.Z-rc"
+$ go-semver-release local . --prerelease
+```
+
+### Build Metadata
+
+The Semantic Version convention states that your semver number can include build metadata in form 
+`1.2.3+<build_metadata>`. Usually, these metadata are a unique build number so that a specific version can be linked to
+the build that created it. 
+
+The `--build-metadata` allows to pass a string containing build metadata that will be appended to the semantic version
+number in the form stated above.
+
+Example:
+```bash
+# Will produce a semver like "X.Y.Z+<some_job_id>"
+$ go-semver-release local . --build-metadata $CI_JOB_ID
+```
 
 ### GPG Signed Tags
 

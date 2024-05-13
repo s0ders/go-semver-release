@@ -37,7 +37,7 @@ func WithSignKey(key *openpgp.Entity) OptionFunc {
 }
 
 // NewFromSemver creates a new Git annotated tag from a semantic version number.
-func NewFromSemver(semver semver.Semver, hash plumbing.Hash) *object.Tag {
+func NewFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),

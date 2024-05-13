@@ -45,7 +45,7 @@ $ go install github.com/s0ders/go-semver-release@latest
 $ go-semver-release --help
 ```
 
-For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/soders/go-semver-release/tags):
+For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/s0ders/go-semver-release/tags):
 
 ```bash
 $ docker pull s0ders/go-semver-release:latest
