@@ -78,13 +78,12 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 	rules, err := rule.Init()
 	assert.NoError(err, "should have been able to create rule reader")
 
-	commitAnalyzer := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
+	latest, err := parser.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
 
-	want := "0.0.0"
-	assert.Equal(want, latest.Name, "latest semver tag should be equal")
+	assert.Nil(latest, "latest semver tag should be nil")
 }
 
 func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
@@ -116,9 +115,9 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	rules, err := rule.Init()
 	assert.NoError(err, "should have been able to parse rule")
 
-	commitAnalyzer := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
+	latest, err := parser.fetchLatestSemverTag(r)
 	assert.NoError(err, "should have been able to fetch latest semver tag")
 
 	assert.Equal(tag, latest.Name, "latest semver tag should be equal")
@@ -178,9 +177,9 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 	rules, err := rule.Init()
 	assert.NoError(err, "should have been able to parse rule")
 
-	ca := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	version, _, err := ca.ComputeNewSemver(r)
+	version, _, err := parser.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "0.0.0"
@@ -202,9 +201,9 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 	rules, err := rule.Init()
 	assert.NoError(err, "should have been able to parse rule")
 
-	ca := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	version, _, err := ca.ComputeNewSemver(r)
+	version, _, err := parser.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "0.0.1"
@@ -228,13 +227,13 @@ func TestParser_UnknownReleaseType(t *testing.T) {
 		},
 	}
 
-	ca := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	_, _, err = ca.ComputeNewSemver(r)
+	_, _, err = parser.ComputeNewSemver(r)
 	assert.Error(err, "should have been failed trying to compute semver")
 }
 
-func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *testing.T) {
+func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWitMinorRelease(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
@@ -248,16 +247,16 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMinorRelease(t *t
 	rules, err := rule.Init()
 	assert.NoError(err, "should have been able to parse rule")
 
-	ca := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	version, _, err := ca.ComputeNewSemver(r)
+	version, _, err := parser.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "0.1.0"
 	assert.Equal(want, version.String(), "version should be equal")
 }
 
-func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *testing.T) {
+func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWithMajorRelease(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
@@ -274,9 +273,9 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	rules, err := rule.Init()
 	assert.NoError(err, "should have been able to parse rule")
 
-	ca := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules)
 
-	version, newRelease, err := ca.ComputeNewSemver(r)
+	version, newRelease, err := parser.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "1.0.1"
@@ -286,7 +285,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitMajorRelease(t *t
 	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
-func TestParser_FetchLatestSemverTagUninitializedRepository(t *testing.T) {
+func TestParser_ComputeNewSemverOnUninitializedRepository(t *testing.T) {
 	assert := assert.New(t)
 
 	dir, err := os.MkdirTemp("", "parser-*")
@@ -313,32 +312,8 @@ func TestParser_FetchLatestSemverTagUninitializedRepository(t *testing.T) {
 
 	parser := New(fakeLogger, rules)
 
-	_, err = parser.fetchLatestSemverTag(repository)
-	assert.Error(err, "should have been failed trying to fetch latest semver tag from uninitialized repository")
-}
-
-func TestParser_FetchLatestSemverTagOnRepositoryWithNoHead(t *testing.T) {
-	assert := assert.New(t)
-
-	tempDirPath, err := os.MkdirTemp("", "tag-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-
-	repository, err := git.PlainInit(tempDirPath, false)
-	if err != nil {
-		t.Fatalf("failed to init repository: %v", err)
-	}
-
-	defaultRules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("failed to initialize rule: %v", err)
-	}
-
-	parser := New(fakeLogger, defaultRules)
-
-	_, err = parser.fetchLatestSemverTag(repository)
-	assert.Error(err, "should have been failed trying to fetch latest semver tag from repository with no HEAD")
+	_, _, err = parser.ComputeNewSemver(repository)
+	assert.ErrorContains(err, "failed to fetch head", "should have been failed trying to fetch latest semver tag from uninitialized repository")
 }
 
 func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
@@ -363,6 +338,96 @@ func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
 
 	_, _, err = parser.ComputeNewSemver(repository)
 	assert.Error(err, "should have been failed trying to compute new semver from repository with no HEAD")
+}
+
+func TestParser_ComputeNewSemverWithBuildMetadata(t *testing.T) {
+
+	assert := assert.New(t)
+
+	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(repositoryPath)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
+
+	err = addCommit(r, "fix: added hello feature")
+	assert.NoError(err, "should have able to add git commit")
+
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
+
+	parser := New(fakeLogger, rules, WithBuildMetadata("metadata"))
+
+	version, newRelease, err := parser.ComputeNewSemver(r)
+	assert.NoError(err, "should have been able to compute newsemver")
+
+	want := "1.0.1+metadata"
+
+	assert.Equal(want, version.String(), "version should be equal")
+
+	assert.Equal(true, newRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemverWithPrerelease(t *testing.T) {
+
+	assert := assert.New(t)
+
+	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(repositoryPath)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
+
+	err = addCommit(r, "fix: added hello feature")
+	assert.NoError(err, "should have able to add git commit")
+
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
+
+	parser := New(fakeLogger, rules, WithPrereleaseMode(true), WithPrereleaseSuffix("rc"))
+
+	version, newRelease, err := parser.ComputeNewSemver(r)
+	assert.NoError(err, "should have been able to compute newsemver")
+
+	want := "1.0.1-rc"
+
+	assert.Equal(want, version.String(), "version should be equal")
+
+	assert.Equal(true, newRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemverWithPrereleaseAndBuildMetadata(t *testing.T) {
+
+	assert := assert.New(t)
+
+	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
+	assert.NoError(err, "should have been able to create git repository")
+
+	defer func(path string) {
+		err := os.RemoveAll(repositoryPath)
+		assert.NoError(err, "should have able to remove git repository")
+	}(repositoryPath)
+
+	err = addCommit(r, "fix: added hello feature")
+	assert.NoError(err, "should have able to add git commit")
+
+	rules, err := rule.Init()
+	assert.NoError(err, "should have been able to parse rule")
+
+	parser := New(fakeLogger, rules, WithPrereleaseMode(true), WithPrereleaseSuffix("rc"), WithBuildMetadata("metadata"))
+
+	version, newRelease, err := parser.ComputeNewSemver(r)
+	assert.NoError(err, "should have been able to compute newsemver")
+
+	want := "1.0.1-rc+metadata"
+
+	assert.Equal(want, version.String(), "version should be equal")
+
+	assert.Equal(true, newRelease, "boolean should be equal")
 }
 
 func TestParser_ShortMessage(t *testing.T) {

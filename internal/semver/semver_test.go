@@ -17,14 +17,19 @@ func TestSemver_Precedence(t *testing.T) {
 	}
 
 	matrix := []test{
-		{&Semver{1, 0, 2}, &Semver{1, 0, 1}, 1},
-		{&Semver{1, 0, 2}, &Semver{1, 0, 3}, -1},
-		{&Semver{1, 0, 2}, &Semver{1, 1, 0}, -1},
-		{&Semver{0, 0, 1}, &Semver{1, 1, 0}, -1},
-		{&Semver{2, 0, 0}, &Semver{1, 99, 99}, 1},
-		{&Semver{99, 0, 0}, &Semver{2, 99, 99}, 1},
-		{&Semver{1, 0, 0}, &Semver{1, 0, 0}, 0},
-		{&Semver{0, 2, 0}, &Semver{0, 1, 0}, 1},
+		{s1: &Semver{Major: 1, Minor: 0, Patch: 2}, s2: &Semver{Major: 1, Minor: 0, Patch: 1}, want: 1},
+		{&Semver{Major: 1, Minor: 0, Patch: 2}, &Semver{Major: 1, Minor: 0, Patch: 3}, -1},
+		{&Semver{Major: 1, Minor: 0, Patch: 2}, &Semver{Major: 1, Minor: 1, Patch: 0}, -1},
+		{&Semver{Major: 0, Minor: 0, Patch: 1}, &Semver{Major: 1, Minor: 1, Patch: 0}, -1},
+		{&Semver{Major: 2, Minor: 0, Patch: 0}, &Semver{Major: 1, Minor: 99, Patch: 99}, 1},
+		{&Semver{Major: 99, Minor: 0, Patch: 0}, &Semver{Major: 2, Minor: 99, Patch: 99}, 1},
+		{s1: &Semver{Major: 1, Minor: 0, Patch: 0}, s2: &Semver{Major: 1, Minor: 0, Patch: 0}},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "foo"}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 1, Patch: 0, BuildMetadata: "foo"}, want: 1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0}, want: -1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "foo"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "bar"}, want: 0},
 	}
 
 	for _, test := range matrix {
@@ -42,11 +47,11 @@ func TestSemver_IsZero(t *testing.T) {
 	}
 
 	matrix := []test{
-		{Semver{0, 0, 0}, true},
-		{Semver{0, 0, 1}, false},
-		{Semver{0, 1, 0}, false},
-		{Semver{1, 0, 0}, false},
-		{Semver{1, 1, 1}, false},
+		{Semver{Major: 0, Minor: 0, Patch: 0}, true},
+		{Semver{Major: 0, Minor: 0, Patch: 1}, false},
+		{Semver{Major: 0, Minor: 1, Patch: 0}, false},
+		{Semver{Major: 1, Minor: 0, Patch: 0}, false},
+		{Semver{Major: 1, Minor: 1, Patch: 1}, false},
 	}
 
 	for _, test := range matrix {
@@ -57,10 +62,23 @@ func TestSemver_IsZero(t *testing.T) {
 
 func TestSemver_String(t *testing.T) {
 	assert := assert.New(t)
-	s := Semver{1, 2, 3}
 
-	want := "1.2.3"
-	assert.Equal(s.String(), want, "the strings should be equal")
+	type test struct {
+		have Semver
+		want string
+	}
+
+	tests := []test{
+		{Semver{Major: 1, Minor: 0, Patch: 0}, "1.0.0"},
+		{Semver{Major: 1, Minor: 0, Patch: 1, Prerelease: "rc"}, "1.0.1-rc"},
+		{Semver{Major: 1, Minor: 0, Patch: 1, BuildMetadata: "metadata"}, "1.0.1+metadata"},
+		{Semver{Major: 1, Minor: 0, Patch: 1, Prerelease: "alpha", BuildMetadata: "metadata"}, "1.0.1-alpha+metadata"},
+	}
+
+	for _, testCase := range tests {
+		assert.Equal(testCase.want, testCase.have.String(), "the strings should be equal")
+	}
+
 }
 
 func TestSemver_FromGitTag(t *testing.T) {
@@ -101,10 +119,21 @@ func TestSemver_FromGitTag(t *testing.T) {
 		},
 	}
 
+	tag4 := &object.Tag{
+		Name:    "version1.2.3-rc+buildmetadata",
+		Message: "1.2.3",
+		Tagger: object.Signature{
+			Name:  "Go Semver Release",
+			Email: "ci@ci.ci",
+			When:  time.Now(),
+		},
+	}
+
 	matrix := []test{
 		{tag1, "1.2.3"},
 		{tag2, "1.2.3"},
 		{tag3, "1.2.3"},
+		{tag4, "1.2.3-rc+buildmetadata"},
 	}
 
 	for _, test := range matrix {
@@ -135,7 +164,7 @@ func TestSemver_FromGitTagInvalid(t *testing.T) {
 func TestSemver_Bump(t *testing.T) {
 	assert := assert.New(t)
 
-	s := Semver{0, 0, 0}
+	s := Semver{Major: 0, Minor: 0, Patch: 0}
 
 	s.BumpPatch()
 	assert.Equal(s.String(), "0.0.1", "the strings should be equal")

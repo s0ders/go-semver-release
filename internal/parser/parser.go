@@ -21,44 +21,87 @@ import (
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
-	releaseRules rule.ReleaseRules
-	logger       zerolog.Logger
+	rules            rule.ReleaseRules
+	logger           zerolog.Logger
+	BuildMetadata    string
+	PrereleaseSuffix string
+	PrereleaseMode   bool
 }
 
-func New(logger zerolog.Logger, releaseRules rule.ReleaseRules) *Parser {
-	return &Parser{
-		releaseRules: releaseRules,
-		logger:       logger,
+type OptionFunc func(*Parser)
+
+func WithBuildMetadata(metadata string) OptionFunc {
+	return func(p *Parser) {
+		p.BuildMetadata = metadata
 	}
+}
+
+func WithPrereleaseMode(b bool) OptionFunc {
+	return func(p *Parser) {
+		p.PrereleaseMode = b
+	}
+}
+
+func WithPrereleaseSuffix(s string) OptionFunc {
+	return func(p *Parser) {
+		p.PrereleaseSuffix = s
+	}
+}
+
+func New(logger zerolog.Logger, rules rule.ReleaseRules, options ...OptionFunc) *Parser {
+	parser := &Parser{
+		rules:  rules,
+		logger: logger,
+	}
+
+	for _, option := range options {
+		option(parser)
+	}
+
+	return parser
 }
 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
-func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, error) {
-	latestSemverTag, err := p.fetchLatestSemverTag(r)
+func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, bool, error) {
+	latestSemverTag, err := p.fetchLatestSemverTag(repository)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to fetch latest semver: %w", err)
 	}
 
-	semverFromTag, err := semver.FromGitTag(latestSemverTag)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
+	var (
+		latestSemver *semver.Semver
+		logOptions   git.LogOptions
+		history      []*object.Commit
+	)
+
+	if latestSemverTag == nil {
+		p.logger.Debug().Msg("no previous tag, creating one")
+
+		head, err := repository.Head()
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to fetch head: %w", err)
+		}
+
+		latestSemver = &semver.Semver{Major: 0, Minor: 0, Patch: 0}
+		latestSemverTag = tag.NewFromSemver(latestSemver, head.Hash())
+	} else {
+		latestSemver, err = semver.FromGitTag(latestSemverTag)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
+		}
 	}
 
-	logOptions := &git.LogOptions{}
-
-	if !semverFromTag.IsZero() {
+	if !latestSemver.IsZero() {
 		logOptions.Since = &latestSemverTag.Tagger.When
 	}
 
-	commitHistory, err := r.Log(logOptions)
+	repositoryLogs, err := repository.Log(&logOptions)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to fetch commit history: %w", err)
 	}
 
-	var history []*object.Commit
-
-	err = commitHistory.ForEach(func(c *object.Commit) error {
+	err = repositoryLogs.ForEach(func(c *object.Commit) error {
 		history = append(history, c)
 		return nil
 	})
@@ -66,27 +109,35 @@ func (p *Parser) ComputeNewSemver(r *git.Repository) (*semver.Semver, bool, erro
 		return nil, false, fmt.Errorf("failed to loop over commit history: %w", err)
 	}
 
-	// Reverse commit history to go from oldest to most recent
+	// Reverse commit history to go from oldest to newest
 	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
 		history[i], history[j] = history[j], history[i]
 	}
 
-	newRelease, err := p.ParseHistory(history, semverFromTag)
+	newRelease, err := p.ParseHistory(history, latestSemver)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
 	}
 
-	return semverFromTag, newRelease, nil
+	// Only add prerelease and build metadata if new release to avoid changing pre-existing semver
+	if newRelease {
+		if p.PrereleaseMode {
+			latestSemver.Prerelease = p.PrereleaseSuffix
+		}
+
+		latestSemver.BuildMetadata = p.BuildMetadata
+	}
+
+	return latestSemver, newRelease, nil
 }
 
 // ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rule
 // provided.
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
-	rulesMap := p.releaseRules.Map()
+	rulesMap := p.rules.Map()
 
 	for _, commit := range commits {
-
 		if !conventionalCommitRegex.MatchString(commit.Message) {
 			continue
 		}
@@ -104,9 +155,9 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			continue
 		}
 
-		releaseType, ruleMatch := rulesMap[commitType]
+		releaseType, ok := rulesMap[commitType]
 
-		if !ruleMatch {
+		if !ok {
 			continue
 		}
 
@@ -129,18 +180,18 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 // fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
-	semverRegex := regexp.MustCompile(semver.Regex)
-
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, err
 	}
 
-	var latestSemver *semver.Semver
-	var latestTag *object.Tag
+	var (
+		latestSemver *semver.Semver
+		latestTag    *object.Tag
+	)
 
 	err = tags.ForEach(func(tag *object.Tag) error {
-		if !semverRegex.MatchString(tag.Name) {
+		if !semver.Regex.MatchString(tag.Name) {
 			return nil
 		}
 
@@ -159,18 +210,9 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 		return nil, fmt.Errorf("failed to loop over tags: %w", err)
 	}
 
-	if latestSemver == nil {
-		p.logger.Debug().Msg("no previous tag, creating one")
-
-		head, err := repository.Head()
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch head: %w", err)
-		}
-
-		return tag.NewFromSemver(semver.Semver{}, head.Hash()), nil
+	if latestTag != nil {
+		p.logger.Debug().Str("tag", latestTag.Name).Msg("latest semver tag found")
 	}
-
-	p.logger.Debug().Str("tag", latestTag.Name).Msg("latest semver tag found")
 
 	return latestTag, nil
 }

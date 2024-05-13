@@ -3,18 +3,21 @@ package semver
 
 import (
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"regexp"
 	"strconv"
-
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-var Regex = `(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+var (
+	Regex = regexp.MustCompile(`(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+)
 
 type Semver struct {
-	Major int
-	Minor int
-	Patch int
+	Major         int
+	Minor         int
+	Patch         int
+	Prerelease    string
+	BuildMetadata string
 }
 
 func (s *Semver) BumpPatch() {
@@ -39,13 +42,22 @@ func (s *Semver) IsZero() bool {
 }
 
 func (s *Semver) String() string {
-	return fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
+	str := fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
+
+	if s.Prerelease != "" {
+		str += "-" + s.Prerelease
+	}
+
+	if s.BuildMetadata != "" {
+		str += "+" + s.BuildMetadata
+	}
+
+	return str
 }
 
 // FromGitTag returns a semver struct corresponding to the Git annotated tag used as an input.
 func FromGitTag(tag *object.Tag) (*Semver, error) {
-	regex := regexp.MustCompile(Regex)
-	submatch := regex.FindStringSubmatch(tag.Name)
+	submatch := Regex.FindStringSubmatch(tag.Name)
 
 	if len(submatch) < 4 {
 		return nil, fmt.Errorf("tag cannot be converted to a valid semver")
@@ -64,13 +76,17 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 		return nil, fmt.Errorf("failed to convert patch component: %w", err)
 	}
 
-	semver := &Semver{major, minor, patch}
+	prerelease := submatch[4]
+	buildMetadata := submatch[5]
+
+	semver := &Semver{Major: major, Minor: minor, Patch: patch, Prerelease: prerelease, BuildMetadata: buildMetadata}
 
 	return semver, nil
 }
 
 // Precedence returns an integer representing which of the two versions s or s2 is the most recent. 1 meaning s1 is the
 // most recent, -1 that it is s2 and 0 that they are equal.
+// TODO: take in account prerelease component
 func (s *Semver) Precedence(s2 *Semver) int {
 	switch {
 	case s.Major > s2.Major:
@@ -84,6 +100,10 @@ func (s *Semver) Precedence(s2 *Semver) int {
 	case s.Patch > s2.Patch:
 		return 1
 	case s.Patch < s2.Patch:
+		return -1
+	case s.Prerelease == "" && s2.Prerelease != "":
+		return 1
+	case s.Prerelease != "" && s2.Prerelease == "":
 		return -1
 	default:
 		return 0

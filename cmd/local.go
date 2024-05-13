@@ -18,11 +18,14 @@ import (
 )
 
 var (
-	rulesPath      string
-	tagPrefix      string
-	releaseBranch  string
-	armoredKeyPath string
-	dryRun         bool
+	rulesPath        string
+	tagPrefix        string
+	releaseBranch    string
+	armoredKeyPath   string
+	buildMetadata    string
+	prereleaseSuffix string
+	dryRun           bool
+	prerelease       bool
 )
 
 func init() {
@@ -30,7 +33,10 @@ func init() {
 	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "", "Prefix added to the version tag name")
 	localCmd.Flags().StringVarP(&releaseBranch, "release-branch", "b", "main", "Branch to fetch commits from")
 	localCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
+	localCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the semantic version")
+	localCmd.Flags().StringVar(&prereleaseSuffix, "prerelease-suffix", "rc", "Suffix appended to the tag if in prerelease mode")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
+	localCmd.Flags().BoolVar(&prerelease, "prerelease", false, "Whether or not the semantic version is a prerelease")
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -87,7 +93,8 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		semver, release, err := parser.New(logger, rules).ComputeNewSemver(repository)
+		parser := parser.New(logger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithPrereleaseMode(prerelease), parser.WithPrereleaseSuffix(prereleaseSuffix))
+		semver, release, err := parser.ComputeNewSemver(repository)
 		if err != nil {
 			return err
 		}
