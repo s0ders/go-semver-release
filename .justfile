@@ -38,7 +38,7 @@ clean:
     rm -rf ./bin/*
 
 lint:
-	@staticcheck ./...
+	@golangci-lint run
 
 vuln:
 	@govulncheck ./...
