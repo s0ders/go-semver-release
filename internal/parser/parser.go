@@ -180,8 +180,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 // fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
-	semverRegex := regexp.MustCompile(semver.Regex)
-
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, err
