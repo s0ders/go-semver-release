@@ -29,6 +29,7 @@ func TestSemver_Precedence(t *testing.T) {
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 1, Patch: 0, BuildMetadata: "foo"}, want: 1},
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0}, want: -1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 1},
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "foo"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "bar"}, want: 0},
 	}
 
