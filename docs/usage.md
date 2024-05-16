@@ -81,9 +81,9 @@ The following `type` are supported for release rules: `build`, `chore`, `ci`, `d
 
 ### Prerelease
 
-A Semantic Version number can include prerelease informations such as `X.Y.Z-alpha.1` or `X.Y.Z-rc`.
+A Semantic Version number can include pre-release information such as `X.Y.Z-alpha.1` or `X.Y.Z-rc`.
 
-The `--prerelease` flag allows to specify that the generated semver tag, if any, is a prerelease tag and will be marked
+The `--prerelease` flag allows specifying that the generated SemVer tag, if any, is a prerelease tag and will be marked
 as such by append a `rc` to the semantic version.
 
 Example:
@@ -94,16 +94,16 @@ $ go-semver-release local . --prerelease
 
 ### Build Metadata
 
-The Semantic Version convention states that your semver number can include build metadata in form 
+The Semantic Version convention states that your SemVer number can include build metadata in form
 `1.2.3+<build_metadata>`. Usually, these metadata are a unique build number so that a specific version can be linked to
-the build that created it. 
+the build that created it.
 
 The `--build-metadata` allows to pass a string containing build metadata that will be appended to the semantic version
 number in the form stated above.
 
 Example:
 ```bash
-# Will produce a semver like "X.Y.Z+<some_job_id>"
+# Will produce a SemVer like "X.Y.Z+<some_job_id>"
 $ go-semver-release local . --build-metadata $CI_JOB_ID
 ```
 
