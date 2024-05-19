@@ -97,6 +97,129 @@ func TestLocalCmd_Release(t *testing.T) {
 	assert.Equal(true, exists, "tag should exist")
 }
 
+func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
+	assert := assert.New(t)
+
+	repository, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	commitTypes := []string{
+		"fix",   // 0.0.1
+		"feat!", // 1.0.0 (breaking change)
+		"feat",  // 1.1.0
+		"fix",   // 1.1.1
+	}
+
+	for _, commitType := range commitTypes {
+		err = sampleCommit(repository, repositoryPath, commitType)
+		assert.NoError(err, "failed to create sample commit")
+	}
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	metadata := "foobarbaz"
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("build-metadata", metadata)
+	assert.NoError(err, "failed to set --build-metadata")
+
+	err = rootCmd.Execute()
+	assert.NoError(err, "local command executed with error")
+
+	expectedVersion := "1.1.1" + "+" + metadata
+	expectedOut := cmdOutput{
+		Message:    "new release found",
+		NewVersion: expectedVersion,
+		NewRelease: true,
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(actual.Bytes(), &actualOut)
+	assert.NoError(err, "failed to unmarshal json")
+
+	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+
+	exists, err := tag.Exists(repository, expectedVersion)
+	assert.NoError(err, "failed to check if tag exists")
+
+	assert.Equal(true, exists, "tag should exist")
+}
+
+func TestLocalCmd_Prerelease(t *testing.T) {
+	assert := assert.New(t)
+
+	repository, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	commitTypes := []string{
+		"fix",   // 0.0.1
+		"feat!", // 1.0.0 (breaking change)
+		"feat",  // 1.1.0
+		"fix",   // 1.1.1
+	}
+
+	for _, commitType := range commitTypes {
+		err = sampleCommit(repository, repositoryPath, commitType)
+		assert.NoError(err, "failed to create sample commit")
+	}
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("release-branch", "main")
+	assert.NoError(err, "failed to set --release-branch")
+
+	err = localCmd.Flags().Set("prerelease", "true")
+	assert.NoError(err, "failed to set --prerelease")
+
+	err = localCmd.Flags().Set("prerelease-suffix", "alpha")
+	assert.NoError(err, "failed to set --prerelease-suffix")
+
+	err = rootCmd.Execute()
+	assert.NoError(err, "local command executed with error")
+
+	expectedVersion := "1.1.1" + "-alpha"
+	expectedOut := cmdOutput{
+		Message:    "new release found",
+		NewVersion: expectedVersion,
+		NewRelease: true,
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(actual.Bytes(), &actualOut)
+	assert.NoError(err, "failed to unmarshal json")
+
+	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+
+	exists, err := tag.Exists(repository, expectedVersion)
+	assert.NoError(err, "failed to check if tag exists")
+
+	assert.Equal(true, exists, "tag should exist")
+}
+
 func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	assert := assert.New(t)
 

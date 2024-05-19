@@ -1,0 +1,13 @@
+{
+  "git-name": "My Robot",
+  "git-email": "ci-robot@git.sh",
+  "tag-prefix": "v",
+  "branches": [
+    {"pattern": "main"},
+    {"pattern": "dev/*", "prerelease": true, "prerelease-suffix": "alpha", "prerelease-incremental": true}
+  ],
+  "rules": {
+    "minor": ["feat"],
+    "patch": ["fix", "perf", "revert"]
+  }
+}

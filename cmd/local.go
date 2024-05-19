@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 
@@ -37,6 +38,9 @@ func init() {
 	localCmd.Flags().StringVar(&prereleaseSuffix, "prerelease-suffix", "rc", "Suffix appended to the tag if in prerelease mode")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next semver, do not push any tag")
 	localCmd.Flags().BoolVar(&prerelease, "prerelease", false, "Whether or not the semantic version is a prerelease")
+
+	viper.BindPFlag("tag-prefix", localCmd.Flags().Lookup("tag-prefix"))
+	viper.BindPFlag("prerelease-suffix", localCmd.Flags().Lookup("prerelease-suffix"))
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -93,7 +97,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		parser := parser.New(logger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithPrereleaseMode(prerelease), parser.WithPrereleaseSuffix(prereleaseSuffix))
+		parser := parser.New(logger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithPrereleaseMode(prerelease))
 		semver, release, err := parser.ComputeNewSemver(repository)
 		if err != nil {
 			return err
@@ -114,7 +118,7 @@ var localCmd = &cobra.Command{
 		default:
 			logger.Info().Str("new-version", semver.String()).Bool("new-release", true).Msg("new release found")
 
-			err = tag.AddToRepository(repository, semver, tag.WithPrefix(tagPrefix), tag.WithSignKey(entity))
+			err = tag.AddToRepository(repository, semver, tag.WithSignKey(entity))
 			if err != nil {
 				return err
 			}

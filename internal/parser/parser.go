@@ -12,6 +12,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 
 	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
@@ -39,12 +40,6 @@ func WithBuildMetadata(metadata string) OptionFunc {
 func WithPrereleaseMode(b bool) OptionFunc {
 	return func(p *Parser) {
 		p.PrereleaseMode = b
-	}
-}
-
-func WithPrereleaseSuffix(s string) OptionFunc {
-	return func(p *Parser) {
-		p.PrereleaseSuffix = s
 	}
 }
 
@@ -119,16 +114,22 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
 	}
 
-	// Only add prerelease and build metadata if new release to avoid changing pre-existing semver
-	if newRelease {
-		if p.PrereleaseMode {
-			latestSemver.Prerelease = p.PrereleaseSuffix
-		}
-
-		latestSemver.BuildMetadata = p.BuildMetadata
+	if !newRelease {
+		return latestSemver, false, nil
 	}
 
-	return latestSemver, newRelease, nil
+	if p.PrereleaseMode {
+		prereleaseSuffix := viper.GetString("prerelease-suffix")
+		if prereleaseSuffix == "" {
+			return nil, false, fmt.Errorf("prerelease mode used with no prerelease suffix")
+		}
+
+		latestSemver.Prerelease = prereleaseSuffix
+	}
+
+	latestSemver.BuildMetadata = p.BuildMetadata
+
+	return latestSemver, true, nil
 }
 
 // ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rule

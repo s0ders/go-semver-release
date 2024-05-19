@@ -76,3 +76,6 @@ tokens on user-end.
 As stated above, `go-semver-release` is agnostic of which CI tool you use or which branch you use it on. You define the
 configuration using flags, environment variables or configurations file however you please on your CI for maximized
 modularity.
+
+## WIP
+- [ ] Make Git tag author name and email configurable 

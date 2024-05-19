@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/spf13/viper"
 
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
@@ -17,18 +18,12 @@ import (
 var ErrTagAlreadyExists = errors.New("tag already exists")
 
 var GitSignature = object.Signature{
-	Name:  "Go Semver Release",
-	Email: "go-semver@release.ci",
+	Name:  viper.GetString("git-name"),
+	Email: viper.GetString("git-email"),
 	When:  time.Now(),
 }
 
 type OptionFunc func(options *git.CreateTagOptions)
-
-func WithPrefix(prefix string) OptionFunc {
-	return func(c *git.CreateTagOptions) {
-		c.Message = prefix + c.Message
-	}
-}
 
 func WithSignKey(key *openpgp.Entity) OptionFunc {
 	return func(c *git.CreateTagOptions) {
@@ -71,7 +66,7 @@ func AddToRepository(repository *git.Repository, semver *semver.Semver, options 
 	}
 
 	tagOpts := &git.CreateTagOptions{
-		Message: semver.String(),
+		Message: viper.GetString("tag-prefix") + semver.String(),
 		Tagger:  &GitSignature,
 	}
 
