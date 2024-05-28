@@ -19,7 +19,7 @@ func GenerateGitHubOutput(prefix string, semver *semver.Semver, release bool) (e
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("error opening ci file: %w", err)
+		return fmt.Errorf("opening ci file: %w", err)
 	}
 
 	defer func(f *os.File) {
@@ -31,7 +31,7 @@ func GenerateGitHubOutput(prefix string, semver *semver.Semver, release bool) (e
 
 	_, err = f.WriteString(output)
 	if err != nil {
-		return fmt.Errorf("error writing to ci file: %w", err)
+		return fmt.Errorf("writing to ci file: %w", err)
 	}
 
 	return nil

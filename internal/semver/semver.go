@@ -65,15 +65,15 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 
 	major, err := strconv.Atoi(submatch[1])
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert major component: %w", err)
+		return nil, fmt.Errorf("converting major component: %w", err)
 	}
 	minor, err := strconv.Atoi(submatch[2])
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert minor component: %w", err)
+		return nil, fmt.Errorf("converting minor component: %w", err)
 	}
 	patch, err := strconv.Atoi(submatch[3])
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert patch component: %w", err)
+		return nil, fmt.Errorf("converting patch component: %w", err)
 	}
 
 	prerelease := submatch[4]

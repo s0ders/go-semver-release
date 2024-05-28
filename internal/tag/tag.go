@@ -62,7 +62,7 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 func AddToRepository(repository *git.Repository, semver *semver.Semver, options ...OptionFunc) error {
 	head, err := repository.Head()
 	if err != nil {
-		return fmt.Errorf("failed to fetch head: %w", err)
+		return fmt.Errorf("fetching head: %w", err)
 	}
 
 	tagOpts := &git.CreateTagOptions{
@@ -75,13 +75,13 @@ func AddToRepository(repository *git.Repository, semver *semver.Semver, options 
 	}
 
 	if exists, err := Exists(repository, tagOpts.Message); err != nil {
-		return fmt.Errorf("failed to check if tag exists: %w", err)
+		return fmt.Errorf("checking if tag exists: %w", err)
 	} else if exists {
 		return ErrTagAlreadyExists
 	}
 
 	if _, err = repository.CreateTag(tagOpts.Message, head.Hash(), tagOpts); err != nil {
-		return fmt.Errorf("failed to create tag on repository: %w", err)
+		return fmt.Errorf("creating tag on repository: %w", err)
 	}
 
 	return nil

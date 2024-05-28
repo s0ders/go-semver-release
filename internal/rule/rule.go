@@ -95,7 +95,7 @@ func Parse(reader io.Reader) (ReleaseRules, error) {
 
 	buf, err := io.ReadAll(reader)
 	if err != nil {
-		return ReleaseRules{}, fmt.Errorf("failed to read rule file: %w", err)
+		return ReleaseRules{}, fmt.Errorf("reading rule file: %w", err)
 	}
 
 	bufReader := bytes.NewReader(buf)
@@ -103,7 +103,7 @@ func Parse(reader io.Reader) (ReleaseRules, error) {
 	decoder := json.NewDecoder(bufReader)
 	err = decoder.Decode(&rules)
 	if err != nil {
-		return ReleaseRules{}, fmt.Errorf("failed to decode JSON into rule: %w", err)
+		return ReleaseRules{}, fmt.Errorf("decoding JSON into rule: %w", err)
 	}
 
 	for _, rule := range rules.Rules {
