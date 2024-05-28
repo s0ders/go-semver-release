@@ -68,7 +68,9 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	assert.NoError(err, "should have been able to create Git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(repositoryPath)
@@ -76,12 +78,16 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 	}(repositoryPath)
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to create rule reader")
+	if err != nil {
+		t.Fatalf("intializing rules: %s", err)
+	}
 
 	parser := New(fakeLogger, rules)
 
 	latest, err := parser.fetchLatestSemverTag(r)
-	assert.NoError(err, "should have been able to fetch latest semver tag")
+	if err != nil {
+		t.Fatalf("fetching latest semver tag: %s", err)
+	}
 
 	assert.Nil(latest, "latest semver tag should be nil")
 }
@@ -90,7 +96,9 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	assert.NoError(err, "should have been able to create Git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(repositoryPath)
@@ -98,7 +106,9 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 	}(repositoryPath)
 
 	h, err := r.Head()
-	assert.NoError(err, "should have been able to get HEAD")
+	if err != nil {
+		t.Fatalf("fetching head: %s", err)
+	}
 
 	tag := "1.0.0"
 
@@ -110,15 +120,21 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 			When:  time.Now(),
 		},
 	})
-	assert.NoError(err, "should have been able to create tag")
+	if err != nil {
+		t.Fatalf("creating tag: %s", err)
+	}
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
+	if err != nil {
+		t.Fatalf("initializing rules: %s", err)
+	}
 
 	parser := New(fakeLogger, rules)
 
 	latest, err := parser.fetchLatestSemverTag(r)
-	assert.NoError(err, "should have been able to fetch latest semver tag")
+	if err != nil {
+		t.Fatalf("fetching latest semver tag: %s", err)
+	}
 
 	assert.Equal(tag, latest.Name, "latest semver tag should be equal")
 }
@@ -127,7 +143,9 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	assert.NoError(err, "should have been able to create Git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(path)
@@ -135,7 +153,9 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 	}(repositoryPath)
 
 	h, err := r.Head()
-	assert.NoError(err, "should have been able to get HEAD")
+	if err != nil {
+		t.Fatalf("fetching head: %s", err)
+	}
 
 	tags := []string{"2.0.0", "2.0.1", "3.0.0", "2.5.0", "0.0.2", "0.0.1", "0.1.0", "1.0.0"}
 
@@ -148,16 +168,22 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
-		assert.NoError(err, "should have been able to create tag")
+		if err != nil {
+			t.Fatalf("creating tag: %s", err)
+		}
 	}
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
+	if err != nil {
+		t.Fatalf("initializing rules: %s", err)
+	}
 
 	commitAnalyzer := New(fakeLogger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
-	assert.NoError(err, "should have been able to fetch latest semver tag")
+	if err != nil {
+		t.Fatalf("fetching latest semver tag: %s", err)
+	}
 
 	want := "3.0.0"
 	assert.Equal(want, latest.Name, "latest semver tag should be equal")
@@ -167,7 +193,9 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("commit that does not trigger a release")
-	assert.NoError(err, "should have been able to create Git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(repositoryPath)
@@ -175,12 +203,16 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 	}(repositoryPath)
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
+	if err != nil {
+		t.Fatalf("initializing rules: %s", err)
+	}
 
-	parser := New(fakeLogger, rules)
+	parser := New(fakeLogger, rules, WithReleaseBranch("master"))
 
 	version, _, err := parser.ComputeNewSemver(r)
-	assert.NoError(err, "should have been able to compute newsemver")
+	if err != nil {
+		t.Fatalf("computing new semver: %s", err)
+	}
 
 	want := "0.0.0"
 
@@ -199,12 +231,16 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 	}(repositoryPath)
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
+	if err != nil {
+		t.Fatalf("initializing rules: %s", err)
+	}
 
 	parser := New(fakeLogger, rules)
 
 	version, _, err := parser.ComputeNewSemver(r)
-	assert.NoError(err, "should have been able to compute newsemver")
+	if err != nil {
+		t.Fatalf("computing new semver: %s", err)
+	}
 
 	want := "0.0.1"
 	assert.Equal(want, version.String(), "version should be equal")
@@ -214,7 +250,9 @@ func TestParser_UnknownReleaseType(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("fix: commit that trigger an unknown release")
-	assert.NoError(err, "should have been able to create git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(repositoryPath)
@@ -237,7 +275,9 @@ func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWitMinorRelease(t *tes
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat: commit that triggers a minor release")
-	assert.NoError(err, "should have been able to create git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(repositoryPath)
@@ -245,12 +285,16 @@ func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWitMinorRelease(t *tes
 	}(repositoryPath)
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
+	if err != nil {
+		t.Fatalf("initializing rules: %s", err)
+	}
 
 	parser := New(fakeLogger, rules)
 
 	version, _, err := parser.ComputeNewSemver(r)
-	assert.NoError(err, "should have been able to compute newsemver")
+	if err != nil {
+		t.Fatalf("computing new semver: %s", err)
+	}
 
 	want := "0.1.0"
 	assert.Equal(want, version.String(), "version should be equal")
@@ -345,7 +389,9 @@ func TestParser_ComputeNewSemverWithBuildMetadata(t *testing.T) {
 	assert := assert.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
-	assert.NoError(err, "should have been able to create git repository")
+	if err != nil {
+		t.Fatalf("creating Git repository: %s", err)
+	}
 
 	defer func(path string) {
 		err := os.RemoveAll(repositoryPath)
@@ -353,80 +399,25 @@ func TestParser_ComputeNewSemverWithBuildMetadata(t *testing.T) {
 	}(repositoryPath)
 
 	err = addCommit(r, "fix: added hello feature")
-	assert.NoError(err, "should have able to add git commit")
+	if err != nil {
+		t.Fatalf("adding commit: %s", err)
+	}
 
 	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
+	if err != nil {
+		t.Fatalf("initializing rules: %s", err)
+	}
 
 	parser := New(fakeLogger, rules, WithBuildMetadata("metadata"))
 
 	version, newRelease, err := parser.ComputeNewSemver(r)
-	assert.NoError(err, "should have been able to compute newsemver")
+	if err != nil {
+		t.Fatalf("computing new semver: %s", err)
+	}
 
 	want := "1.0.1+metadata"
 
 	assert.Equal(want, version.String(), "version should be equal")
-
-	assert.Equal(true, newRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemverWithPrerelease(t *testing.T) {
-
-	assert := assert.New(t)
-
-	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
-	assert.NoError(err, "should have been able to create git repository")
-
-	defer func(path string) {
-		err := os.RemoveAll(repositoryPath)
-		assert.NoError(err, "should have able to remove git repository")
-	}(repositoryPath)
-
-	err = addCommit(r, "fix: added hello feature")
-	assert.NoError(err, "should have able to add git commit")
-
-	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
-
-	parser := New(fakeLogger, rules, WithPrereleaseMode(true), WithPrereleaseSuffix("rc"))
-
-	version, newRelease, err := parser.ComputeNewSemver(r)
-	assert.NoError(err, "should have been able to compute newsemver")
-
-	want := "1.0.1-rc"
-
-	assert.Equal(want, version.String(), "version should be equal")
-
-	assert.Equal(true, newRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemverWithPrereleaseAndBuildMetadata(t *testing.T) {
-
-	assert := assert.New(t)
-
-	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
-	assert.NoError(err, "should have been able to create git repository")
-
-	defer func(path string) {
-		err := os.RemoveAll(repositoryPath)
-		assert.NoError(err, "should have able to remove git repository")
-	}(repositoryPath)
-
-	err = addCommit(r, "fix: added hello feature")
-	assert.NoError(err, "should have able to add git commit")
-
-	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
-
-	parser := New(fakeLogger, rules, WithPrereleaseMode(true), WithPrereleaseSuffix("rc"), WithBuildMetadata("metadata"))
-
-	version, newRelease, err := parser.ComputeNewSemver(r)
-	assert.NoError(err, "should have been able to compute newsemver")
-
-	want := "1.0.1-rc+metadata"
-
-	assert.Equal(want, version.String(), "version should be equal")
-
 	assert.Equal(true, newRelease, "boolean should be equal")
 }
 

@@ -97,7 +97,7 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		parser := parser.New(logger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithPrereleaseMode(prerelease))
+		parser := parser.New(logger, rules, parser.WithReleaseBranch(releaseBranch), parser.WithBuildMetadata(buildMetadata), parser.WithPrereleaseMode(prerelease))
 		semver, release, err := parser.ComputeNewSemver(repository)
 		if err != nil {
 			return err

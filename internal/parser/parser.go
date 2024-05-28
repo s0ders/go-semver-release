@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
@@ -24,12 +25,19 @@ var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix
 type Parser struct {
 	rules            rule.ReleaseRules
 	logger           zerolog.Logger
+	ReleaseBranch    string
 	BuildMetadata    string
 	PrereleaseSuffix string
 	PrereleaseMode   bool
 }
 
 type OptionFunc func(*Parser)
+
+func WithReleaseBranch(branch string) OptionFunc {
+	return func(p *Parser) {
+		p.ReleaseBranch = branch
+	}
+}
 
 func WithBuildMetadata(metadata string) OptionFunc {
 	return func(p *Parser) {
@@ -59,9 +67,10 @@ func New(logger zerolog.Logger, rules rule.ReleaseRules, options ...OptionFunc) 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
 func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, bool, error) {
+
 	latestSemverTag, err := p.fetchLatestSemverTag(repository)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to fetch latest semver: %w", err)
+		return nil, false, fmt.Errorf("fetching latest semver tag: %w", err)
 	}
 
 	var (
@@ -75,7 +84,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 
 		head, err := repository.Head()
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to fetch head: %w", err)
+			return nil, false, fmt.Errorf("fetching head: %w", err)
 		}
 
 		latestSemver = &semver.Semver{Major: 0, Minor: 0, Patch: 0}
@@ -83,8 +92,21 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 	} else {
 		latestSemver, err = semver.FromGitTag(latestSemverTag)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to build semver from git tag: %w", err)
+			return nil, false, fmt.Errorf("building semver from git tag: %w", err)
 		}
+	}
+
+	worktree, err := repository.Worktree()
+	releaseBranchRef := plumbing.NewBranchReferenceName(p.ReleaseBranch)
+	branchCheckOutOpts := git.CheckoutOptions{
+		Branch: releaseBranchRef,
+		Force:  true,
+	}
+
+	// TODO: try fetching remote branch of the same name in case of error
+	err = worktree.Checkout(&branchCheckOutOpts)
+	if err != nil {
+		return nil, false, fmt.Errorf("checking out to release branch: %w", err)
 	}
 
 	if !latestSemver.IsZero() {
@@ -93,7 +115,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 
 	repositoryLogs, err := repository.Log(&logOptions)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to fetch commit history: %w", err)
+		return nil, false, fmt.Errorf("fetching commit history: %w", err)
 	}
 
 	err = repositoryLogs.ForEach(func(c *object.Commit) error {
@@ -101,7 +123,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		return nil
 	})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to loop over commit history: %w", err)
+		return nil, false, fmt.Errorf("looping over commit history: %w", err)
 	}
 
 	// Reverse commit history to go from oldest to newest
@@ -111,7 +133,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 
 	newRelease, err := p.ParseHistory(history, latestSemver)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to parse commit history: %w", err)
+		return nil, false, fmt.Errorf("parsing commit history: %w", err)
 	}
 
 	if !newRelease {
@@ -208,7 +230,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to loop over tags: %w", err)
+		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
 	if latestTag != nil {

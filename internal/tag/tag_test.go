@@ -88,10 +88,10 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	err = AddToRepository(repository, version, WithPrefix("v"))
+	err = AddToRepository(repository, version)
 	assert.NoError(err, "should not have been able to add tag to repository")
 
-	err = AddToRepository(repository, version, WithPrefix("v"))
+	err = AddToRepository(repository, version)
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
