@@ -11,7 +11,7 @@ commitHash := "local"
 importPath := "github.com/s0ders/go-semver-release/v2/"
 ldFlags := "-X " + importPath + "cmd.version=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.commitHash=" + commitHash + " -w -s"
 
-test-all:
+tests:
 	go test -failfast -race -v -covermode=atomic ./...
 
 test-coverage: clean-coverage
