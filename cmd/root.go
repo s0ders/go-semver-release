@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.semver)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.semver.json)")
 	rootCmd.PersistentFlags().StringVar(&gitName, "git-name", "Go Semver Release", "Name used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&gitEmail, "git-email", "go-semver@release.ci", "Email used in semantic version tags")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
@@ -43,7 +43,7 @@ func initConfig() {
 
 		viper.AddConfigPath(home)
 		viper.SetConfigType("json")
-		viper.SetConfigName(".semrel")
+		viper.SetConfigName(".semver")
 	}
 
 	viper.AutomaticEnv()
