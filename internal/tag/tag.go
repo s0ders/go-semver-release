@@ -10,33 +10,53 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/spf13/viper"
-
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
 var ErrTagAlreadyExists = errors.New("tag already exists")
 
-var GitSignature = object.Signature{
-	Name:  viper.GetString("git-name"),
-	Email: viper.GetString("git-email"),
-	When:  time.Now(),
-}
+type OptionFunc func(t *Tagger)
 
-type OptionFunc func(options *git.CreateTagOptions)
-
-func WithSignKey(key *openpgp.Entity) OptionFunc {
-	return func(c *git.CreateTagOptions) {
-		c.SignKey = key
+func WithTagPrefix(prefix string) OptionFunc {
+	return func(t *Tagger) {
+		t.TagPrefix = prefix
 	}
 }
 
-// NewFromSemver creates a new Git annotated tag from a semantic version number.
-func NewFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
+func WithSignKey(key *openpgp.Entity) OptionFunc {
+	return func(t *Tagger) {
+		t.SignKey = key
+	}
+}
+
+type Tagger struct {
+	TagPrefix    string
+	GitSignature object.Signature
+	SignKey      *openpgp.Entity
+}
+
+func NewTagger(name, email string, options ...OptionFunc) *Tagger {
+	tagger := &Tagger{
+		GitSignature: object.Signature{
+			Name:  name,
+			Email: email,
+			When:  time.Now(),
+		},
+	}
+
+	for _, option := range options {
+		option(tagger)
+	}
+
+	return tagger
+}
+
+// TagFromSemver creates a new Git annotated tag from a semantic version number.
+func (t *Tagger) TagFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
-		Tagger: GitSignature,
+		Tagger: t.GitSignature,
 	}
 
 	return tag
@@ -57,21 +77,18 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 	return exists, nil
 }
 
-// AddToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
+// AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
-func AddToRepository(repository *git.Repository, semver *semver.Semver, options ...OptionFunc) error {
+func (t *Tagger) AddTagToRepository(repository *git.Repository, semver *semver.Semver) error {
 	head, err := repository.Head()
 	if err != nil {
 		return fmt.Errorf("fetching head: %w", err)
 	}
 
 	tagOpts := &git.CreateTagOptions{
-		Message: viper.GetString("tag-prefix") + semver.String(),
-		Tagger:  &GitSignature,
-	}
-
-	for _, option := range options {
-		option(tagOpts)
+		Message: t.TagPrefix + semver.String(),
+		SignKey: t.SignKey,
+		Tagger:  &t.GitSignature,
 	}
 
 	if exists, err := Exists(repository, tagOpts.Message); err != nil {

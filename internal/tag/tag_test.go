@@ -17,6 +17,11 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
+var (
+	taggerName  = "Go SemVer Release"
+	taggerEmail = "go-semver@release.ci"
+)
+
 func TestTag_TagExists(t *testing.T) {
 	assert := assert.New(t)
 	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
@@ -66,7 +71,9 @@ func TestTag_AddTagToRepository(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	err = AddToRepository(repository, version)
+	tagger := NewTagger(taggerName, taggerEmail)
+
+	err = tagger.AddTagToRepository(repository, version)
 	assert.NoError(err, "should have been able to add tag to repository")
 
 	tagExists, err := Exists(repository, version.String())
@@ -88,10 +95,12 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	err = AddToRepository(repository, version)
+	tagger := NewTagger(taggerName, taggerEmail)
+
+	err = tagger.AddTagToRepository(repository, version)
 	assert.NoError(err, "should not have been able to add tag to repository")
 
-	err = AddToRepository(repository, version)
+	err = tagger.AddTagToRepository(repository, version)
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
@@ -107,12 +116,14 @@ func TestTag_NewTagFromServer(t *testing.T) {
 
 	version := &semver.Semver{Patch: 1}
 
-	gotTag := NewFromSemver(version, hash)
+	tagger := NewTagger(taggerName, taggerEmail)
+
+	gotTag := tagger.TagFromSemver(version, hash)
 
 	wantTag := &object.Tag{
 		Hash:   hash,
 		Name:   version.String(),
-		Tagger: GitSignature,
+		Tagger: tagger.GitSignature,
 	}
 
 	assert.Equal(*gotTag, *wantTag, "tag should match")
@@ -138,7 +149,9 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 		t.Fatalf("failed to init repository: %v", err)
 	}
 
-	err = AddToRepository(repository, nil)
+	tagger := NewTagger(taggerName, taggerEmail)
+
+	err = tagger.AddTagToRepository(repository, nil)
 	assert.Error(err, "should have failed trying to fetch uninitialized repo. HEAD")
 }
 
@@ -164,7 +177,9 @@ func TestTag_SignKey(t *testing.T) {
 
 	version := &semver.Semver{Major: 1}
 
-	err = AddToRepository(repository, version, WithSignKey(entity))
+	tagger := NewTagger(taggerName, taggerEmail, WithSignKey(entity))
+
+	err = tagger.AddTagToRepository(repository, version)
 	if err != nil {
 		t.Fatalf("failed to add tag to repository: %s", err)
 	}
