@@ -16,13 +16,15 @@ var (
 )
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.semver.json)")
+	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file path (default is ./.semver.json)")
 	rootCmd.PersistentFlags().StringVar(&gitName, "git-name", "Go Semver Release", "Name used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&gitEmail, "git-email", "go-semver@release.ci", "Email used in semantic version tags")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
 
-	viper.BindPFlag("git-name", rootCmd.PersistentFlags().Lookup("git-name"))
-	viper.BindPFlag("git-email", rootCmd.PersistentFlags().Lookup("git-email"))
+	cobra.CheckErr(viper.BindPFlag("git-name", rootCmd.PersistentFlags().Lookup("git-name")))
+	cobra.CheckErr(viper.BindPFlag("git-email", rootCmd.PersistentFlags().Lookup("git-email")))
 }
 
 var rootCmd = &cobra.Command{
