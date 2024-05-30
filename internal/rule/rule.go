@@ -4,6 +4,16 @@ import "errors"
 
 type Rules struct {
 	Unmarshalled map[string][]string
+	Mapped       map[string]string
+}
+
+var Default = Rules{
+	Mapped: map[string]string{
+		"feat":   "minor",
+		"fix":    "patch",
+		"perf":   "patch",
+		"revert": "patch",
+	},
 }
 
 var (
@@ -53,13 +63,17 @@ func (r Rules) Validate() error {
 }
 
 func (r Rules) Map() map[string]string {
-	m := make(map[string]string)
+	if r.Mapped != nil {
+		return r.Mapped
+	}
+
+	r.Mapped = make(map[string]string)
 
 	for releaseType, commitTypes := range r.Unmarshalled {
 		for _, commitType := range commitTypes {
-			m[commitType] = releaseType
+			r.Mapped[commitType] = releaseType
 		}
 	}
 
-	return m
+	return r.Mapped
 }
