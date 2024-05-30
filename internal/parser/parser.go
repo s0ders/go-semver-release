@@ -13,7 +13,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
-	"github.com/spf13/viper"
 
 	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
@@ -23,38 +22,53 @@ import (
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
-	rules            rule.ReleaseRules
-	logger           zerolog.Logger
-	ReleaseBranch    string
-	BuildMetadata    string
-	PrereleaseSuffix string
-	PrereleaseMode   bool
+	rules                 rule.Rules
+	tagger                *tag.Tagger
+	logger                zerolog.Logger
+	releaseBranch         string
+	buildMetadata         string
+	prereleasePrefix      string
+	prereleaseMode        bool
+	incrementalPrerelease bool
 }
 
 type OptionFunc func(*Parser)
 
 func WithReleaseBranch(branch string) OptionFunc {
 	return func(p *Parser) {
-		p.ReleaseBranch = branch
+		p.releaseBranch = branch
 	}
 }
 
 func WithBuildMetadata(metadata string) OptionFunc {
 	return func(p *Parser) {
-		p.BuildMetadata = metadata
+		p.buildMetadata = metadata
 	}
 }
 
 func WithPrereleaseMode(b bool) OptionFunc {
 	return func(p *Parser) {
-		p.PrereleaseMode = b
+		p.prereleaseMode = b
 	}
 }
 
-func New(logger zerolog.Logger, rules rule.ReleaseRules, options ...OptionFunc) *Parser {
+func WithIncrementalPrerelease(b bool) OptionFunc {
+	return func(p *Parser) {
+		p.incrementalPrerelease = b
+	}
+}
+
+func WithPrereleasePrefix(s string) OptionFunc {
+	return func(p *Parser) {
+		p.prereleasePrefix = s
+	}
+}
+
+func New(logger zerolog.Logger, tagger *tag.Tagger, rules rule.Rules, options ...OptionFunc) *Parser {
 	parser := &Parser{
-		rules:  rules,
 		logger: logger,
+		tagger: tagger,
+		rules:  rules,
 	}
 
 	for _, option := range options {
@@ -67,7 +81,6 @@ func New(logger zerolog.Logger, rules rule.ReleaseRules, options ...OptionFunc) 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
 func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, bool, error) {
-
 	latestSemverTag, err := p.fetchLatestSemverTag(repository)
 	if err != nil {
 		return nil, false, fmt.Errorf("fetching latest semver tag: %w", err)
@@ -75,8 +88,8 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 
 	var (
 		latestSemver *semver.Semver
-		logOptions   git.LogOptions
 		history      []*object.Commit
+		logOptions   git.LogOptions
 	)
 
 	if latestSemverTag == nil {
@@ -88,7 +101,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		}
 
 		latestSemver = &semver.Semver{Major: 0, Minor: 0, Patch: 0}
-		latestSemverTag = tag.NewFromSemver(latestSemver, head.Hash())
+		latestSemverTag = p.tagger.TagFromSemver(latestSemver, head.Hash())
 	} else {
 		latestSemver, err = semver.FromGitTag(latestSemverTag)
 		if err != nil {
@@ -97,13 +110,20 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 	}
 
 	worktree, err := repository.Worktree()
-	releaseBranchRef := plumbing.NewBranchReferenceName(p.ReleaseBranch)
+	if err != nil {
+		return nil, false, fmt.Errorf("fetching worktree: %w", err)
+	}
+
+	if worktree == nil {
+		return nil, false, fmt.Errorf("worktree is nil, check that repository is initiliazed")
+	}
+
+	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
 	branchCheckOutOpts := git.CheckoutOptions{
 		Branch: releaseBranchRef,
 		Force:  true,
 	}
 
-	// TODO: try fetching remote branch of the same name in case of error
 	err = worktree.Checkout(&branchCheckOutOpts)
 	if err != nil {
 		return nil, false, fmt.Errorf("checking out to release branch: %w", err)
@@ -140,16 +160,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		return latestSemver, false, nil
 	}
 
-	if p.PrereleaseMode {
-		prereleaseSuffix := viper.GetString("prerelease-suffix")
-		if prereleaseSuffix == "" {
-			return nil, false, fmt.Errorf("prerelease mode used with no prerelease suffix")
-		}
-
-		latestSemver.Prerelease = prereleaseSuffix
-	}
-
-	latestSemver.BuildMetadata = p.BuildMetadata
+	latestSemver.BuildMetadata = p.buildMetadata
 
 	return latestSemver, true, nil
 }
@@ -184,6 +195,21 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			continue
 		}
 
+		if p.prereleaseMode {
+			if latestSemver.Prerelease == "" {
+				latestSemver.Prerelease = p.prereleasePrefix
+			}
+
+			if p.incrementalPrerelease {
+				err := latestSemver.BumpPrerelease()
+				if err != nil {
+					return false, err
+				}
+			}
+
+			continue
+		}
+
 		switch releaseType {
 		case "patch":
 			latestSemver.BumpPatch()
@@ -200,6 +226,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 	return newRelease, nil
 }
 
+// TODO: add logic to check whether the latest SemVer tag points to a commit on the release branch
 // fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {

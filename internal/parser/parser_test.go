@@ -15,9 +15,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/s0ders/go-semver-release/v2/internal/rule"
+	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
-var fakeLogger = zerolog.New(io.Discard)
+var (
+	logger = zerolog.New(io.Discard)
+	tagger = tag.NewTagger("foo", "foo")
+	rules  = rule.Default
+)
 
 func TestParser_CommitTypeRegex(t *testing.T) {
 	assert := assert.New(t)
@@ -77,12 +82,7 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 		assert.NoError(err, "should have been able to remove Git repository")
 	}(repositoryPath)
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("intializing rules: %s", err)
-	}
-
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, rules)
 
 	latest, err := parser.fetchLatestSemverTag(r)
 	if err != nil {
@@ -124,12 +124,7 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 		t.Fatalf("creating tag: %s", err)
 	}
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("initializing rules: %s", err)
-	}
-
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, rules)
 
 	latest, err := parser.fetchLatestSemverTag(r)
 	if err != nil {
@@ -159,12 +154,12 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 
 	tags := []string{"2.0.0", "2.0.1", "3.0.0", "2.5.0", "0.0.2", "0.0.1", "0.1.0", "1.0.0"}
 
-	for i, tag := range tags {
-		_, err := r.CreateTag(tag, h.Hash(), &git.CreateTagOptions{
-			Message: tag,
+	for i, v := range tags {
+		_, err := r.CreateTag(v, h.Hash(), &git.CreateTagOptions{
+			Message: v,
 			Tagger: &object.Signature{
-				Name:  "Go Semver Release",
-				Email: "ci@ci.ci",
+				Name:  "Go SemVer Release",
+				Email: "go-semver@release.ci",
 				When:  time.Now().Add(time.Duration(i) * time.Hour),
 			},
 		})
@@ -173,12 +168,7 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		}
 	}
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("initializing rules: %s", err)
-	}
-
-	commitAnalyzer := New(fakeLogger, rules)
+	commitAnalyzer := New(logger, tagger, rules)
 
 	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
 	if err != nil {
@@ -202,12 +192,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 		assert.NoError(err, "should have able to remove Git repository")
 	}(repositoryPath)
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("initializing rules: %s", err)
-	}
-
-	parser := New(fakeLogger, rules, WithReleaseBranch("master"))
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
 	version, _, err := parser.ComputeNewSemver(r)
 	if err != nil {
@@ -230,12 +215,7 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("initializing rules: %s", err)
-	}
-
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
 	version, _, err := parser.ComputeNewSemver(r)
 	if err != nil {
@@ -259,13 +239,9 @@ func TestParser_UnknownReleaseType(t *testing.T) {
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	rules := rule.ReleaseRules{
-		Rules: []rule.ReleaseRule{
-			{CommitType: "fix", ReleaseType: "unknown"},
-		},
-	}
+	invalidRules := rule.Rules{Mapped: map[string]string{"fix": "unknown"}}
 
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, invalidRules)
 
 	_, _, err = parser.ComputeNewSemver(r)
 	assert.Error(err, "should have been failed trying to compute semver")
@@ -284,12 +260,7 @@ func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWitMinorRelease(t *tes
 		assert.NoError(err, "should have able to remove git repository")
 	}(repositoryPath)
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("initializing rules: %s", err)
-	}
-
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
 	version, _, err := parser.ComputeNewSemver(r)
 	if err != nil {
@@ -314,10 +285,7 @@ func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWithMajorRelease(t *te
 	err = addCommit(r, "fix: added hello feature")
 	assert.NoError(err, "should have able to add git commit")
 
-	rules, err := rule.Init()
-	assert.NoError(err, "should have been able to parse rule")
-
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
 	version, newRelease, err := parser.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
@@ -349,15 +317,10 @@ func TestParser_ComputeNewSemverOnUninitializedRepository(t *testing.T) {
 		return
 	}
 
-	rules, err := rule.Init()
-	if !assert.NoError(err, "failed to initialize rule") {
-		return
-	}
-
-	parser := New(fakeLogger, rules)
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
 	_, _, err = parser.ComputeNewSemver(repository)
-	assert.ErrorContains(err, "failed to fetch head", "should have been failed trying to fetch latest semver tag from uninitialized repository")
+	assert.ErrorContains(err, "reference not found", "should have been failed trying to fetch latest semver tag from uninitialized repository")
 }
 
 func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
@@ -373,12 +336,7 @@ func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
 		t.Fatalf("failed to init repository: %v", err)
 	}
 
-	defaultRules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("failed to initialize rule: %v", err)
-	}
-
-	parser := New(fakeLogger, defaultRules)
+	parser := New(logger, tagger, rules)
 
 	_, _, err = parser.ComputeNewSemver(repository)
 	assert.Error(err, "should have been failed trying to compute new semver from repository with no HEAD")
@@ -403,12 +361,7 @@ func TestParser_ComputeNewSemverWithBuildMetadata(t *testing.T) {
 		t.Fatalf("adding commit: %s", err)
 	}
 
-	rules, err := rule.Init()
-	if err != nil {
-		t.Fatalf("initializing rules: %s", err)
-	}
-
-	parser := New(fakeLogger, rules, WithBuildMetadata("metadata"))
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"), WithBuildMetadata("metadata"))
 
 	version, newRelease, err := parser.ComputeNewSemver(r)
 	if err != nil {
