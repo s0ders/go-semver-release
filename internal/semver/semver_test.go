@@ -176,3 +176,27 @@ func TestSemver_Bump(t *testing.T) {
 	s.BumpMajor()
 	assert.Equal(s.String(), "1.0.0", "the strings should be equal")
 }
+
+func TestSemver_PrereleaseBump(t *testing.T) {
+	assert := assert.New(t)
+
+	type test struct {
+		got  Semver
+		want Semver
+	}
+
+	tests := []test{
+		{got: Semver{Major: 1, Minor: 2, Patch: 3, Prerelease: "rc"}, want: Semver{Major: 1, Minor: 2, Patch: 3, Prerelease: "rc0"}},
+		{got: Semver{Major: 0, Minor: 0, Patch: 1, Prerelease: "alpha1"}, want: Semver{Major: 0, Minor: 0, Patch: 1, Prerelease: "alpha2"}},
+	}
+
+	for _, testCase := range tests {
+		err := testCase.got.BumpPrerelease()
+		if err != nil {
+			t.Fatalf("bumping prerelease: %s", err)
+		}
+
+		assert.Equal(testCase.want, testCase.got, "versions should be equal")
+	}
+
+}

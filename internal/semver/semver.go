@@ -3,13 +3,15 @@ package semver
 
 import (
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"regexp"
 	"strconv"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
-	Regex = regexp.MustCompile(`(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+	Regex           = regexp.MustCompile(`(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+	prereleaseRegex = regexp.MustCompile(`([a-zA-Z]+)([0-9]*)`)
 )
 
 type Semver struct {
@@ -33,6 +35,36 @@ func (s *Semver) BumpMajor() {
 	s.Patch = 0
 	s.Minor = 0
 	s.Major++
+}
+
+func (s *Semver) BumpPrerelease() error {
+	match := prereleaseRegex.FindStringSubmatch(s.Prerelease)
+
+	var (
+		suffix    string
+		increment int
+		err       error
+	)
+
+	if len(match) == 0 {
+		return nil
+	}
+
+	suffix = match[1]
+
+	if match[2] != "" {
+		increment, err = strconv.Atoi(match[2])
+		increment += 1
+		if err != nil {
+			return err
+		}
+	} else {
+		increment = 0
+	}
+
+	s.Prerelease = fmt.Sprintf("%s%d", suffix, increment)
+
+	return nil
 }
 
 // IsZero checks if all component of a semantic version number are equal to zero.
