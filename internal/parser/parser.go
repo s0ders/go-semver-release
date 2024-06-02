@@ -6,6 +6,7 @@ package parser
 
 import (
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 	"regexp"
 	"strings"
 
@@ -226,7 +227,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 	return newRelease, nil
 }
 
-// TODO: add logic to check whether the latest SemVer tag points to a commit on the release branch
 // fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
@@ -265,6 +265,41 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 	}
 
 	return latestTag, nil
+}
+
+func tagPointsToCommitOnBranch(repository *git.Repository, tag *object.Tag, branchName string) (bool, error) {
+	var found bool
+
+	branch, err := repository.Reference(plumbing.NewBranchReferenceName(branchName), true)
+	if err != nil {
+		return found, fmt.Errorf("fetching branch reference: %w", err)
+	}
+
+	tagCommit, err := tag.Commit()
+	if err != nil {
+		return found, fmt.Errorf("fetching tag commit: %w", err)
+	}
+
+	branchCommitIter, err := repository.Log(&git.LogOptions{
+		From:  branch.Hash(),
+		Until: &tagCommit.Committer.When,
+	})
+	if err != nil {
+		return found, fmt.Errorf("creating branch commit iterator: %w", err)
+	}
+
+	err = branchCommitIter.ForEach(func(c *object.Commit) error {
+		if c.Hash == tagCommit.Hash {
+			found = true
+			return storer.ErrStop
+		}
+		return nil
+	})
+	if err != nil {
+		return found, fmt.Errorf("iterating over branch commits: %w", err)
+	}
+
+	return found, nil
 }
 
 func shortenMessage(message string) string {
