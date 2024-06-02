@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/s0ders/go-semver-release/v2/internal/rule"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,9 +15,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
+	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
@@ -29,17 +30,9 @@ type cmdOutput struct {
 var sampleCommitFile = "not_a_real_file.txt"
 
 func TestLocalCmd_Release(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
-	repository, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
-
-	defer func() {
-		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
-
-	commitTypes := []string{
+	commits := []string{
 		"fix",      // 0.0.1
 		"feat!",    // 1.0.0 (breaking change)
 		"feat",     // 1.1.0
@@ -55,27 +48,14 @@ func TestLocalCmd_Release(t *testing.T) {
 		"style",    // 1.2.2
 	}
 
-	for _, commitType := range commitTypes {
-		err = sampleCommit(repository, repositoryPath, commitType)
-		assert.NoError(err, "failed to create sample commit")
+	flags := map[string]string{
+		"release-branch": "master",
+		"tag-prefix":     "v",
 	}
 
-	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
+	buf := new(bytes.Buffer)
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
-
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
-
-	err = localCmd.Flags().Set("tag-prefix", "v")
-	assert.NoError(err, "failed to set --tag-prefix")
-
-	err = rootCmd.Execute()
-	assert.NoError(err, "local command executed with error")
+	repository := setup(t, buf, flags, commits)
 
 	expectedVersion := "1.2.2"
 	expectedTag := "v" + expectedVersion
@@ -86,58 +66,36 @@ func TestLocalCmd_Release(t *testing.T) {
 	}
 	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(actual.Bytes(), &actualOut)
-	assert.NoError(err, "failed to unmarshal json")
+	err := json.Unmarshal(buf.Bytes(), &actualOut)
+	checkErr(t, err, "unmarshalling output")
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedTag)
-	assert.NoError(err, "failed to check if tag exists")
+	checkErr(t, err, "checking if tag exists")
 
-	assert.Equal(true, exists, "tag should exist")
+	assert.Equal(true, exists)
 }
 
 func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
-	repository, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
+	metadata := "foobarbaz"
+	buf := new(bytes.Buffer)
 
-	defer func() {
-		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
-
-	commitTypes := []string{
+	commits := []string{
 		"fix",   // 0.0.1
 		"feat!", // 1.0.0 (breaking change)
 		"feat",  // 1.1.0
 		"fix",   // 1.1.1
 	}
 
-	for _, commitType := range commitTypes {
-		err = sampleCommit(repository, repositoryPath, commitType)
-		assert.NoError(err, "failed to create sample commit")
+	flags := map[string]string{
+		"release-branch": "master",
+		"build-metadata": metadata,
 	}
 
-	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
-
-	metadata := "foobarbaz"
-
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
-
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
-
-	err = localCmd.Flags().Set("build-metadata", metadata)
-	assert.NoError(err, "failed to set --build-metadata")
-
-	err = rootCmd.Execute()
-	assert.NoError(err, "local command executed with error")
+	repository := setup(t, buf, flags, commits)
 
 	expectedVersion := "1.1.1" + "+" + metadata
 	expectedOut := cmdOutput{
@@ -147,59 +105,36 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	}
 	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(actual.Bytes(), &actualOut)
-	assert.NoError(err, "failed to unmarshal json")
+	err := json.Unmarshal(buf.Bytes(), &actualOut)
+	checkErr(t, err, "unmarshalling output")
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedVersion)
-	assert.NoError(err, "failed to check if tag exists")
+	checkErr(t, err, "checking if tag exists")
 
-	assert.Equal(true, exists, "tag should exist")
+	assert.Equal(true, exists)
 }
 
 func TestLocalCmd_Prerelease(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
-	repository, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
-
-	defer func() {
-		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
-
-	commitTypes := []string{
+	commits := []string{
 		"fix",   // 0.0.1
 		"feat!", // 1.0.0 (breaking change)
 		"feat",  // 1.1.0
 		"fix",   // 1.1.1
 	}
 
-	for _, commitType := range commitTypes {
-		err = sampleCommit(repository, repositoryPath, commitType)
-		assert.NoError(err, "failed to create sample commit")
+	flags := map[string]string{
+		"release-branch":    "master",
+		"prerelease":        "true",
+		"prerelease-suffix": "alpha",
 	}
 
-	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
+	buf := new(bytes.Buffer)
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
-
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
-
-	err = localCmd.Flags().Set("prerelease", "true")
-	assert.NoError(err, "failed to set --prerelease")
-
-	err = localCmd.Flags().Set("prerelease-suffix", "alpha")
-	assert.NoError(err, "failed to set --prerelease-suffix")
-
-	err = rootCmd.Execute()
-	assert.NoError(err, "local command executed with error")
+	repository := setup(t, buf, flags, commits)
 
 	expectedVersion := "1.1.1" + "-alpha"
 	expectedOut := cmdOutput{
@@ -209,57 +144,34 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 	}
 	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(actual.Bytes(), &actualOut)
-	assert.NoError(err, "failed to unmarshal json")
+	err := json.Unmarshal(buf.Bytes(), &actualOut)
+	checkErr(t, err, "unmarshalling output")
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedVersion)
-	assert.NoError(err, "failed to check if tag exists")
+	checkErr(t, err, "checking if tag exists")
 
-	assert.Equal(true, exists, "tag should exist")
+	assert.Equal(true, exists)
 }
 
 func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
-	repository, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
-
-	defer func() {
-		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
-
-	commitTypes := []string{
+	commits := []string{
 		"fix",   // 0.0.1
 		"feat!", // 1.0.0 (breaking change)
 	}
 
-	for _, commitType := range commitTypes {
-		err = sampleCommit(repository, repositoryPath, commitType)
-		assert.NoError(err, "failed to create sample commit")
+	flags := map[string]string{
+		"release-branch": "master",
+		"tag-prefix":     "v",
+		"dry-run":        "true",
 	}
 
 	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
-
-	err = localCmd.Flags().Set("dry-run", "true")
-	assert.NoError(err, "failed to set --dry-run")
-
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
-
-	err = localCmd.Flags().Set("tag-prefix", "v")
-	assert.NoError(err, "failed to set --tag-prefix")
-
-	err = rootCmd.Execute()
-	assert.NoError(err, "local command executed with error")
+	repository := setup(t, actual, flags, commits)
 
 	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
@@ -270,44 +182,28 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	}
 	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(actual.Bytes(), &actualOut)
-	assert.NoError(err, "failed to unmarshal json")
+	err := json.Unmarshal(actual.Bytes(), &actualOut)
+	checkErr(t, err, "unmarshalling output")
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedTag)
-	assert.NoError(err, "failed to check if tag exists")
+	checkErr(t, err, "checking if tag exists")
 
 	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
 }
 
 func TestLocalCmd_NoRelease(t *testing.T) {
-	assert := assert.New(t)
-
-	_, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
-
-	defer func() {
-		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
+	assert := assertion.New(t)
 
 	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
+	flags := map[string]string{
+		"release-branch": "master",
+		"tag-prefix":     "v",
+	}
 
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
-
-	err = localCmd.Flags().Set("tag-prefix", "v")
-	assert.NoError(err, "failed to set --tag-prefix")
-
-	err = rootCmd.Execute()
-	assert.NoError(err, "local command executed with error")
+	_ = setup(t, actual, flags, []string{})
 
 	expectedOut := cmdOutput{
 		Message:    "no new release",
@@ -315,58 +211,43 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	}
 	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(actual.Bytes(), &actualOut)
-	assert.NoError(err, "failed to unmarshal json")
+	err := json.Unmarshal(actual.Bytes(), &actualOut)
+	checkErr(t, err, "removing temporary directory")
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 }
 
 func TestLocalCmd_Verbose(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
-	_, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
+	buf := new(bytes.Buffer)
 
-	defer func() {
-		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
+	flags := map[string]string{
+		"verbose":        "true",
+		"release-branch": "master",
+		"tag-prefix":     "v",
+	}
 
-	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
+	_ = setup(t, buf, flags, []string{})
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
-
-	err = rootCmd.PersistentFlags().Set("verbose", "true")
-	assert.NoError(err, "failed to set --verbose")
-
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
-
-	err = localCmd.Flags().Set("tag-prefix", "v")
-	assert.NoError(err, "failed to set --tag-prefix")
-
-	err = rootCmd.Execute()
+	err := rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
 }
 
 func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %s", err)
 	}
 
-	defer func(path string) {
+	defer func() {
 		err = os.RemoveAll(outputDir)
 		if err != nil {
 			t.Fatalf("failed to remove temporary directory: %s", err)
 		}
-	}(outputDir)
+	}()
 
 	outputFilePath := filepath.Join(outputDir, "output")
 
@@ -426,7 +307,7 @@ func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 }
 
 func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
@@ -441,7 +322,7 @@ func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
 }
 
 func TestLocalCmd_InvalidArmoredKeyPath(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
@@ -456,7 +337,7 @@ func TestLocalCmd_InvalidArmoredKeyPath(t *testing.T) {
 }
 
 func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
 	if err != nil {
@@ -497,7 +378,7 @@ func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
 }
 
 func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	tempDirPath, err := os.MkdirTemp("", "tag-*")
 	if err != nil {
@@ -529,7 +410,7 @@ func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
 }
 
 func TestLocalCmd_InvalidRulesPath(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	_, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
@@ -555,7 +436,7 @@ func TestLocalCmd_InvalidRulesPath(t *testing.T) {
 }
 
 func TestLocalCmd_ViperConfigFile(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	_, repositoryPath, err := sampleRepository()
 	assert.NoError(err, "failed to create sample repository")
@@ -581,44 +462,14 @@ func TestLocalCmd_ViperConfigFile(t *testing.T) {
 }
 
 func TestLocalCmd_InvalidCustomRules(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	_, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
+	checkErr(t, err, "creating sample repository")
 
 	defer func() {
 		err = os.RemoveAll(repositoryPath)
-		assert.NoError(err, "failed to remove repository")
-	}()
-
-	tempRulesDir, err := os.MkdirTemp("", "rule-*")
-	assert.NoError(err, "failed to create temp. dir.")
-
-	defer func() {
-		err = os.RemoveAll(tempRulesDir)
-		assert.NoError(err, "failed to remove temp. dir.")
-	}()
-
-	customRulesPath := filepath.Join(tempRulesDir, "custom.json")
-
-	customRules, err := os.Create(customRulesPath)
-	assert.NoError(err, "failed to create empty rule file")
-
-	customRulesJSON := `
-{
-    "rule": [
-        {"type": "feat",   "release": "minor"},
-        {"type": "feat",   "release": "patch"}
-    ]
-}
-`
-
-	_, err = customRules.Write([]byte(customRulesJSON))
-	assert.NoError(err, "failed to write empty rule file")
-
-	defer func() {
-		err = customRules.Close()
-		assert.NoError(err, "failed to close empty rule file")
+		checkErr(t, err, "removing sample repository")
 	}()
 
 	actual := new(bytes.Buffer)
@@ -627,23 +478,25 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 	rootCmd.SetArgs([]string{"local", repositoryPath})
 
 	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
+	checkErr(t, err, "resetting flags")
 
-	err = localCmd.Flags().Set("rule-path", customRulesPath)
-	assert.NoError(err, "failed to set --rule-path")
+	// TODO: fix rules
+	err = localCmd.Flags().Set("rules", "...")
+	checkErr(t, err, "setting rules")
 
 	err = rootCmd.Execute()
 	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
 }
 
 func TestLocalCmd_CustomRules(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	repository, repositoryPath, err := sampleRepository()
-	assert.NoError(err, "failed to create sample repository")
+	checkErr(t, err, "creating sample repository")
 
 	defer func() {
 		err = os.RemoveAll(repositoryPath)
+		checkErr(t, err, "creating sample repository")
 		assert.NoError(err, "failed to remove repository")
 	}()
 
@@ -697,9 +550,6 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 
 	err = localCmd.Flags().Set("rule-path", customRulesPath)
 	assert.NoError(err, "failed to set --rule-path")
-
-	err = localCmd.Flags().Set("release-branch", "master")
-	assert.NoError(err, "failed to set --release-branch")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")
@@ -776,8 +626,8 @@ func sampleRepository() (*git.Repository, string, error) {
 	return repository, dir, nil
 }
 
-// sampleCommit modifies the sample commit files with the same line of text
-// and creates a new commit to the given repository with the given commit type.
+// sampleCommit modifies the sample commit files with the same line of text and creates a new commit to the given
+// repository with the given commit type.
 func sampleCommit(repository *git.Repository, repositoryPath string, commitType string) (err error) {
 	worktree, err := repository.Worktree()
 	if err != nil {
@@ -812,6 +662,40 @@ func sampleCommit(repository *git.Repository, repositoryPath string, commitType 
 	return nil
 }
 
+func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []string) *git.Repository {
+	repository, repositoryPath, err := sampleRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		checkErr(t, err, "removing sample repository")
+	}()
+
+	if len(commits) != 0 {
+		for _, commit := range commits {
+			err = sampleCommit(repository, repositoryPath, commit)
+			checkErr(t, err, "creating sample commit")
+		}
+	}
+
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	checkErr(t, err, "resetting flags")
+
+	for k, v := range flags {
+		err = localCmd.Flags().Set(k, v)
+		checkErr(t, err, "setting "+k)
+	}
+
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	return repository
+}
+
 func resetFlags(cmd *cobra.Command) (err error) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		err = f.Value.Set(f.DefValue)
@@ -821,4 +705,10 @@ func resetFlags(cmd *cobra.Command) (err error) {
 	})
 
 	return err
+}
+
+func checkErr(t *testing.T, err error, message string) {
+	if err != nil {
+		t.Fatalf("%s: %s", message, err)
+	}
 }
