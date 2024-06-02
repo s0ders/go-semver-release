@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
-	Regex           = regexp.MustCompile(`(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
-	prereleaseRegex = regexp.MustCompile(`([a-zA-Z]+)([0-9]*)`)
+	Regex = regexp.MustCompile(`(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
 )
 
 type Semver struct {
@@ -35,36 +35,6 @@ func (s *Semver) BumpMajor() {
 	s.Patch = 0
 	s.Minor = 0
 	s.Major++
-}
-
-func (s *Semver) BumpPrerelease() error {
-	match := prereleaseRegex.FindStringSubmatch(s.Prerelease)
-
-	var (
-		suffix    string
-		increment int
-		err       error
-	)
-
-	if len(match) == 0 {
-		return nil
-	}
-
-	suffix = match[1]
-
-	if match[2] != "" {
-		increment, err = strconv.Atoi(match[2])
-		increment += 1
-		if err != nil {
-			return err
-		}
-	} else {
-		increment = 0
-	}
-
-	s.Prerelease = fmt.Sprintf("%s%d", suffix, increment)
-
-	return nil
 }
 
 // IsZero checks if all component of a semantic version number are equal to zero.
@@ -116,27 +86,28 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 	return semver, nil
 }
 
-// Precedence returns an integer representing which of the two versions s or s2 is the most recent. 1 meaning s1 is the
-// most recent, -1 that it is s2 and 0 that they are equal.
-// TODO: take in account prerelease component
-func (s *Semver) Precedence(s2 *Semver) int {
+// Compare returns an integer comparing two semantic versions. The result will be 0 if a == b, -1 if a < b, and +1
+// if a > b.
+func Compare(a, b *Semver) int {
 	switch {
-	case s.Major > s2.Major:
+	case a.Major > b.Major:
 		return 1
-	case s.Major < s2.Major:
+	case a.Major < b.Major:
 		return -1
-	case s.Minor > s2.Minor:
+	case a.Minor > b.Minor:
 		return 1
-	case s.Minor < s2.Minor:
+	case a.Minor < b.Minor:
 		return -1
-	case s.Patch > s2.Patch:
+	case a.Patch > b.Patch:
 		return 1
-	case s.Patch < s2.Patch:
+	case a.Patch < b.Patch:
 		return -1
-	case s.Prerelease == "" && s2.Prerelease != "":
+	case a.Prerelease == "" && b.Prerelease != "":
 		return 1
-	case s.Prerelease != "" && s2.Prerelease == "":
+	case a.Prerelease != "" && b.Prerelease == "":
 		return -1
+	case a.Prerelease != "" && b.Prerelease != "":
+		return strings.Compare(a.Prerelease, b.Prerelease)
 	default:
 		return 0
 	}

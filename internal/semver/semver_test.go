@@ -31,11 +31,14 @@ func TestSemver_Precedence(t *testing.T) {
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0}, want: -1},
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 1},
 		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "foo"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "bar"}, want: 0},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "alpha"}, want: 1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "alpha"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "beta"}, want: -1},
+		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 0},
 	}
 
-	for _, test := range matrix {
-		got := test.s1.Precedence(test.s2)
-		assert.Equal(got, test.want, "semver precedence is not correct")
+	for _, tc := range matrix {
+		got := Compare(tc.s1, tc.s2)
+		assert.Equal(got, tc.want, "semver precedence is not correct")
 	}
 }
 
@@ -175,28 +178,4 @@ func TestSemver_Bump(t *testing.T) {
 
 	s.BumpMajor()
 	assert.Equal(s.String(), "1.0.0", "the strings should be equal")
-}
-
-func TestSemver_PrereleaseBump(t *testing.T) {
-	assert := assertion.New(t)
-
-	type test struct {
-		got  Semver
-		want Semver
-	}
-
-	tests := []test{
-		{got: Semver{Major: 1, Minor: 2, Patch: 3, Prerelease: "rc"}, want: Semver{Major: 1, Minor: 2, Patch: 3, Prerelease: "rc0"}},
-		{got: Semver{Major: 0, Minor: 0, Patch: 1, Prerelease: "alpha1"}, want: Semver{Major: 0, Minor: 0, Patch: 1, Prerelease: "alpha2"}},
-	}
-
-	for _, testCase := range tests {
-		err := testCase.got.BumpPrerelease()
-		if err != nil {
-			t.Fatalf("bumping prerelease: %s", err)
-		}
-
-		assert.Equal(testCase.want, testCase.got, "versions should be equal")
-	}
-
 }
