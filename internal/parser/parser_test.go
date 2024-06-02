@@ -90,9 +90,7 @@ func TestParser_FetchLatestSemverTagWithNoTag(t *testing.T) {
 		}
 	}()
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
-
-	latest, err := parser.fetchLatestSemverTag(r)
+	latest, err := FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("fetching latest semver tag: %s", err)
 	}
@@ -131,9 +129,7 @@ func TestParser_FetchLatestSemverTagWithOneTag(t *testing.T) {
 		t.Fatalf("creating tagName: %s", err)
 	}
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
-
-	latest, err := parser.fetchLatestSemverTag(r)
+	latest, err := FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("fetching latest semver tagName: %s", err)
 	}
@@ -173,9 +169,7 @@ func TestParser_FetchLatestSemverTagWithMultipleTags(t *testing.T) {
 		}
 	}
 
-	commitAnalyzer := New(logger, tagger, rules, WithReleaseBranch("master"))
-
-	latest, err := commitAnalyzer.fetchLatestSemverTag(r)
+	latest, err := FetchLatestSemverTag(r)
 	if err != nil {
 		t.Fatalf("fetching latest semver tag: %s", err)
 	}
@@ -361,7 +355,6 @@ func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
 }
 
 func TestParser_ComputeNewSemverWithBuildMetadata(t *testing.T) {
-
 	assert := assertion.New(t)
 
 	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
@@ -406,6 +399,8 @@ func TestParser_ShortMessage(t *testing.T) {
 }
 
 func TestParser_TagPointsToCommitOnBranch(t *testing.T) {
+	assert := assertion.New(t)
+
 	// Create Git repository with a commit on "master"
 	repo, path, err := createGitRepository("first commit")
 	if err != nil {
@@ -425,7 +420,70 @@ func TestParser_TagPointsToCommitOnBranch(t *testing.T) {
 	}
 
 	// Create a new branch "rc"
-	rcBranchRef := plumbing.NewBranchReferenceName("rc")
+	rcBranchName := "rc"
+	rcBranchRef := plumbing.NewBranchReferenceName(rcBranchName)
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: rcBranchRef,
+		Create: true,
+	})
+	if err != nil {
+		t.Fatalf("checking out branch: %s", err)
+	}
+
+	// Create a new commits on "rc"
+	rcCommitHash, err := addCommit(repo, "feat: ...")
+	if err != nil {
+		t.Fatalf("adding commit: %s", err)
+	}
+
+	// Create a tag that points to that commit
+	tagRef, err := repo.CreateTag("v0.0.1", rcCommitHash, &git.CreateTagOptions{
+		Tagger: &object.Signature{
+			Name:  "Go SemVer Release",
+			Email: "go-semver@release.ci",
+			When:  time.Now(),
+		},
+		Message: "v0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("creating tag: %s", err)
+	}
+
+	tagObject, err := repo.TagObject(tagRef.Hash())
+	if err != nil {
+		t.Fatalf("getting tag object: %s", err)
+	}
+
+	// Tests if the commit pointed by that tag is reachable from branch "rc"
+	got, err := TagPointsToCommitOnBranch(repo, tagObject, rcBranchName)
+
+	assert.Equal(true, got, "tag points to commit on a branch that does not point to a commit")
+}
+
+func TestParser_TagDoesNotPointToCommitOnBranch(t *testing.T) {
+	assert := assertion.New(t)
+
+	// Create Git repository with a commit on "master"
+	repo, path, err := createGitRepository("first commit")
+	if err != nil {
+		t.Fatalf("creating git repository: %s", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("removing temp dir: %s", err)
+		}
+	}()
+
+	w, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("Failed to get worktree: %v", err)
+	}
+
+	// Create a new branch "rc"
+	rcBranchName := "rc"
+	rcBranchRef := plumbing.NewBranchReferenceName(rcBranchName)
 	err = w.Checkout(&git.CheckoutOptions{
 		Branch: rcBranchRef,
 		Create: true,
@@ -454,7 +512,7 @@ func TestParser_TagPointsToCommitOnBranch(t *testing.T) {
 	masterCommitHash, err := addCommit(repo, "fix: some fix")
 
 	// Create a tag that points to that commit
-	_, err = repo.CreateTag("v0.0.1", masterCommitHash, &git.CreateTagOptions{
+	tagRef, err := repo.CreateTag("v0.0.1", masterCommitHash, &git.CreateTagOptions{
 		Tagger: &object.Signature{
 			Name:  "Go SemVer Release",
 			Email: "go-semver@release.ci",
@@ -466,7 +524,15 @@ func TestParser_TagPointsToCommitOnBranch(t *testing.T) {
 		t.Fatalf("creating tag: %s", err)
 	}
 
+	tagObject, err := repo.TagObject(tagRef.Hash())
+	if err != nil {
+		t.Fatalf("getting tag object: %s", err)
+	}
+
 	// Tests if the commit pointed by that tag is reachable from branch "rc"
+	got, err := TagPointsToCommitOnBranch(repo, tagObject, rcBranchName)
+
+	assert.Equal(false, got, "tag points to commit on a branch that does not point to a commit")
 }
 
 func createGitRepository(commitMsg string) (*git.Repository, string, error) {

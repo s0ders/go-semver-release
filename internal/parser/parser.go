@@ -23,14 +23,13 @@ import (
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
-	rules                 rule.Rules
-	tagger                *tag.Tagger
-	logger                zerolog.Logger
-	releaseBranch         string
-	buildMetadata         string
-	prereleasePrefix      string
-	prereleaseMode        bool
-	incrementalPrerelease bool
+	rules                rule.Rules
+	tagger               *tag.Tagger
+	logger               zerolog.Logger
+	releaseBranch        string
+	buildMetadata        string
+	prereleaseIdentifier string
+	prereleaseMode       bool
 }
 
 type OptionFunc func(*Parser)
@@ -53,15 +52,9 @@ func WithPrereleaseMode(b bool) OptionFunc {
 	}
 }
 
-func WithIncrementalPrerelease(b bool) OptionFunc {
+func WithPrereleaseIdentifier(s string) OptionFunc {
 	return func(p *Parser) {
-		p.incrementalPrerelease = b
-	}
-}
-
-func WithPrereleasePrefix(s string) OptionFunc {
-	return func(p *Parser) {
-		p.prereleasePrefix = s
+		p.prereleaseIdentifier = s
 	}
 }
 
@@ -82,7 +75,7 @@ func New(logger zerolog.Logger, tagger *tag.Tagger, rules rule.Rules, options ..
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
 func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, bool, error) {
-	latestSemverTag, err := p.fetchLatestSemverTag(repository)
+	latestSemverTag, err := FetchLatestSemverTag(repository)
 	if err != nil {
 		return nil, false, fmt.Errorf("fetching latest semver tag: %w", err)
 	}
@@ -93,6 +86,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		logOptions   git.LogOptions
 	)
 
+	// Check if a previous semver tag exists, if not, create it
 	if latestSemverTag == nil {
 		p.logger.Debug().Msg("no previous tag, creating one")
 
@@ -104,6 +98,8 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		latestSemver = &semver.Semver{Major: 0, Minor: 0, Patch: 0}
 		latestSemverTag = p.tagger.TagFromSemver(latestSemver, head.Hash())
 	} else {
+		p.logger.Debug().Str("tag", latestSemverTag.Name).Msg("latest semver tag found")
+
 		latestSemver, err = semver.FromGitTag(latestSemverTag)
 		if err != nil {
 			return nil, false, fmt.Errorf("building semver from git tag: %w", err)
@@ -119,6 +115,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		return nil, false, fmt.Errorf("worktree is nil, check that repository is initiliazed")
 	}
 
+	// Checkout to release branch
 	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
 	branchCheckOutOpts := git.CheckoutOptions{
 		Branch: releaseBranchRef,
@@ -130,8 +127,14 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		return nil, false, fmt.Errorf("checking out to release branch: %w", err)
 	}
 
+	// If there is a previous semver tags, fetch commits newer than its targeted commit
 	if !latestSemver.IsZero() {
-		logOptions.Since = &latestSemverTag.Tagger.When
+		latestSemverTagTarget, err := repository.CommitObject(latestSemverTag.Hash)
+		if err != nil {
+			return nil, false, fmt.Errorf("fetching latest semver tag target: %w", err)
+		}
+
+		logOptions.Since = &latestSemverTagTarget.Author.When
 	}
 
 	repositoryLogs, err := repository.Log(&logOptions)
@@ -139,6 +142,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 		return nil, false, fmt.Errorf("fetching commit history: %w", err)
 	}
 
+	// Create commit history
 	err = repositoryLogs.ForEach(func(c *object.Commit) error {
 		history = append(history, c)
 		return nil
@@ -170,7 +174,17 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 // provided.
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
+	latestWasAPrerelease := latestSemver.Prerelease != ""
 	rulesMap := p.rules.Map()
+
+	if latestWasAPrerelease && !p.prereleaseMode {
+		latestSemver.Prerelease = ""
+		newRelease = true
+	}
+
+	if p.prereleaseMode {
+		latestSemver.Prerelease = p.prereleaseIdentifier
+	}
 
 	for _, commit := range commits {
 		if !conventionalCommitRegex.MatchString(commit.Message) {
@@ -196,21 +210,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 			continue
 		}
 
-		if p.prereleaseMode {
-			if latestSemver.Prerelease == "" {
-				latestSemver.Prerelease = p.prereleasePrefix
-			}
-
-			if p.incrementalPrerelease {
-				err := latestSemver.BumpPrerelease()
-				if err != nil {
-					return false, err
-				}
-			}
-
-			continue
-		}
-
 		switch releaseType {
 		case "patch":
 			latestSemver.BumpPatch()
@@ -227,9 +226,9 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 	return newRelease, nil
 }
 
-// fetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
+// FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
-func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
+func FetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, err
@@ -250,7 +249,7 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 			return err
 		}
 
-		if latestSemver == nil || latestSemver.Precedence(currentSemver) != 1 {
+		if latestSemver == nil || semver.Compare(latestSemver, currentSemver) == -1 {
 			latestSemver = currentSemver
 			latestTag = tag
 		}
@@ -260,14 +259,10 @@ func (p *Parser) fetchLatestSemverTag(repository *git.Repository) (*object.Tag, 
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
-	if latestTag != nil {
-		p.logger.Debug().Str("tag", latestTag.Name).Msg("latest semver tag found")
-	}
-
 	return latestTag, nil
 }
 
-func tagPointsToCommitOnBranch(repository *git.Repository, tag *object.Tag, branchName string) (bool, error) {
+func TagPointsToCommitOnBranch(repository *git.Repository, tag *object.Tag, branchName string) (bool, error) {
 	var found bool
 
 	branch, err := repository.Reference(plumbing.NewBranchReferenceName(branchName), true)
@@ -282,7 +277,7 @@ func tagPointsToCommitOnBranch(repository *git.Repository, tag *object.Tag, bran
 
 	branchCommitIter, err := repository.Log(&git.LogOptions{
 		From:  branch.Hash(),
-		Until: &tagCommit.Committer.When,
+		Since: &tagCommit.Committer.When,
 	})
 	if err != nil {
 		return found, fmt.Errorf("creating branch commit iterator: %w", err)
