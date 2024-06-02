@@ -4,7 +4,7 @@
   "tag-prefix": "v",
   "branches": [
     {"pattern": "main"},
-    {"pattern": "rc", "prerelease": true, "prerelease-suffix": "rc", "prerelease-incremental": true}
+    {"pattern": "rc", "prerelease": true, "prerelease-identifier": "rc"}
   ],
   "rules": {
     "minor": ["feat"],
