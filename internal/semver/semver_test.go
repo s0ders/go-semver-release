@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/stretchr/testify/assert"
+	assertion "github.com/stretchr/testify/assert"
 )
 
 func TestSemver_Precedence(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	type test struct {
 		s1, s2 *Semver
@@ -40,7 +40,7 @@ func TestSemver_Precedence(t *testing.T) {
 }
 
 func TestSemver_IsZero(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	type test struct {
 		semver Semver
@@ -62,7 +62,7 @@ func TestSemver_IsZero(t *testing.T) {
 }
 
 func TestSemver_String(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	type test struct {
 		have Semver
@@ -83,7 +83,7 @@ func TestSemver_String(t *testing.T) {
 }
 
 func TestSemver_FromGitTag(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	type test struct {
 		tag  *object.Tag
@@ -146,7 +146,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 }
 
 func TestSemver_FromGitTagInvalid(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	notSemverTag := &object.Tag{
 		Name:    "foo",
@@ -163,7 +163,7 @@ func TestSemver_FromGitTagInvalid(t *testing.T) {
 }
 
 func TestSemver_Bump(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	s := Semver{Major: 0, Minor: 0, Patch: 0}
 
@@ -178,7 +178,7 @@ func TestSemver_Bump(t *testing.T) {
 }
 
 func TestSemver_PrereleaseBump(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	type test struct {
 		got  Semver

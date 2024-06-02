@@ -68,7 +68,7 @@ func TestLocalCmd_Release(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("tag-prefix", "v")
@@ -130,7 +130,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("build-metadata", metadata)
@@ -189,7 +189,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("prerelease", "true")
@@ -252,7 +252,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	err = localCmd.Flags().Set("dry-run", "true")
 	assert.NoError(err, "failed to set --dry-run")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("tag-prefix", "v")
@@ -300,7 +300,7 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("tag-prefix", "v")
@@ -343,7 +343,7 @@ func TestLocalCmd_Verbose(t *testing.T) {
 	err = rootCmd.PersistentFlags().Set("verbose", "true")
 	assert.NoError(err, "failed to set --verbose")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("tag-prefix", "v")
@@ -415,7 +415,7 @@ func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	err = rootCmd.PersistentFlags().Set("verbose", "true")
 	assert.NoError(err, "failed to set --verbose")
 
-	err = localCmd.Flags().Set("release-branch", "main")
+	err = localCmd.Flags().Set("release-branch", "master")
 	assert.NoError(err, "failed to set --release-branch")
 
 	err = localCmd.Flags().Set("tag-prefix", "v")
@@ -529,6 +529,32 @@ func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
 }
 
 func TestLocalCmd_InvalidRulesPath(t *testing.T) {
+	assert := assert.New(t)
+
+	_, repositoryPath, err := sampleRepository()
+	assert.NoError(err, "failed to create sample repository")
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		assert.NoError(err, "failed to remove repository")
+	}()
+
+	actual := new(bytes.Buffer)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"local", repositoryPath})
+
+	err = resetFlags(localCmd)
+	assert.NoError(err, "failed to reset localCmd flags")
+
+	err = localCmd.Flags().Set("rule-path", "./does/no/exist.json")
+	assert.NoError(err, "failed to set --rule-path")
+
+	err = rootCmd.Execute()
+	assert.Error(err, "should have failed trying to open inexisting rule file")
+}
+
+func TestLocalCmd_ViperConfigFile(t *testing.T) {
 	assert := assert.New(t)
 
 	_, repositoryPath, err := sampleRepository()
@@ -671,6 +697,9 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 
 	err = localCmd.Flags().Set("rule-path", customRulesPath)
 	assert.NoError(err, "failed to set --rule-path")
+
+	err = localCmd.Flags().Set("release-branch", "master")
+	assert.NoError(err, "failed to set --release-branch")
 
 	err = rootCmd.Execute()
 	assert.NoError(err, "local command executed with error")

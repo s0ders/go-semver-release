@@ -10,11 +10,11 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	"github.com/stretchr/testify/assert"
+	assertion "github.com/stretchr/testify/assert"
 )
 
 func TestGPG_FromArmored(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 	// Creates new armored key file
 	dir, err := os.MkdirTemp("", "gpg-*")
 	if err != nil {
@@ -33,6 +33,7 @@ func TestGPG_FromArmored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create armored key file: %s", err)
 	}
+
 	defer func() {
 		err = armoredKeyFile.Close()
 		if err != nil {
@@ -72,12 +73,11 @@ func TestGPG_FromArmored(t *testing.T) {
 	}
 
 	assert.Equal(expectedEntity.PrimaryKey.Fingerprint, actualEntity.PrimaryKey.Fingerprint, "public keys fingerprints should be equal")
-
 	assert.Equal(expectedEntity.PrivateKey.Fingerprint, actualEntity.PrivateKey.Fingerprint, "private keys fingerprints should be equal")
 }
 
 func TestGPG_FromArmoredEmptyReader(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	reader := strings.NewReader("")
 

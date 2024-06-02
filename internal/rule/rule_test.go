@@ -3,11 +3,11 @@ package rule
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	assertion "github.com/stretchr/testify/assert"
 )
 
 func TestRule_Validate(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	type test struct {
 		have Rules
@@ -26,7 +26,7 @@ func TestRule_Validate(t *testing.T) {
 }
 
 func TestRule_Map(t *testing.T) {
-	assert := assert.New(t)
+	assert := assertion.New(t)
 
 	have := Rules{
 		Unmarshalled: map[string][]string{"minor": {"feat"}, "patch": {"fix", "perf"}},
