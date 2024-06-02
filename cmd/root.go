@@ -40,15 +40,13 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		home, err := os.UserHomeDir()
+		wd, err := os.Getwd()
 		cobra.CheckErr(err)
 
-		viper.AddConfigPath(home)
+		viper.AddConfigPath(wd)
 		viper.SetConfigType("json")
 		viper.SetConfigName(".semver")
 	}
-
-	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
