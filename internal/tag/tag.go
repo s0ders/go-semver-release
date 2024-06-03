@@ -62,7 +62,6 @@ func (t *Tagger) TagFromSemver(semver *semver.Semver, hash plumbing.Hash) *objec
 	return tag
 }
 
-// TODO: fix this function
 // Exists check if a given tag name exists on a given Git repository.
 func Exists(repository *git.Repository, tagName string) (bool, error) {
 	reference, err := repository.Reference(plumbing.NewTagReferenceName(tagName), true)
@@ -78,7 +77,7 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 	return exists, nil
 }
 
-// TagRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
+// TagRepository AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
 func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver) error {
 	head, err := repository.Head()
