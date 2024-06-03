@@ -1,14 +1,15 @@
 package rule
 
-import "errors"
+import (
+	"errors"
+)
 
 type Rules struct {
-	Unmarshalled map[string][]string
-	Mapped       map[string]string
+	Map map[string]string
 }
 
 var Default = Rules{
-	Mapped: map[string]string{
+	Map: map[string]string{
 		"feat":   "minor",
 		"fix":    "patch",
 		"perf":   "patch",
@@ -42,38 +43,31 @@ var validReleaseTypes = map[string]struct{}{
 	"patch": {},
 }
 
-func (r Rules) Validate() error {
-	if len(r.Unmarshalled) == 0 {
-		return ErrNoRules
+func Unmarshall(input map[string][]string) (Rules, error) {
+	var rules Rules
+	rules.Map = make(map[string]string)
+
+	if len(input) == 0 {
+		return rules, ErrNoRules
 	}
 
-	for releaseType, commitTypes := range r.Unmarshalled {
+	for releaseType, commitTypes := range input {
 		if _, ok := validReleaseTypes[releaseType]; !ok {
-			return ErrInvalidReleaseType
+			return rules, ErrInvalidReleaseType
 		}
 
 		for _, commitType := range commitTypes {
 			if _, ok := validCommitTypes[commitType]; !ok {
-				return ErrInvalidCommitType
+				return rules, ErrInvalidCommitType
 			}
+
+			if _, ok := rules.Map[commitType]; ok {
+				return rules, ErrDuplicateReleaseRule
+			}
+
+			rules.Map[commitType] = releaseType
 		}
 	}
 
-	return nil
-}
-
-func (r Rules) Map() map[string]string {
-	if r.Mapped != nil {
-		return r.Mapped
-	}
-
-	r.Mapped = make(map[string]string)
-
-	for releaseType, commitTypes := range r.Unmarshalled {
-		for _, commitType := range commitTypes {
-			r.Mapped[commitType] = releaseType
-		}
-	}
-
-	return r.Mapped
+	return rules, nil
 }
