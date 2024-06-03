@@ -175,7 +175,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, error) {
 	newRelease := false
 	latestWasAPrerelease := latestSemver.Prerelease != ""
-	rulesMap := p.rules.Map()
+	rulesMap := p.rules.Map
 
 	if latestWasAPrerelease && !p.prereleaseMode {
 		latestSemver.Prerelease = ""

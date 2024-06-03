@@ -246,7 +246,7 @@ func TestParser_UnknownReleaseType(t *testing.T) {
 		}
 	}()
 
-	invalidRules := rule.Rules{Mapped: map[string]string{"fix": "unknown"}}
+	invalidRules := rule.Rules{Map: map[string]string{"fix": "unknown"}}
 
 	parser := New(logger, tagger, invalidRules)
 
