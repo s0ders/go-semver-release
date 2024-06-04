@@ -273,7 +273,7 @@ func addCommit(repo *git.Repository, message string) (plumbing.Hash, error) {
 		},
 	})
 	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("commiting file: %s", err)
+		return plumbing.ZeroHash, fmt.Errorf("committing file: %s", err)
 	}
 
 	return commitHash, nil

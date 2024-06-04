@@ -112,7 +112,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (*semver.Semver, b
 	}
 
 	if worktree == nil {
-		return nil, false, fmt.Errorf("worktree is nil, check that repository is initiliazed")
+		return nil, false, fmt.Errorf("worktree is nil, check that repository is initialized")
 	}
 
 	// Checkout to release branch
