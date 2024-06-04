@@ -51,9 +51,13 @@ func TestLocalCmd_Release(t *testing.T) {
 		"style",    // 1.2.2
 	}
 
+	flags := map[string]string{
+		"tag-prefix": "v",
+	}
+
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, nil, commits)
+	repository, path := setup(t, buf, flags, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -61,7 +65,7 @@ func TestLocalCmd_Release(t *testing.T) {
 	}()
 
 	expectedVersion := "1.2.2"
-	expectedTag := expectedVersion
+	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
 		NewVersion: expectedVersion,
@@ -603,18 +607,6 @@ func checkErr(t *testing.T, err error, message string) {
 	if err != nil {
 		t.Fatalf("%s: %s", message, err)
 	}
-}
-
-func configSetGitName(name string) {
-	viper.Set("git-name", name)
-}
-
-func configSetGitEmail(email string) {
-	viper.Set("git-email", email)
-}
-
-func configSetTagPrefix(prefix string) {
-	viper.Set("tag-prefix", prefix)
 }
 
 func configSetBranches(branches []map[string]string) {

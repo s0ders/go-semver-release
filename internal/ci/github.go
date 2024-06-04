@@ -9,8 +9,6 @@ import (
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
-type options func()
-
 func GenerateGitHubOutput(branch string, prefix string, semver *semver.Semver, release bool) (err error) {
 	path, exists := os.LookupEnv("GITHUB_OUTPUT")
 

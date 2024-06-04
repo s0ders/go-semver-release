@@ -231,6 +231,9 @@ func TestTag_SignKey(t *testing.T) {
 
 func createGitRepository(commitMsg string) (*git.Repository, string, error) {
 	dirPath, err := os.MkdirTemp("", "tag-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("creating temporary directory: %s", err)
+	}
 
 	repository, err := git.PlainInit(dirPath, false)
 	if err != nil {
