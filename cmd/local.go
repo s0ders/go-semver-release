@@ -35,7 +35,6 @@ func init() {
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
 
 	cobra.CheckErr(viper.BindPFlag("tag-prefix", localCmd.Flags().Lookup("tag-prefix")))
-	cobra.CheckErr(viper.BindPFlag("rules", localCmd.Flags().Lookup("rules")))
 
 	rootCmd.AddCommand(localCmd)
 }
