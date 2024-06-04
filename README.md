@@ -64,18 +64,15 @@ Documentation about the CLI usage can be found [here](docs/usage.md).
 This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be
 found [here](docs/workflows.md).
 
-## How is this different from tool X ?
+## How is this tool different from X ?
 
 Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). 
-This project focuses on versioning only, no package publishing, release log generation or other features. 
+Go Semver Release focuses on versioning only, no package publishing, release log generation or other features. 
 
-If you want a simple tool that only handle the generation of the next semantic version tag for your project, you are at 
+If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at 
 the right place. This allows the program to work with minimal dependencies and to avoid requiring the use of secret 
 tokens on user-end.
 
 As stated above, `go-semver-release` is agnostic of which CI tool you use or which branch you use it on. You define the
 configuration using flags, environment variables or configurations file however you please on your CI for maximized
 modularity.
-
-## WIP
-- [ ] Make Git tag author name and email configurable 
