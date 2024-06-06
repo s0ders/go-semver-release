@@ -31,8 +31,8 @@ func TestBranch_Unmarshall(t *testing.T) {
 
 	have := []map[string]string{{"pattern": "main"}, {"pattern": "alpha", "prerelease": "true", "prerelease-identifier": "alpha"}}
 	want := []Branch{
-		{Pattern: "main"},
-		{Pattern: "alpha", Prerelease: true, PrereleaseIdentifier: "alpha"},
+		{Name: "main"},
+		{Name: "alpha", Prerelease: true, PrereleaseIdentifier: "alpha"},
 	}
 
 	branches, err := Unmarshall(have)

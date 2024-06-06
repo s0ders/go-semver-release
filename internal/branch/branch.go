@@ -10,7 +10,7 @@ var (
 )
 
 type Branch struct {
-	Pattern              string
+	Name                 string
 	Prerelease           bool
 	PrereleaseIdentifier string
 }
@@ -24,12 +24,12 @@ func Unmarshall(input []map[string]string) ([]Branch, error) {
 
 	for i, b := range input {
 
-		pattern, ok := b["pattern"]
+		pattern, ok := b["name"]
 		if !ok {
 			return nil, ErrNoPattern
 		}
 
-		branch := Branch{Pattern: pattern}
+		branch := Branch{Name: pattern}
 
 		_, ok = b["prerelease"]
 		if ok {
