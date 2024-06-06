@@ -5,8 +5,8 @@ import (
 )
 
 var (
-	ErrNoBranch  = errors.New("no branch configuration")
-	ErrNoPattern = errors.New("no pattern in branch configuration")
+	ErrNoBranch = errors.New("no branch configuration")
+	ErrNoName   = errors.New("no name in branch configuration")
 )
 
 type Branch struct {
@@ -26,7 +26,7 @@ func Unmarshall(input []map[string]string) ([]Branch, error) {
 
 		pattern, ok := b["name"]
 		if !ok {
-			return nil, ErrNoPattern
+			return nil, ErrNoName
 		}
 
 		branch := Branch{Name: pattern}
