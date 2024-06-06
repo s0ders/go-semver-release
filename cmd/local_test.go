@@ -33,7 +33,7 @@ var sampleCommitFile = "not_a_real_file.txt"
 func TestLocalCmd_Release(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -87,7 +87,7 @@ func TestLocalCmd_Release(t *testing.T) {
 func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 
 	metadata := "foobarbaz"
 	buf := new(bytes.Buffer)
@@ -133,7 +133,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	prereleaseID := "alpha"
-	configSetBranches([]map[string]string{{"pattern": "master", "prerelease": "true", "prerelease-identifier": prereleaseID}})
+	configSetBranches([]map[string]string{{"name": "master", "prerelease": "true", "prerelease-identifier": prereleaseID}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -173,7 +173,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -216,7 +216,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 func TestLocalCmd_NoRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 
 	actual := new(bytes.Buffer)
 
@@ -242,7 +242,7 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
 	if err != nil {
@@ -380,7 +380,7 @@ func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
 func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 
 	tempDirPath, err := os.MkdirTemp("", "tag-*")
 	if err != nil {
@@ -414,7 +414,7 @@ func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
 func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
 
 	_, repositoryPath, err := sampleRepository()
@@ -440,7 +440,7 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 func TestLocalCmd_CustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"pattern": "master"}})
+	configSetBranches([]map[string]string{{"name": "master"}})
 	configSetRules(map[string][]string{"minor": {"feat", "fix"}})
 
 	commits := []string{
