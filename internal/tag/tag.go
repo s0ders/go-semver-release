@@ -79,10 +79,9 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 
 // TagRepository AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
-func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver) error {
-	head, err := repository.Head()
-	if err != nil {
-		return fmt.Errorf("fetching head: %w", err)
+func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver, commitHash plumbing.Hash) error {
+	if semver == nil {
+		return fmt.Errorf("semver is nil")
 	}
 
 	tagOpts := &git.CreateTagOptions{
@@ -97,7 +96,7 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver
 		return ErrTagAlreadyExists
 	}
 
-	if _, err = repository.CreateTag(tagOpts.Message, head.Hash(), tagOpts); err != nil {
+	if _, err := repository.CreateTag(tagOpts.Message, commitHash, tagOpts); err != nil {
 		return fmt.Errorf("creating tag on repository: %w", err)
 	}
 

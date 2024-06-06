@@ -195,14 +195,14 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWithoutNewRelease(t 
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	version, _, err := parser.ComputeNewSemver(r)
+	output, err := parser.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("computing new semver: %s", err)
 	}
 
 	want := "0.0.0"
 
-	assert.Equal(want, version.String(), "version should be equal")
+	assert.Equal(want, output.Semver.String(), "version should be equal")
 }
 
 func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *testing.T) {
@@ -222,13 +222,13 @@ func TestParser_ComputeNewSemverNumberWithUntaggedRepositoryWitPatchRelease(t *t
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	version, _, err := parser.ComputeNewSemver(r)
+	output, err := parser.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("computing new semver: %s", err)
 	}
 
 	want := "0.0.1"
-	assert.Equal(want, version.String(), "version should be equal")
+	assert.Equal(want, output.Semver.String(), "version should be equal")
 }
 
 func TestParser_UnknownReleaseType(t *testing.T) {
@@ -250,7 +250,7 @@ func TestParser_UnknownReleaseType(t *testing.T) {
 
 	parser := New(logger, tagger, invalidRules)
 
-	_, _, err = parser.ComputeNewSemver(r)
+	_, err = parser.ComputeNewSemver(r)
 	assert.Error(err, "should have been failed trying to compute semver")
 }
 
@@ -269,13 +269,13 @@ func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWitMinorRelease(t *tes
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	version, _, err := parser.ComputeNewSemver(r)
+	output, err := parser.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("computing new semver: %s", err)
 	}
 
 	want := "0.1.0"
-	assert.Equal(want, version.String(), "version should be equal")
+	assert.Equal(want, output.Semver.String(), "version should be equal")
 }
 
 func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWithMajorRelease(t *testing.T) {
@@ -300,13 +300,13 @@ func TestParser_ComputeNewSemverNumberOnUntaggedRepositoryWithMajorRelease(t *te
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	version, newRelease, err := parser.ComputeNewSemver(r)
+	output, err := parser.ComputeNewSemver(r)
 	assert.NoError(err, "should have been able to compute newsemver")
 
 	want := "1.0.1"
 
-	assert.Equal(want, version.String(), "version should be equal")
-	assert.Equal(true, newRelease, "boolean should be equal")
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
 }
 
 func TestParser_ComputeNewSemverOnUninitializedRepository(t *testing.T) {
@@ -331,7 +331,7 @@ func TestParser_ComputeNewSemverOnUninitializedRepository(t *testing.T) {
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	_, _, err = parser.ComputeNewSemver(repository)
+	_, err = parser.ComputeNewSemver(repository)
 	assert.ErrorContains(err, "reference not found", "should have been failed trying to fetch latest semver tag from uninitialized repository")
 }
 
@@ -350,7 +350,7 @@ func TestParser_ComputeNewSemverOnRepositoryWithNoHead(t *testing.T) {
 
 	parser := New(logger, tagger, rules)
 
-	_, _, err = parser.ComputeNewSemver(repository)
+	_, err = parser.ComputeNewSemver(repository)
 	assert.Error(err, "should have been failed trying to compute new semver from repository with no HEAD")
 }
 
@@ -376,15 +376,91 @@ func TestParser_ComputeNewSemverWithBuildMetadata(t *testing.T) {
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"), WithBuildMetadata("metadata"))
 
-	version, newRelease, err := parser.ComputeNewSemver(r)
+	output, err := parser.ComputeNewSemver(r)
 	if err != nil {
 		t.Fatalf("computing new semver: %s", err)
 	}
 
 	want := "1.0.1+metadata"
 
-	assert.Equal(want, version.String(), "version should be equal")
-	assert.Equal(true, newRelease, "boolean should be equal")
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemverWithPrerelease(t *testing.T) {
+	assert := assertion.New(t)
+
+	r, repositoryPath, err := createGitRepository("feat!: commit that triggers a major release")
+	if err != nil {
+		t.Fatalf("creating git repository: %s", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(repositoryPath)
+		if err != nil {
+			t.Fatalf("removing git repository: %s", err)
+		}
+	}()
+
+	_, err = addCommit(r, "fix: added hello feature")
+	if err != nil {
+		t.Fatalf("adding commit: %s", err)
+	}
+
+	prereleaseID := "rc"
+
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"), WithPrereleaseMode(true), WithPrereleaseIdentifier(prereleaseID))
+
+	output, err := parser.ComputeNewSemver(r)
+	if err != nil {
+		t.Fatalf("computing new semver: %s", err)
+	}
+
+	want := "1.0.1-" + prereleaseID
+
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_StrippingPrerelease(t *testing.T) {
+	assert := assertion.New(t)
+
+	repository, path, err := createGitRepository("commit that does not trigger a release")
+	if err != nil {
+		t.Fatalf("creating git repository: %s", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("removing git repository: %s", err)
+		}
+	}()
+
+	head, err := repository.Head()
+	if err != nil {
+		t.Fatalf("fetching head: %s", err)
+	}
+
+	tagName := "1.0.0-rc"
+	want := "1.0.0"
+
+	_, err = repository.CreateTag(tagName, head.Hash(), &git.CreateTagOptions{
+		Message: tagName,
+		Tagger:  signature,
+	})
+	if err != nil {
+		t.Fatalf("creating tag: %s", err)
+	}
+
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+
+	output, err := parser.ComputeNewSemver(repository)
+	if err != nil {
+		t.Fatalf("fetching latest semver tagName: %s", err)
+	}
+
+	assert.Equal(want, output.Semver.String(), "latest semver tagName should be equal")
 }
 
 func TestParser_ShortMessage(t *testing.T) {
@@ -396,143 +472,6 @@ func TestParser_ShortMessage(t *testing.T) {
 	expected := "This is a very long commit message that is over..."
 
 	assert.Equal(expected, short, "short message should be equal")
-}
-
-func TestParser_TagPointsToCommitOnBranch(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Create Git repository with a commit on "master"
-	repo, path, err := createGitRepository("first commit")
-	if err != nil {
-		t.Fatalf("creating git repository: %s", err)
-	}
-
-	defer func() {
-		err = os.RemoveAll(path)
-		if err != nil {
-			t.Fatalf("removing temp dir: %s", err)
-		}
-	}()
-
-	w, err := repo.Worktree()
-	if err != nil {
-		t.Fatalf("Failed to get worktree: %v", err)
-	}
-
-	// Create a new branch "rc"
-	rcBranchName := "rc"
-	rcBranchRef := plumbing.NewBranchReferenceName(rcBranchName)
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: rcBranchRef,
-		Create: true,
-	})
-	if err != nil {
-		t.Fatalf("checking out branch: %s", err)
-	}
-
-	// Create a new commits on "rc"
-	rcCommitHash, err := addCommit(repo, "feat: ...")
-	if err != nil {
-		t.Fatalf("adding commit: %s", err)
-	}
-
-	// Create a tag that points to that commit
-	tagRef, err := repo.CreateTag("v0.0.1", rcCommitHash, &git.CreateTagOptions{
-		Tagger: &object.Signature{
-			Name:  "Go SemVer Release",
-			Email: "go-semver@release.ci",
-			When:  time.Now(),
-		},
-		Message: "v0.0.1",
-	})
-	if err != nil {
-		t.Fatalf("creating tag: %s", err)
-	}
-
-	tagObject, err := repo.TagObject(tagRef.Hash())
-	if err != nil {
-		t.Fatalf("getting tag object: %s", err)
-	}
-
-	// Tests if the commit pointed by that tag is reachable from branch "rc"
-	got, err := TagPointsToCommitOnBranch(repo, tagObject, rcBranchName)
-
-	assert.Equal(true, got, "tag points to commit on a branch that does not point to a commit")
-}
-
-func TestParser_TagDoesNotPointToCommitOnBranch(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Create Git repository with a commit on "master"
-	repo, path, err := createGitRepository("first commit")
-	if err != nil {
-		t.Fatalf("creating git repository: %s", err)
-	}
-
-	defer func() {
-		err = os.RemoveAll(path)
-		if err != nil {
-			t.Fatalf("removing temp dir: %s", err)
-		}
-	}()
-
-	w, err := repo.Worktree()
-	if err != nil {
-		t.Fatalf("Failed to get worktree: %v", err)
-	}
-
-	// Create a new branch "rc"
-	rcBranchName := "rc"
-	rcBranchRef := plumbing.NewBranchReferenceName(rcBranchName)
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: rcBranchRef,
-		Create: true,
-	})
-	if err != nil {
-		t.Fatalf("checking out branch: %s", err)
-	}
-
-	// Create two new commits on "rc"
-	for i := 0; i < 2; i++ {
-		_, err = addCommit(repo, fmt.Sprintf("feat: new commit (%d)", i))
-		if err != nil {
-			t.Fatalf("adding commit: %s", err)
-		}
-	}
-
-	// Checkout back to "master"
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.Master,
-	})
-	if err != nil {
-		t.Fatalf("Failed to checkout 'master' branch: %v", err)
-	}
-
-	// Create a commit on "master"
-	masterCommitHash, err := addCommit(repo, "fix: some fix")
-
-	// Create a tag that points to that commit
-	tagRef, err := repo.CreateTag("v0.0.1", masterCommitHash, &git.CreateTagOptions{
-		Tagger: &object.Signature{
-			Name:  "Go SemVer Release",
-			Email: "go-semver@release.ci",
-			When:  time.Now(),
-		},
-		Message: "v0.0.1",
-	})
-	if err != nil {
-		t.Fatalf("creating tag: %s", err)
-	}
-
-	tagObject, err := repo.TagObject(tagRef.Hash())
-	if err != nil {
-		t.Fatalf("getting tag object: %s", err)
-	}
-
-	// Tests if the commit pointed by that tag is reachable from branch "rc"
-	got, err := TagPointsToCommitOnBranch(repo, tagObject, rcBranchName)
-
-	assert.Equal(false, got, "tag points to commit on a branch that does not point to a commit")
 }
 
 func createGitRepository(commitMsg string) (*git.Repository, string, error) {
@@ -574,6 +513,9 @@ func addCommit(repo *git.Repository, message string) (plumbing.Hash, error) {
 	if err != nil {
 		return plumbing.ZeroHash, fmt.Errorf("adding file to worktree: %s", err)
 	}
+
+	signature.When = time.Now()
+
 	commitHash, err := w.Commit(message, &git.CommitOptions{
 		Author: signature,
 	})

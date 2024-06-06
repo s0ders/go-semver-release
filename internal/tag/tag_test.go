@@ -80,6 +80,11 @@ func TestTag_AddTagToRepository(t *testing.T) {
 		t.Fatalf("creating git repository: %s", err)
 	}
 
+	head, err := repository.Head()
+	if err != nil {
+		t.Fatalf("fetching head: %s", err)
+	}
+
 	defer func() {
 		err = os.RemoveAll(repositoryPath)
 		if err != nil {
@@ -91,7 +96,7 @@ func TestTag_AddTagToRepository(t *testing.T) {
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, version)
+	err = tagger.TagRepository(repository, version, head.Hash())
 	if err != nil {
 		t.Fatalf("adding tag: %s", err)
 	}
@@ -112,6 +117,11 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 		t.Fatalf("creating git repository: %s", err)
 	}
 
+	head, err := repository.Head()
+	if err != nil {
+		t.Fatalf("fetching head: %s", err)
+	}
+
 	defer func() {
 		err = os.RemoveAll(repositoryPath)
 		if err != nil {
@@ -123,12 +133,12 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, version)
+	err = tagger.TagRepository(repository, version, head.Hash())
 	if err != nil {
 		t.Fatalf("adding tag to repository: %s", err)
 	}
 
-	err = tagger.TagRepository(repository, version)
+	err = tagger.TagRepository(repository, version, head.Hash())
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
@@ -179,7 +189,7 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, nil)
+	err = tagger.TagRepository(repository, &semver.Semver{}, plumbing.Hash{})
 	assert.Error(err, "should have failed trying to fetch uninitialized repository head")
 }
 
@@ -200,6 +210,11 @@ func TestTag_SignKey(t *testing.T) {
 		t.Fatalf("creating git repository: %s", err)
 	}
 
+	head, err := repository.Head()
+	if err != nil {
+		t.Fatalf("fetching head: %s", err)
+	}
+
 	defer func() {
 		err = os.RemoveAll(repositoryPath)
 		if err != nil {
@@ -211,7 +226,7 @@ func TestTag_SignKey(t *testing.T) {
 
 	tagger := NewTagger(taggerName, taggerEmail, WithSignKey(entity))
 
-	err = tagger.TagRepository(repository, version)
+	err = tagger.TagRepository(repository, version, head.Hash())
 	if err != nil {
 		t.Fatalf("adding tag to repository: %s", err)
 	}

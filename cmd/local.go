@@ -122,22 +122,25 @@ var localCmd = &cobra.Command{
 		for _, branch := range branches {
 			group.Go(func() error {
 				parser := parser.New(logger, tagger, rules,
-					parser.WithReleaseBranch(branch.Pattern),
+					parser.WithReleaseBranch(branch.Name),
 					parser.WithPrereleaseMode(branch.Prerelease),
 					parser.WithPrereleaseIdentifier(branch.PrereleaseIdentifier),
 					parser.WithBuildMetadata(buildMetadata),
 				)
 
 				mu.RLock()
-				semver, release, err := parser.ComputeNewSemver(repository)
+				computeSemverOutput, err := parser.ComputeNewSemver(repository)
 				mu.RUnlock()
 				if err != nil {
 					return fmt.Errorf("computing new semver: %w", err)
 				}
 
-				// TODO: handle multi branch and parallelism
+				semver := computeSemverOutput.Semver
+				release := computeSemverOutput.NewRelease
+				commitHash := computeSemverOutput.CommitHash
+
 				mu.Lock()
-				err = ci.GenerateGitHubOutput(branch.Pattern, tagPrefix, semver, release)
+				err = ci.GenerateGitHubOutput(branch.Name, tagPrefix, semver, release)
 				mu.Unlock()
 				if err != nil {
 					return err
@@ -154,7 +157,7 @@ var localCmd = &cobra.Command{
 					logger.Info().Str("new-version", semver.String()).Bool("new-release", true).Msg("new release found")
 
 					mu.Lock()
-					err = tagger.TagRepository(repository, semver)
+					err = tagger.TagRepository(repository, semver, commitHash)
 					mu.Unlock()
 					if err != nil {
 						return fmt.Errorf("tagging repository: %w", err)
