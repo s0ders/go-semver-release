@@ -1,6 +1,6 @@
 module github.com/s0ders/go-semver-release/v2
 
-go 1.22.3
+go 1.22.4
 
 require (
 	github.com/ProtonMail/go-crypto v1.0.0

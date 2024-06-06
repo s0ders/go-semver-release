@@ -1,10 +1,10 @@
 {
-  "git-name": "My Robot",
-  "git-email": "ci-robot@git.sh",
+  "git-name": "Go SemVer Release",
+  "git-email": "go-semver@release.ci",
   "tag-prefix": "v",
   "branches": [
-    {"pattern": "main"},
-    {"pattern": "rc", "prerelease": true, "prerelease-identifier": "rc"}
+    {"name": "main"},
+    {"name": "rc", "prerelease": true, "prerelease-identifier": "rc"}
   ],
   "rules": {
     "minor": ["feat"],
