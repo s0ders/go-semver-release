@@ -5,6 +5,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -73,8 +74,8 @@ func New(logger zerolog.Logger, tagger *tag.Tagger, rules rule.Rules, options ..
 
 type ComputeNewSemverOutput struct {
 	Semver     *semver.Semver
-	NewRelease bool
 	CommitHash plumbing.Hash
+	NewRelease bool
 }
 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
@@ -130,7 +131,11 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 	}
 
 	err = worktree.Checkout(&branchCheckOutOpts)
+	// TODO: ignore error if branch does not exists ?
 	if err != nil {
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return output, fmt.Errorf("branch %s does not exist", p.releaseBranch)
+		}
 		return output, fmt.Errorf("checking out to release branch: %w", err)
 	}
 
@@ -182,13 +187,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver) (bool, plumbing.Hash, error) {
 	newRelease := false
 	latestReleaseCommitHash := plumbing.Hash{}
-	latestWasAPrerelease := latestSemver.Prerelease != ""
 	rulesMap := p.rules.Map
-
-	if latestWasAPrerelease && !p.prereleaseMode {
-		latestSemver.Prerelease = ""
-		newRelease = true
-	}
 
 	if p.prereleaseMode {
 		latestSemver.Prerelease = p.prereleaseIdentifier
