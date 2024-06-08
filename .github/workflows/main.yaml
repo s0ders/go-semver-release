@@ -9,7 +9,7 @@ env:
   DOCKER_IMAGE: docker.io/s0ders/go-semver-release
   GIT_CI_USERNAME: go-semver-ci
   GIT_CI_EMAIL: go-semver@release.ci
-  GO_VERSION: 1.22.3
+  GO_VERSION: 1.22.4
 
 permissions: read-all
 
