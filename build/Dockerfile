@@ -12,6 +12,14 @@ RUN go mod download
 RUN CGO_ENABLED=0 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=$APP_VERSION -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=$APP_BUILD_NUMBER  -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=$APP_COMMIT_HASH -w -s" -v -o app .
 
 # alpine:3.19.1
+FROM alpine@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b as vulnscan
+
+COPY --from=builder /app/app /app
+
+COPY --from=aquasec/trivy:latest /usr/local/bin/trivy /usr/local/bin/trivy
+RUN trivy rootfs --vuln-type os,library --severity CRITICAL,HIGH,MEDIUM --exit-code 1 --no-progress /
+
+# alpine:3.19.1
 FROM alpine@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b
 
 COPY --from=builder /app/app /app
