@@ -10,9 +10,8 @@ var (
 )
 
 type Branch struct {
-	Name                 string
-	Prerelease           bool
-	PrereleaseIdentifier string
+	Name       string
+	Prerelease bool
 }
 
 func Unmarshall(input []map[string]string) ([]Branch, error) {
@@ -34,11 +33,6 @@ func Unmarshall(input []map[string]string) ([]Branch, error) {
 		_, ok = b["prerelease"]
 		if ok {
 			branch.Prerelease = true
-		}
-
-		prereleaseID, ok := b["prerelease-identifier"]
-		if ok {
-			branch.PrereleaseIdentifier = prereleaseID
 		}
 
 		branches[i] = branch
