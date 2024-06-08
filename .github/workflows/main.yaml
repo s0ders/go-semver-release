@@ -9,16 +9,15 @@ env:
   DOCKER_IMAGE: docker.io/s0ders/go-semver-release
   GIT_CI_USERNAME: go-semver-ci
   GIT_CI_EMAIL: go-semver@release.ci
-  GO_VERSION: 1.22
+  GO_VERSION: 1.22.3
+
+permissions: read-all
 
 jobs:
-  go-build:
+  tests:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    outputs:
-      release: ${{ steps.go-semver.outputs.NEW_RELEASE }}
-      semver: ${{ steps.go-semver.outputs.SEMVER }}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
@@ -29,9 +28,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Go Build
-        run: go build -v -o output/go-semver-release main.go
-
       - name: Go Test
         run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
 
@@ -40,14 +36,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Go Semver Release
-        id: go-semver
-        run: |
-          go install github.com/s0ders/go-semver-release/v2@latest
-          go-semver-release local . --release-branch main --tag-prefix v --verbose --dry-run
-
-  golangci:
-    name: lint
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
@@ -61,89 +50,38 @@ jobs:
         with:
           version: v1.58
 
-  docker-scan-build-push-prerelease:
+  versioning:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      release: ${{ steps.go-semver.outputs.MAIN_NEW_RELEASE }}
+      semver: ${{ steps.go-semver.outputs.MAIN_SEMVER }}
     needs:
-     - go-build
-     - golangci
-    if: ${{needs.go-build.outputs.release == 'true'}}
-    env:
-      PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
-      SEMVER: ${{needs.go-build.outputs.semver}}
+      - tests
+      - lint
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          go-version: ${{ env.GO_VERSION }}
 
-      - name: Docker build pre-release
-        uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5.3.0
-        with:
-          context: .
-          file: ./build/Dockerfile
-          push: true
-          build-args: |
-            APP_VERSION="${{ env.SEMVER }}"
-            APP_BUILD_NUMBER="${{ github.run_id }}"
-            APP_COMMIT_HASH="${{ github.sha }}"
-          tags: s0ders/go-semver-release:${{ env.PRERELEASE_TAG }}
-
-      - name: Trivy Scan
-        uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # v0.19.0
-        with:
-          image-ref: '${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }}'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH,MEDIUM'
-
-
-  update-docker-prerelease-tag:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    needs:
-      - go-build
-      - docker-scan-build-push-prerelease
-    if: ${{needs.go-build.outputs.release == 'true'}}
-    env:
-      PRERELEASE_TAG: '${{needs.go-build.outputs.semver}}-${{ github.sha }}'
-      SEMVER: ${{needs.go-build.outputs.semver}}
-    steps:
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Install Crane
-        uses: imjasonh/setup-crane@00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c # v0.3.0
-
-      - name: Crane Add Release Tags
+      - name: Go Semver Release
+        id: go-semver
         run: |
-          crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} ${{ env.SEMVER }}
-          crane tag ${{ env.DOCKER_IMAGE }}:${{ env.PRERELEASE_TAG }} latest
+          go install github.com/s0ders/go-semver-release/v2@latest
+          go-semver-release local . --config ./semver.yaml --verbose --dry-run
 
-  push-tag:
+  tag:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     needs:
-      - go-build
-      - docker-scan-build-push-prerelease
-    if: ${{needs.go-build.outputs.release == 'true'}}
+      - versioning
+    if: ${{needs.versioning.outputs.release == 'true'}}
     env:
-      RELEASE_TAG: ${{needs.go-build.outputs.semver}}
+      VERSION: ${{needs.versioning.outputs.semver}}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
@@ -163,40 +101,57 @@ jobs:
 
       - name: Sign Tag and Push
         run: |
-          git tag --sign --annotate ${{ env.RELEASE_TAG }} --message "${{ env.RELEASE_TAG }}"
-          git push origin ${{ env.RELEASE_TAG }}
+          git tag --sign --annotate ${{ env.VERSION }} --message "${{ env.VERSION }}"
+          git push origin ${{ env.VERSION }}
 
-  github-release:
+  release:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: write
+      actions: read
+    strategy:
+      matrix:
+        os:
+          - linux
+          - windows
+          - darwin
+        arch:
+          - amd64
+          - arm64
     needs:
-      - go-build
-      - push-tag
-      - update-docker-prerelease-tag
-    if: ${{needs.go-build.outputs.release == 'true'}}
+      - tag
+      - versioning
     env:
-      SEMVER: ${{needs.go-build.outputs.semver}}
+      VERSION: ${{needs.versioning.outputs.semver}}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
-      - name: Set up Go
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker build pre-release
+        uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5.3.0
+        with:
+          context: .
+          file: ./build/Dockerfile
+          push: true
+          build-args: |
+            APP_VERSION="${{ env.VERSION }}"
+            APP_BUILD_NUMBER="${{ github.run_id }}"
+            APP_COMMIT_HASH="${{ github.sha }}"
+          tags: s0ders/go-semver-release:${{ env.VERSION }}
+
+      - uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
-
-      - name: Go Build
-        run: |
-          GOOS=linux GOARCH=amd64 go build  -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-amd64-linux .
-          GOOS=linux GOARCH=arm64 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-arm64-linux .
-          GOOS=windows GOARCH=amd64 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=${{ env.SEMVER }} -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=${{ github.run_id }} -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=${{ github.sha }} -w -s" -o output/go-semver-release-amd64-win.exe .
-
-      - name: GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Release ${{ env.SEMVER }}
-          tag_name: ${{ env.SEMVER }}
-          files: |
-            output/go-semver-release-amd64-linux
-            output/go-semver-release-arm64-linux
-            output/go-semver-release-amd64-win.exe
+          config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
+          evaluated-envs: "VERSION:${{ env.VERSION }}, COMMIT_HASH:${{ github.sha }}, BUILD_NUMBER:${{ github.run_id }}"
+          upload-assets: true
+          upload-tag-name: true

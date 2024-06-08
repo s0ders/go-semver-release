@@ -1,6 +1,6 @@
 version: 1
 
-goos: windows
+goos: darwin
 goarch: amd64
 
 main: ./main.go
@@ -8,6 +8,6 @@ main: ./main.go
 binary: go-semver-release-{{ .Os }}-{{ .Arch }}
 
 ldflags:
-  - "-X cmd.version={{ .Env.VERSION }}"
-  - "-X cmd.buildNumber={{ .Env.BUILD_NUMBER }}"
-  - "-X cmd.commitHash={{ .Env.COMMIT_HASH }}"
+  - "-X github.com/s0ders/go-semver-release/v2/cmd.version={{ .Env.VERSION }}"
+  - "-X github.com/s0ders/go-semver-release/v2/cmd.buildNumber={{ .Env.BUILD_NUMBER }}"
+  - "-X github.com/s0ders/go-semver-release/v2/cmd.commitHash={{ .Env.COMMIT_HASH }}"
