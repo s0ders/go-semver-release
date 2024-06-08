@@ -7,7 +7,6 @@ branches:
   - name: main
   - name: rc
     prerelease: true
-    prerelease-identifier: rc
 
 rules:
   minor:

@@ -18,7 +18,7 @@ var (
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file path (default is ./.semver.json)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file path (default is ./.semver.yaml)")
 	rootCmd.PersistentFlags().StringVar(&gitName, "git-name", "Go Semver Release", "Name used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&gitEmail, "git-email", "go-semver@release.ci", "Email used in semantic version tags")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
@@ -44,7 +44,7 @@ func initConfig() {
 		cobra.CheckErr(err)
 
 		viper.AddConfigPath(wd)
-		viper.SetConfigType("json")
+		viper.SetConfigType("yaml")
 		viper.SetConfigName(".semver")
 	}
 
