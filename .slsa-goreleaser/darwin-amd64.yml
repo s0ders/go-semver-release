@@ -1,5 +1,8 @@
 version: 1
 
+env:
+  - CGO_ENABLED=0
+
 goos: darwin
 goarch: amd64
 
