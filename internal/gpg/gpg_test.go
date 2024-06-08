@@ -76,7 +76,7 @@ func TestGPG_FromArmored(t *testing.T) {
 	assert.Equal(expectedEntity.PrivateKey.Fingerprint, actualEntity.PrivateKey.Fingerprint, "private keys fingerprints should be equal")
 }
 
-func TestGPG_FromArmoredEmptyReader(t *testing.T) {
+func TestGPG_FromArmored_EmptyReader(t *testing.T) {
 	assert := assertion.New(t)
 
 	reader := strings.NewReader("")

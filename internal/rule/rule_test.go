@@ -6,6 +6,25 @@ import (
 	assertion "github.com/stretchr/testify/assert"
 )
 
+func TestRule_Unmarshall(t *testing.T) {
+	assert := assertion.New(t)
+
+	have := map[string][]string{"minor": {"feat"}, "patch": {"fix", "perf", "revert"}}
+	want := Rules{Map: map[string]string{
+		"feat":   "minor",
+		"fix":    "patch",
+		"perf":   "patch",
+		"revert": "patch",
+	}}
+
+	rules, err := Unmarshall(have)
+	if err != nil {
+		t.Fatalf("unmarshalling rules: %s", err)
+	}
+
+	assert.Equal(want, rules)
+}
+
 func TestRule_UnmarshallError(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -26,23 +45,4 @@ func TestRule_UnmarshallError(t *testing.T) {
 		_, err := Unmarshall(tc.have)
 		assert.Equal(tc.want, err)
 	}
-}
-
-func TestRule_Unmarshall(t *testing.T) {
-	assert := assertion.New(t)
-
-	have := map[string][]string{"minor": {"feat"}, "patch": {"fix", "perf", "revert"}}
-	want := Rules{Map: map[string]string{
-		"feat":   "minor",
-		"fix":    "patch",
-		"perf":   "patch",
-		"revert": "patch",
-	}}
-
-	rules, err := Unmarshall(have)
-	if err != nil {
-		t.Fatalf("unmarshalling rules: %s", err)
-	}
-
-	assert.Equal(want, rules)
 }

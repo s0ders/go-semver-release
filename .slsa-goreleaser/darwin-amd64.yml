@@ -1,0 +1,13 @@
+version: 1
+
+goos: windows
+goarch: amd64
+
+main: ./main.go
+
+binary: go-semver-release-{{ .Os }}-{{ .Arch }}
+
+ldflags:
+  - "-X cmd.version={{ .Env.VERSION }}"
+  - "-X cmd.buildNumber={{ .Env.BUILD_NUMBER }}"
+  - "-X cmd.commitHash={{ .Env.COMMIT_HASH }}"

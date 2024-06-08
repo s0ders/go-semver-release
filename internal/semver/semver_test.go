@@ -58,9 +58,9 @@ func TestSemver_IsZero(t *testing.T) {
 		{Semver{Major: 1, Minor: 1, Patch: 1}, false},
 	}
 
-	for _, test := range matrix {
-		got := test.semver.IsZero()
-		assert.Equal(got, test.want, "semver has not been correctly classified as zero")
+	for _, tc := range matrix {
+		got := tc.semver.IsZero()
+		assert.Equal(got, tc.want, "semver has not been correctly classified as zero")
 	}
 }
 
@@ -79,8 +79,8 @@ func TestSemver_String(t *testing.T) {
 		{Semver{Major: 1, Minor: 0, Patch: 1, Prerelease: "alpha", BuildMetadata: "metadata"}, "1.0.1-alpha+metadata"},
 	}
 
-	for _, testCase := range tests {
-		assert.Equal(testCase.want, testCase.have.String(), "the strings should be equal")
+	for _, tc := range tests {
+		assert.Equal(tc.want, tc.have.String(), "the strings should be equal")
 	}
 
 }
@@ -124,7 +124,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 	}
 
 	tag4 := &object.Tag{
-		Name:    "version1.2.3-rc+buildmetadata",
+		Name:    "v1.2.3-rc+metadata",
 		Message: "1.2.3",
 		Tagger: object.Signature{
 			Name:  "Go Semver Release",
@@ -137,7 +137,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 		{tag1, "1.2.3"},
 		{tag2, "1.2.3"},
 		{tag3, "1.2.3"},
-		{tag4, "1.2.3-rc+buildmetadata"},
+		{tag4, "1.2.3-rc+metadata"},
 	}
 
 	for _, test := range matrix {
@@ -168,7 +168,7 @@ func TestSemver_FromGitTagInvalid(t *testing.T) {
 func TestSemver_Bump(t *testing.T) {
 	assert := assertion.New(t)
 
-	s := Semver{Major: 0, Minor: 0, Patch: 0}
+	s := &Semver{Major: 0, Minor: 0, Patch: 0}
 
 	s.BumpPatch()
 	assert.Equal(s.String(), "0.0.1", "the strings should be equal")
