@@ -1,34 +1,32 @@
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/s0ders/go-semver-release/v2/internal/rule"
-	"github.com/spf13/viper"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	assertion "github.com/stretchr/testify/assert"
 
+	"github.com/s0ders/go-semver-release/v2/internal/gittest"
+	"github.com/s0ders/go-semver-release/v2/internal/rule"
 	"github.com/s0ders/go-semver-release/v2/internal/tag"
 )
 
 type cmdOutput struct {
-	Message     string `json:"message"`
-	NewVersion  string `json:"new-version"`
-	NextVersion string `json:"next-version"`
-	NewRelease  bool   `json:"new-release"`
+	Message    string `json:"message"`
+	Branch     string `json:"branch"`
+	Version    string `json:"version"`
+	NewRelease bool   `json:"new-release"`
 }
-
-var sampleCommitFile = "not_a_real_file.txt"
 
 func TestLocalCmd_Release(t *testing.T) {
 	assert := assertion.New(t)
@@ -68,8 +66,9 @@ func TestLocalCmd_Release(t *testing.T) {
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
-		NewVersion: expectedVersion,
+		Version:    expectedVersion,
 		NewRelease: true,
+		Branch:     "master",
 	}
 	actualOut := cmdOutput{}
 
@@ -82,6 +81,121 @@ func TestLocalCmd_Release(t *testing.T) {
 	checkErr(t, err, "checking if tag exists")
 
 	assert.Equal(true, exists, "tag not found")
+}
+
+func TestLocalCmd_MultiBranchRelease(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetBranches([]map[string]string{
+		{"name": "master"},
+		{"name": "rc", "prerelease": "true"},
+	})
+
+	buf := new(bytes.Buffer)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = testRepository.Remove()
+		checkErr(t, err, "removing repository")
+	}()
+
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"local", testRepository.Path})
+
+	// Create commits on master
+	masterCommits := []string{
+		"fix",      // 0.0.1
+		"feat!",    // 1.0.0 (breaking change)
+		"feat",     // 1.1.0
+		"fix",      // 1.1.1
+		"fix",      // 1.1.2
+		"chores",   // 1.1.2
+		"refactor", // 1.1.2
+		"test",     // 1.1.2
+		"ci",       // 1.1.2
+		"feat",     // 1.2.0
+		"perf",     // 1.2.1
+		"revert",   // 1.2.2
+		"style",    // 1.2.2
+	}
+
+	if len(masterCommits) != 0 {
+		for _, commit := range masterCommits {
+			_, err = testRepository.AddCommit(commit)
+			checkErr(t, err, "creating sample commit on master")
+		}
+	}
+
+	// Create branch rc and its commits
+	head, err := testRepository.Head()
+	checkErr(t, err, "fetching head")
+
+	rcRef := plumbing.NewHashReference("refs/heads/rc", head.Hash())
+
+	err = testRepository.Storer.SetReference(rcRef)
+	checkErr(t, err, "creating branch rc")
+
+	worktree, err := testRepository.Worktree()
+	checkErr(t, err, "fetching worktree")
+
+	branchCoOpts := git.CheckoutOptions{
+		Branch: rcRef.Name(),
+		Force:  true,
+	}
+
+	err = worktree.Checkout(&branchCoOpts)
+	checkErr(t, err, "checking out to branch rc")
+
+	rcCommits := []string{
+		"feat!", // 2.0.0
+		"feat",  // 2.1.0
+		"perf",  // 2.1.1
+	}
+
+	for _, commit := range rcCommits {
+		_, err = testRepository.AddCommit(commit)
+		checkErr(t, err, "creating sample commit on rc")
+	}
+
+	// Executing command
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	i := 0
+	expectedOutputs := []cmdOutput{
+		{
+			Message:    "new release found",
+			Version:    "1.2.2",
+			NewRelease: true,
+			Branch:     "master",
+		},
+		{
+			Message:    "new release found",
+			Version:    "2.1.1-rc",
+			NewRelease: true,
+			Branch:     "rc",
+		},
+	}
+
+	scanner := bufio.NewScanner(buf)
+
+	for scanner.Scan() {
+		rawOutput := scanner.Bytes()
+
+		actualOutput := cmdOutput{}
+
+		err = json.Unmarshal(rawOutput, &actualOutput)
+		checkErr(t, err, "unmarshalling output")
+
+		assert.Equal(expectedOutputs[i], actualOutput)
+		i++
+	}
+
+	err = scanner.Err()
+	checkErr(t, err, "scanning error")
 }
 
 func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
@@ -113,8 +227,9 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	expectedVersion := "1.1.1" + "+" + metadata
 	expectedOut := cmdOutput{
 		Message:    "new release found",
-		NewVersion: expectedVersion,
+		Version:    expectedVersion,
 		NewRelease: true,
+		Branch:     "master",
 	}
 	actualOut := cmdOutput{}
 
@@ -132,8 +247,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 func TestLocalCmd_Prerelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	prereleaseID := "alpha"
-	configSetBranches([]map[string]string{{"name": "master", "prerelease": "true", "prerelease-identifier": prereleaseID}})
+	configSetBranches([]map[string]string{{"name": "master", "prerelease": "true"}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -151,11 +265,12 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 		checkErr(t, err, "removing repository")
 	}()
 
-	expectedVersion := "1.1.1" + "-" + prereleaseID
+	expectedVersion := "1.1.1-master"
 	expectedOut := cmdOutput{
 		Message:    "new release found",
-		NewVersion: expectedVersion,
+		Version:    expectedVersion,
 		NewRelease: true,
+		Branch:     "master",
 	}
 	actualOut := cmdOutput{}
 
@@ -196,9 +311,10 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	expectedVersion := "1.0.0"
 	expectedTag := expectedVersion
 	expectedOut := cmdOutput{
-		Message:     "new release found, dry-run is enabled",
-		NextVersion: expectedVersion,
-		NewRelease:  true,
+		Message:    "dry-run enabled, new release found",
+		Branch:     "master",
+		Version:    expectedVersion,
+		NewRelease: true,
 	}
 	actualOut := cmdOutput{}
 
@@ -230,6 +346,8 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	expectedOut := cmdOutput{
 		Message:    "no new release",
 		NewRelease: false,
+		Branch:     "master",
+		Version:    "0.0.0",
 	}
 	actualOut := cmdOutput{}
 
@@ -245,59 +363,47 @@ func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	configSetBranches([]map[string]string{{"name": "master"}})
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
-	if err != nil {
-		t.Fatalf("creating temporary GitHub directory: %s", err)
-	}
+	checkErr(t, err, "creating output directory")
 
 	defer func() {
 		err = os.RemoveAll(outputDir)
-		if err != nil {
-			t.Fatalf("removing temporary GitHub directory: %s", err)
-		}
+		checkErr(t, err, "removing output directory")
 	}()
 
 	outputFilePath := filepath.Join(outputDir, "output")
 
 	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o444)
-	if err != nil {
-		t.Fatalf("creating GitHub output file: %s", err)
-	}
+	checkErr(t, err, "creating output file")
 
 	defer func() {
 		err = outputFile.Close()
-		if err != nil {
-			t.Fatalf("closing GitHub output file: %s", err)
-		}
+		checkErr(t, err, "closing output file")
 	}()
 
 	outputPath := filepath.Join(outputDir, "output")
 
 	err = os.Setenv("GITHUB_OUTPUT", outputPath)
-	if err != nil {
-		t.Fatalf("setting GITHUB_OUTPUT env. var.: %s", err)
-	}
+	checkErr(t, err, "setting GITHUB_OUTPUT environment variable")
 
 	defer func() {
 		err = os.Unsetenv("GITHUB_OUTPUT")
-		if err != nil {
-			t.Fatalf("unsetting GITHUB_OUTPUT env. var.: %s", err)
-		}
+		checkErr(t, err, "unsetting GITHUB_OUTPUT environment variable")
 	}()
 
-	_, repositoryPath, err := sampleRepository()
+	testRepository, err := gittest.NewRepository()
 	if err != nil {
 		t.Fatalf("creating sample repository: %s", err)
 	}
 
 	defer func() {
-		err = os.RemoveAll(repositoryPath)
+		err = testRepository.Remove()
 		assert.NoError(err, "removing sample repository")
 	}()
 
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
+	rootCmd.SetArgs([]string{"local", testRepository.Path})
 
 	err = resetFlags(localCmd)
 	assert.NoError(err, "failed to reset localCmd flags")
@@ -344,12 +450,12 @@ func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
 		t.Fatalf("failed to create temporary directory: %s", err)
 	}
 
-	defer func(path string) {
+	defer func() {
 		err = os.RemoveAll(gpgKeyDir)
 		if err != nil {
 			t.Fatalf("failed to remove temporary directory: %s", err)
 		}
-	}(gpgKeyDir)
+	}()
 
 	keyFilePath := filepath.Join(gpgKeyDir, "key.asc")
 
@@ -417,18 +523,18 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 	configSetBranches([]map[string]string{{"name": "master"}})
 	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
 
-	_, repositoryPath, err := sampleRepository()
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
 	defer func() {
-		err = os.RemoveAll(repositoryPath)
+		err = os.RemoveAll(testRepository.Path)
 		checkErr(t, err, "removing sample repository")
 	}()
 
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", repositoryPath})
+	rootCmd.SetArgs([]string{"local", testRepository.Path})
 
 	err = resetFlags(localCmd)
 	checkErr(t, err, "resetting flags")
@@ -461,8 +567,9 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	expectedTag := expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
-		NewVersion: expectedVersion,
+		Version:    expectedVersion,
 		NewRelease: true,
+		Branch:     "master",
 	}
 	actualOut := cmdOutput{}
 
@@ -479,104 +586,20 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.Equal(true, exists, "tag should exist")
 }
 
-func sampleRepository() (*git.Repository, string, error) {
-	dir, err := os.MkdirTemp("", "localcmd-test-*")
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	repository, err := git.PlainInit(dir, false)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to initialize git repository: %s", err)
-	}
-
-	tempFilePath := filepath.Join(dir, sampleCommitFile)
-
-	commitFile, err := os.Create(tempFilePath)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create sample commit file: %s", err)
-	}
-
-	defer func() {
-		_ = commitFile.Close()
-	}()
-
-	_, err = commitFile.Write([]byte("first line"))
-	if err != nil {
-		return nil, "", err
-	}
-
-	worktree, err := repository.Worktree()
-	if err != nil {
-		return nil, "", fmt.Errorf("could not get worktree: %w", err)
-	}
-
-	_, err = worktree.Add(sampleCommitFile)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to add sample commit file to worktree: %w", err)
-	}
-
-	_, err = worktree.Commit("first commit", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Go Semver Release",
-			Email: "go-semver-release@ci.go",
-			When:  time.Now(),
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create commit: %w", err)
-	}
-	return repository, dir, nil
-}
-
-func sampleCommit(repository *git.Repository, repositoryPath string, commitType string) (err error) {
-	worktree, err := repository.Worktree()
-	if err != nil {
-		return fmt.Errorf("could not get worktree: %w", err)
-	}
-
-	commitFilePath := filepath.Join(repositoryPath, sampleCommitFile)
-
-	err = os.WriteFile(commitFilePath, []byte("data to modify file"), 0o666)
-	if err != nil {
-		return fmt.Errorf("failed to open sample commit file: %w", err)
-	}
-
-	_, err = worktree.Add(sampleCommitFile)
-	if err != nil {
-		return fmt.Errorf("failed to add sample commit file to worktree: %w", err)
-	}
-
-	commitMessage := fmt.Sprintf("%s: this a test commit", commitType)
-
-	_, err = worktree.Commit(commitMessage, &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Go Semver Release",
-			Email: "go-semver-release@ci.go",
-			When:  time.Now(),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create commit: %w", err)
-	}
-
-	return nil
-}
-
 func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []string) (*git.Repository, string) {
-	repository, path, err := sampleRepository()
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
 	if len(commits) != 0 {
 		for _, commit := range commits {
-			err = sampleCommit(repository, path, commit)
+			_, err = testRepository.AddCommit(commit)
 			checkErr(t, err, "creating sample commit")
 		}
 	}
 
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"local", path})
+	rootCmd.SetArgs([]string{"local", testRepository.Path})
 
 	err = resetFlags(localCmd)
 	checkErr(t, err, "resetting flags")
@@ -589,7 +612,7 @@ func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []strin
 	err = rootCmd.Execute()
 	checkErr(t, err, "executing command")
 
-	return repository, path
+	return testRepository.Repository, testRepository.Path
 }
 
 func resetFlags(cmd *cobra.Command) (err error) {
