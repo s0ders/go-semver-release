@@ -3,17 +3,15 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"github.com/s0ders/go-semver-release/v2/internal/branch"
-	"github.com/spf13/viper"
 	"os"
-	"sync"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
+	"github.com/spf13/viper"
 
+	"github.com/s0ders/go-semver-release/v2/internal/branch"
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
 	"github.com/s0ders/go-semver-release/v2/internal/gpg"
 	"github.com/s0ders/go-semver-release/v2/internal/parser"
@@ -115,65 +113,55 @@ var localCmd = &cobra.Command{
 			return fmt.Errorf("unmarshalling branches: %w", err)
 		}
 
-		group, _ := errgroup.WithContext(cmd.Context())
-		var mu sync.RWMutex
-
 		// Launch a parser per branch to analyze
 		for _, branch := range branches {
-			group.Go(func() error {
-				parser := parser.New(logger, tagger, rules,
-					parser.WithReleaseBranch(branch.Name),
-					parser.WithPrereleaseMode(branch.Prerelease),
-					parser.WithPrereleaseIdentifier(branch.PrereleaseIdentifier),
-					parser.WithBuildMetadata(buildMetadata),
-				)
+			// TODO: optimize parser creation, create one and update branch
+			parser := parser.New(logger, tagger, rules,
+				parser.WithReleaseBranch(branch.Name),
+				parser.WithPrereleaseMode(branch.Prerelease),
+				parser.WithPrereleaseIdentifier(branch.Name),
+				parser.WithBuildMetadata(buildMetadata),
+			)
 
-				mu.RLock()
-				computeSemverOutput, err := parser.ComputeNewSemver(repository)
-				mu.RUnlock()
-				if err != nil {
-					return fmt.Errorf("computing new semver: %w", err)
-				}
+			computeSemverOutput, err := parser.ComputeNewSemver(repository)
+			if err != nil {
+				return fmt.Errorf("computing new semver: %w", err)
+			}
 
-				semver := computeSemverOutput.Semver
-				release := computeSemverOutput.NewRelease
-				commitHash := computeSemverOutput.CommitHash
+			semver := computeSemverOutput.Semver
+			release := computeSemverOutput.NewRelease
+			commitHash := computeSemverOutput.CommitHash
 
-				mu.Lock()
-				err = ci.GenerateGitHubOutput(branch.Name, tagPrefix, semver, release)
-				mu.Unlock()
-				if err != nil {
-					return err
-				}
+			err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix))
+			if err != nil {
+				return err
+			}
 
-				switch {
-				case !release:
-					logger.Info().Str("current-version", semver.String()).Bool("new-release", false).Msg("no new release")
-					return nil
-				case release && dryRun:
-					logger.Info().Str("next-version", semver.String()).Bool("new-release", true).Msg("new release found, dry-run is enabled")
-					return nil
-				default:
-					logger.Info().Str("new-version", semver.String()).Bool("new-release", true).Msg("new release found")
+			logEvent := logger.Info()
+			logEvent.Bool("new-release", release)
+			logEvent.Str("version", semver.String())
+			logEvent.Str("branch", branch.Name)
 
-					mu.Lock()
-					err = tagger.TagRepository(repository, semver, commitHash)
-					mu.Unlock()
-					if err != nil {
-						return fmt.Errorf("tagging repository: %w", err)
-					}
-
-					logger.Debug().Str("tag", tagPrefix+semver.String()).Msg("new tag added to repository")
-				}
-
+			switch {
+			case !release:
+				logEvent.Msg("no new release")
 				return nil
-			})
+			case release && dryRun:
+				logEvent.Msg("dry-run enabled, next release found")
+				return nil
+			default:
+				logEvent.Msg("new release found")
+
+				err = tagger.TagRepository(repository, semver, commitHash)
+				if err != nil {
+					return fmt.Errorf("tagging repository: %w", err)
+				}
+
+				logger.Debug().Str("tag", tagPrefix+semver.String()).Msg("new tag added to repository")
+			}
+
 		}
 
-		if err := group.Wait(); err != nil {
-			return err
-		}
-
-		return
+		return nil
 	},
 }
