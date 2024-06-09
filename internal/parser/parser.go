@@ -131,7 +131,6 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 	}
 
 	err = worktree.Checkout(&branchCheckOutOpts)
-	// TODO: ignore error if branch does not exists ?
 	if err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return output, fmt.Errorf("branch %s does not exist", p.releaseBranch)
