@@ -1,11 +1,8 @@
 package tag
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
@@ -14,6 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	assertion "github.com/stretchr/testify/assert"
 
+	"github.com/s0ders/go-semver-release/v2/internal/gittest"
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
@@ -25,62 +23,51 @@ var (
 func TestTag_TagExists(t *testing.T) {
 	assert := assertion.New(t)
 
-	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = os.RemoveAll(repositoryPath)
+		_ = testRepository.Remove()
 	})
 
-	head, err := repository.Head()
+	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	tags := []string{"1.0.0", "1.0.2"}
+	tagName := "1.0.0"
 
-	for i, tag := range tags {
-		_, err = repository.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
-			Message: tag,
-			Tagger: &object.Signature{
-				Name:  taggerName,
-				Email: taggerEmail,
-				When:  time.Now().Add(time.Duration(i) * time.Hour),
-			},
-		})
-		checkErr(t, "creating tag", err)
-	}
+	err = testRepository.AddTag(tagName, head.Hash())
+	checkErr(t, "creating tag", err)
 
-	tagExists, err := Exists(repository, tags[0])
+	tagExists, err := Exists(testRepository.Repository, tagName)
 	checkErr(t, "checking if tag exists", err)
-
 	assert.Equal(tagExists, true, "tag should have been found")
 
-	tagDoesNotExists, err := Exists(repository, "0.0.1")
+	tagDoesNotExists, err := Exists(testRepository.Repository, "0.0.1")
 	checkErr(t, "checking if tag exists", err)
-
 	assert.Equal(tagDoesNotExists, false, "tag should not have been found")
 }
 
 func TestTag_AddTagToRepository(t *testing.T) {
 	assert := assertion.New(t)
 
-	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = os.RemoveAll(repositoryPath)
+		_ = testRepository.Remove()
 	})
 
-	head, err := repository.Head()
+	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
 	version := &semver.Semver{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, version, head.Hash())
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
 	checkErr(t, "tagging repository", err)
 
-	tagExists, err := Exists(repository, version.String())
+	tagExists, err := Exists(testRepository.Repository, version.String())
 	checkErr(t, "checking if tag exists", err)
 
 	assert.Equal(tagExists, true, "tag should have been found")
@@ -89,24 +76,24 @@ func TestTag_AddTagToRepository(t *testing.T) {
 func TestTag_AddExistingTagToRepository(t *testing.T) {
 	assert := assertion.New(t)
 
-	repository, repositoryPath, err := createGitRepository("fix: commit that trigger a patch release")
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = os.RemoveAll(repositoryPath)
+		_ = testRepository.Remove()
 	})
 
-	head, err := repository.Head()
+	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
 	version := &semver.Semver{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, version, head.Hash())
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
 	checkErr(t, "tagging repository", err)
 
-	err = tagger.TagRepository(repository, version, head.Hash())
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
@@ -164,83 +151,30 @@ func TestTag_SignKey(t *testing.T) {
 	entity, err := openpgp.NewEntity("John Doe", "", "john.doe@example.com", config)
 	checkErr(t, "creating openpgp entity", err)
 
-	repository, repositoryPath, err := createGitRepository("fix: ...")
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = os.RemoveAll(repositoryPath)
+		_ = testRepository.Remove()
 	})
 
-	head, err := repository.Head()
+	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
 	version := &semver.Semver{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail, WithSignKey(entity))
 
-	err = tagger.TagRepository(repository, version, head.Hash())
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
 	checkErr(t, "tagging repository", err)
 
-	reference, err := repository.Reference(plumbing.NewTagReferenceName(version.String()), true)
+	reference, err := testRepository.Reference(plumbing.NewTagReferenceName(version.String()), true)
 	checkErr(t, "fetching tag reference", err)
 
-	actualTag, err := repository.TagObject(reference.Hash())
+	actualTag, err := testRepository.TagObject(reference.Hash())
 	checkErr(t, "fetching tag from reference", err)
 
 	assert.NotEqual("", actualTag.PGPSignature, "PGP signature should not be empty")
-}
-
-func createGitRepository(commitMsg string) (*git.Repository, string, error) {
-	dirPath, err := os.MkdirTemp("", "tag-*")
-	if err != nil {
-		return nil, "", fmt.Errorf("creating temporary directory: %s", err)
-	}
-
-	repository, err := git.PlainInit(dirPath, false)
-	if err != nil {
-		return nil, "", fmt.Errorf("initializing git repository: %s", err)
-	}
-
-	_, err = addCommit(repository, commitMsg)
-	if err != nil {
-		return nil, "", fmt.Errorf("adding commit: %s", err)
-	}
-
-	return repository, dirPath, nil
-}
-
-func addCommit(repo *git.Repository, message string) (plumbing.Hash, error) {
-	w, err := repo.Worktree()
-	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("fetching worktree: %s", err)
-	}
-
-	fsRoot := w.Filesystem.Root()
-
-	fileName := fmt.Sprintf("file_%d.txt", time.Now().UnixNano())
-	filePath := filepath.Join(fsRoot, fileName)
-
-	err = os.WriteFile(filePath, []byte(message), 0644)
-	if err != nil {
-		return plumbing.ZeroHash, err
-	}
-
-	_, err = w.Add(fileName)
-	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("adding file to worktree: %s", err)
-	}
-	commitHash, err := w.Commit(message, &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Go Semver Release",
-			Email: "go-semver@release.ci",
-			When:  time.Now(),
-		},
-	})
-	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("committing file: %s", err)
-	}
-
-	return commitHash, nil
 }
 
 func checkErr(t *testing.T, msg string, err error) {
