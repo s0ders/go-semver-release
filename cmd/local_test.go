@@ -311,7 +311,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	expectedVersion := "1.0.0"
 	expectedTag := expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "dry-run enabled, new release found",
+		Message:    "dry-run enabled, next release found",
 		Branch:     "master",
 		Version:    expectedVersion,
 		NewRelease: true,
