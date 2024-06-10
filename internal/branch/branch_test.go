@@ -9,7 +9,7 @@ import (
 func TestBranch_Unmarshall(t *testing.T) {
 	assert := assertion.New(t)
 
-	have := []map[string]string{{"name": "main"}, {"name": "alpha", "prerelease": "true", "prerelease-identifier": "alpha"}}
+	have := []map[string]string{{"name": "main"}, {"name": "alpha", "prerelease": "true"}}
 	want := []Branch{
 		{Name: "main"},
 		{Name: "alpha", Prerelease: true},
