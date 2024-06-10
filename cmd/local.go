@@ -43,11 +43,7 @@ var localCmd = &cobra.Command{
 	Long:  "Tag a Git repository with the new semantic version number if a new release is found",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		var (
-			rules    rule.Rules
-			branches []branch.Branch
-			entity   *openpgp.Entity
-		)
+		var entity *openpgp.Entity
 
 		logger := zerolog.New(cmd.OutOrStdout())
 
@@ -74,44 +70,17 @@ var localCmd = &cobra.Command{
 			return err
 		}
 
-		if !viper.IsSet("rules") {
-			rules = rule.Default
-		} else {
-			var rulesMarshalled map[string][]string
-
-			err = viper.UnmarshalKey("rules", &rulesMarshalled)
-			if err != nil {
-				return fmt.Errorf("unmarshalling rules: %w", err)
-			}
-
-			rules, err = rule.Unmarshall(rulesMarshalled)
-			if err != nil {
-				return err
-			}
-		}
-
-		if !viper.IsSet("branches") {
-			return fmt.Errorf("missing branches key in configuration")
-		}
-
-		var branchesMarshalled []map[string]string
-
-		err = viper.UnmarshalKey("branches", &branchesMarshalled)
+		rules, err := configureRules()
 		if err != nil {
-			return fmt.Errorf("unmarshalling branches: %w", err)
+			return fmt.Errorf("loading rules configuration: %w", err)
 		}
 
-		branches, err = branch.Unmarshall(branchesMarshalled)
+		branches, err := configureBranches()
 		if err != nil {
-			return fmt.Errorf("unmarshalling branches: %w", err)
+			return fmt.Errorf("loading branches configuration: %w", err)
 		}
 
 		tagger := tag.NewTagger(gitName, gitEmail, tag.WithTagPrefix(tagPrefix), tag.WithSignKey(entity))
-
-		err = viper.UnmarshalKey("branches", &branches)
-		if err != nil {
-			return fmt.Errorf("unmarshalling branches: %w", err)
-		}
 
 		// Launch a parser per branch to analyze
 		for _, branch := range branches {
@@ -134,7 +103,7 @@ var localCmd = &cobra.Command{
 
 			err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix))
 			if err != nil {
-				return err
+				return fmt.Errorf("generating github output: %w", err)
 			}
 
 			logEvent := logger.Info()
@@ -164,4 +133,50 @@ var localCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func configureRules() (rule.Rules, error) {
+	if !viper.IsSet("rules") {
+		return rule.Default, nil
+	}
+
+	var (
+		rulesMarshalled map[string][]string
+		rules           rule.Rules
+	)
+
+	err := viper.UnmarshalKey("rules", &rulesMarshalled)
+	if err != nil {
+		return rules, fmt.Errorf("unmarshalling rules key: %w", err)
+	}
+
+	rules, err = rule.Unmarshall(rulesMarshalled)
+	if err != nil {
+		return rules, fmt.Errorf("parsing rules: %w", err)
+	}
+
+	return rules, nil
+}
+
+func configureBranches() ([]branch.Branch, error) {
+	if !viper.IsSet("branches") {
+		return nil, fmt.Errorf("missing branches key in configuration")
+	}
+
+	var (
+		branchesMarshalled []map[string]string
+		branches           []branch.Branch
+	)
+
+	err := viper.UnmarshalKey("branches", &branchesMarshalled)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling branches: %w", err)
+	}
+
+	branches, err = branch.Unmarshall(branchesMarshalled)
+	if err != nil {
+		return nil, fmt.Errorf("parsing branches: %w", err)
+	}
+
+	return branches, nil
 }
