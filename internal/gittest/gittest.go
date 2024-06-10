@@ -16,6 +16,8 @@ import (
 
 const sampleFile = "sample.txt"
 
+var referenceTime = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
+
 type TestRepository struct {
 	*git.Repository
 	Path    string
@@ -69,7 +71,7 @@ func NewRepository() (testRepository *TestRepository, err error) {
 		Author: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  time.Now(),
+			When:  referenceTime,
 		},
 	})
 	if err != nil {
@@ -103,13 +105,20 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 
 	r.Counter++
 
-	commitHash, err = worktree.Commit(commitMessage, &git.CommitOptions{
+	commitOpts := &git.CommitOptions{
+		Committer: &object.Signature{
+			Name:  "Go Semver Release",
+			Email: "go-semver@release.ci",
+			When:  referenceTime.Add((time.Duration(r.Counter) * 10) * time.Second),
+		},
 		Author: &object.Signature{
 			Name:  "Go Semver Release",
-			Email: "go-semver-release@ci.go",
-			When:  time.Now().Add((time.Duration(r.Counter) + 10) * time.Second),
+			Email: "go-semver@release.ci",
+			When:  referenceTime.Add((time.Duration(r.Counter) * 10) * time.Second),
 		},
-	})
+	}
+
+	commitHash, err = worktree.Commit(commitMessage, commitOpts)
 	if err != nil {
 		return commitHash, fmt.Errorf("creating commit: %w", err)
 	}
@@ -120,14 +129,16 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 	r.Counter++
 
-	_, err := r.CreateTag(tagName, hash, &git.CreateTagOptions{
+	tagOpts := &git.CreateTagOptions{
 		Message: tagName,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  time.Now().Add((time.Duration(r.Counter) + 10) * time.Second),
+			When:  referenceTime.Add((time.Duration(r.Counter) * 10) * time.Second),
 		},
-	})
+	}
+
+	_, err := r.CreateTag(tagName, hash, tagOpts)
 
 	return err
 }
