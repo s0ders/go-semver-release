@@ -141,16 +141,16 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	repositoryTest, err := gittest.NewRepository()
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = repositoryTest.Remove()
+		_ = testRepository.Remove()
 	})
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	output, err := parser.ComputeNewSemver(repositoryTest.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository)
 	checkErr(t, "computing new semver", err)
 
 	want := "0.0.0"
@@ -161,19 +161,19 @@ func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
 func TestParser_ComputeNewSemver_UntaggedRepository_PatchRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	repositoryTest, err := gittest.NewRepository()
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = repositoryTest.Remove()
+		_ = testRepository.Remove()
 	})
 
-	_, err = repositoryTest.AddCommit("fix")
+	_, err = testRepository.AddCommit("fix")
 	checkErr(t, "adding commit", err)
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	output, err := parser.ComputeNewSemver(repositoryTest.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository)
 	checkErr(t, "computing new semver", err)
 
 	want := "0.0.1"
@@ -183,19 +183,19 @@ func TestParser_ComputeNewSemver_UntaggedRepository_PatchRelease(t *testing.T) {
 func TestParser_ComputeNewSemver_UntaggedRepository_MinorRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	repositoryTest, err := gittest.NewRepository()
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = repositoryTest.Remove()
+		_ = testRepository.Remove()
 	})
 
-	_, err = repositoryTest.AddCommit("feat")
+	_, err = testRepository.AddCommit("feat")
 	checkErr(t, "adding commit", err)
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	output, err := parser.ComputeNewSemver(repositoryTest.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository)
 	checkErr(t, "computing new semver", err)
 
 	want := "0.1.0"
@@ -205,22 +205,54 @@ func TestParser_ComputeNewSemver_UntaggedRepository_MinorRelease(t *testing.T) {
 func TestParser_ComputeNewSemver_UntaggedRepository_MajorRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	repositoryTest, err := gittest.NewRepository()
+	testRepository, err := gittest.NewRepository()
 	checkErr(t, "creating repository", err)
 
 	t.Cleanup(func() {
-		_ = repositoryTest.Remove()
+		_ = testRepository.Remove()
 	})
 
-	_, err = repositoryTest.AddCommit("feat!")
+	_, err = testRepository.AddCommit("feat!")
 	checkErr(t, "adding commit", err)
 
 	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
 
-	output, err := parser.ComputeNewSemver(repositoryTest.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository)
 	checkErr(t, "computing new semver ", err)
 
 	want := "1.0.0"
+
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	firstCommitHash, err := testRepository.AddCommit("feat!") // 1.0.0
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("1.0.0", firstCommitHash)
+	checkErr(t, "adding tag", err)
+
+	_, err = testRepository.AddCommit("feat") // 1.1.0
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommit("fix") // 1.1.1
+	checkErr(t, "adding commit", err)
+
+	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	checkErr(t, "computing new semver ", err)
+
+	want := "1.1.1"
 
 	assert.Equal(want, output.Semver.String(), "version should be equal")
 	assert.Equal(true, output.NewRelease, "boolean should be equal")
