@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -94,17 +95,10 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 		logOptions   git.LogOptions
 	)
 
-	// Check if a previous semver tag exists, if not, create it
 	if latestSemverTag == nil {
 		p.logger.Debug().Msg("no previous tag, creating one")
 
-		head, err := repository.Head()
-		if err != nil {
-			return output, fmt.Errorf("fetching head: %w", err)
-		}
-
 		latestSemver = &semver.Semver{Major: 0, Minor: 0, Patch: 0}
-		latestSemverTag = p.tagger.TagFromSemver(latestSemver, head.Hash())
 	} else {
 		p.logger.Debug().Str("tag", latestSemverTag.Name).Msg("latest semver tag found")
 
@@ -112,6 +106,15 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 		if err != nil {
 			return output, fmt.Errorf("building semver from git tag: %w", err)
 		}
+
+		latestSemverTagCommit, err := latestSemverTag.Commit()
+		if err != nil {
+			return output, fmt.Errorf("fetching latest semver tag commit: %w", err)
+		}
+
+		// Show all commit that are at least one second older than the latest one pointed by SemVer tag
+		since := latestSemverTagCommit.Committer.When.Add(time.Second)
+		logOptions.Since = &since
 	}
 
 	worktree, err := repository.Worktree()
@@ -120,7 +123,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 	}
 
 	if worktree == nil {
-		return output, fmt.Errorf("worktree is nil, check that repository is initialized")
+		return output, fmt.Errorf("no worktree, check that repository is initialized")
 	}
 
 	// Checkout to release branch
@@ -133,19 +136,9 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 	err = worktree.Checkout(&branchCheckOutOpts)
 	if err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return output, fmt.Errorf("branch %s does not exist", p.releaseBranch)
+			return output, fmt.Errorf("branch %q does not exist: %w", p.releaseBranch, err)
 		}
 		return output, fmt.Errorf("checking out to release branch: %w", err)
-	}
-
-	// If there is a previous semver tags, fetch commits newer than its targeted commit
-	if !latestSemver.IsZero() {
-		latestSemverTagCommit, err := latestSemverTag.Commit()
-		if err != nil {
-			return output, fmt.Errorf("fetching latest semver tag commit: %w", err)
-		}
-
-		logOptions.Since = &latestSemverTagCommit.Author.When
 	}
 
 	repositoryLogs, err := repository.Log(&logOptions)
@@ -154,13 +147,10 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 	}
 
 	// Create commit history
-	err = repositoryLogs.ForEach(func(c *object.Commit) error {
+	_ = repositoryLogs.ForEach(func(c *object.Commit) error {
 		history = append(history, c)
 		return nil
 	})
-	if err != nil {
-		return output, fmt.Errorf("looping over commit history: %w", err)
-	}
 
 	// Reverse commit history to go from oldest to newest
 	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
@@ -223,7 +213,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		case "minor":
 			latestSemver.BumpMinor()
 		default:
-			return false, latestReleaseCommitHash, fmt.Errorf("unknown release type %s", releaseType)
+			return false, latestReleaseCommitHash, fmt.Errorf("unknown release type %q", releaseType)
 		}
 
 		latestReleaseCommitHash = commit.Hash
