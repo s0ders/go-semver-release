@@ -38,7 +38,8 @@ clean:
     rm -rf ./bin/*
 
 lint:
-	@golangci-lint run
+	golangci-lint run
+	gocyclo -over 15 .
 
 vuln:
 	@govulncheck ./...
