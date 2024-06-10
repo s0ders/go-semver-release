@@ -61,13 +61,16 @@ func TestTag_AddTagToRepository(t *testing.T) {
 	checkErr(t, "fetching head", err)
 
 	version := &semver.Semver{Major: 1}
+	prefix := "v"
 
-	tagger := NewTagger(taggerName, taggerEmail)
+	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(prefix))
 
 	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
 	checkErr(t, "tagging repository", err)
 
-	tagExists, err := Exists(testRepository.Repository, version.String())
+	wantTag := prefix + version.String()
+
+	tagExists, err := Exists(testRepository.Repository, wantTag)
 	checkErr(t, "checking if tag exists", err)
 
 	assert.Equal(tagExists, true, "tag should have been found")
@@ -119,7 +122,7 @@ func TestTag_NewTagFromServer(t *testing.T) {
 		Tagger: tagger.GitSignature,
 	}
 
-	assert.Equal(*gotTag, *wantTag)
+	assert.Equal(*wantTag, *gotTag)
 }
 
 func TestTag_AddToRepositoryWithNoHead(t *testing.T) {

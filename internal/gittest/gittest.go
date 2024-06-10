@@ -103,18 +103,16 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 
 	commitMessage := fmt.Sprintf("%s: this a test commit", commitType)
 
-	r.Counter++
-
 	commitOpts := &git.CommitOptions{
 		Committer: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  referenceTime.Add((time.Duration(r.Counter) * 10) * time.Second),
+			When:  r.When(),
 		},
 		Author: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  referenceTime.Add((time.Duration(r.Counter) * 10) * time.Second),
+			When:  r.When(),
 		},
 	}
 
@@ -127,14 +125,12 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 }
 
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
-	r.Counter++
-
 	tagOpts := &git.CreateTagOptions{
 		Message: tagName,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  referenceTime.Add((time.Duration(r.Counter) * 10) * time.Second),
+			When:  r.When(),
 		},
 	}
 
@@ -145,4 +141,9 @@ func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 
 func (r *TestRepository) Remove() error {
 	return os.RemoveAll(r.Path)
+}
+
+func (r *TestRepository) When() time.Time {
+	r.Counter++
+	return referenceTime.Add(time.Duration(r.Counter*10) * time.Second)
 }
