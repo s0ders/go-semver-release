@@ -71,7 +71,7 @@ jobs:
       - name: Go Semver Release
         id: go-semver
         run: |
-          go install github.com/s0ders/go-semver-release/v3@latest
+          go install .
           go-semver-release local . --config ./.semver.yaml --verbose --dry-run
 
   tag:
