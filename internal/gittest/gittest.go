@@ -162,6 +162,20 @@ func (r *TestRepository) CheckoutBranch(name string) error {
 		return err
 	}
 
+	branchCoOpts := &git.CheckoutOptions{
+		Branch: plumbing.ReferenceName(refName),
+		Force:  true,
+	}
+
+	worktree, err := r.Worktree()
+	if err != nil {
+		return err
+	}
+
+	if err := worktree.Checkout(branchCoOpts); err != nil {
+		return err
+	}
+
 	return nil
 }
 
