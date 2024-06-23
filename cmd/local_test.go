@@ -13,7 +13,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	assertion "github.com/stretchr/testify/assert"
 
 	"github.com/s0ders/go-semver-release/v2/internal/gittest"
@@ -26,6 +25,162 @@ type cmdOutput struct {
 	Branch     string `json:"branch"`
 	Version    string `json:"version"`
 	NewRelease bool   `json:"new-release"`
+}
+
+func TestLocalCmd_SemVerConfigFile(t *testing.T) {
+	assert := assertion.New(t)
+
+	taggerName := "My CI Robot"
+	taggerEmail := "my-robot@release.ci"
+
+	// Create configuration file
+	configurationContent := []byte(`
+git-name: ` + taggerName + `
+git-email: ` + taggerEmail + `
+tag-prefix: v
+branches:
+  - name: master
+  - name: alpha
+    prerelease: true
+rules:
+  minor:
+    - feat
+  patch:
+    - fix
+    - perf
+    - revert
+`)
+
+	configurationFileDirectory, err := os.MkdirTemp("", "*")
+	checkErr(t, err, "creating configuration file")
+
+	defer func() {
+		err = os.RemoveAll(configurationFileDirectory)
+		checkErr(t, err, "removing configuration file")
+	}()
+
+	configurationFilePath := filepath.Join(configurationFileDirectory, "config.yml")
+
+	err = os.WriteFile(configurationFilePath, configurationContent, 0644)
+	checkErr(t, err, "writing configuration file")
+
+	// Create test repository
+	masterCommits := []string{
+		"fix",      // 0.0.1
+		"feat!",    // 1.0.0 (breaking change)
+		"feat",     // 1.1.0
+		"fix",      // 1.1.1
+		"fix",      // 1.1.2
+		"chores",   // 1.1.2
+		"refactor", // 1.1.2
+		"test",     // 1.1.2
+		"ci",       // 1.1.2
+		"feat",     // 1.2.0
+		"perf",     // 1.2.1
+		"revert",   // 1.2.2
+		"style",    // 1.2.2
+	}
+
+	alphaCommits := []string{
+		"fix",  // 1.2.3-alpha
+		"feat", // 1.3.0-alpha
+	}
+
+	buf := new(bytes.Buffer)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = os.RemoveAll(testRepository.Path)
+		checkErr(t, err, "removing repository")
+	}()
+
+	for _, commit := range masterCommits {
+		_, err = testRepository.AddCommit(commit)
+		checkErr(t, err, "creating sample commit")
+	}
+
+	// Creating alpha branch and associated commits
+	err = testRepository.CheckoutBranch("alpha")
+	checkErr(t, err, "checking out alpha branch")
+
+	for _, commit := range alphaCommits {
+		_, err = testRepository.AddCommit(commit)
+		checkErr(t, err, "creating sample commit")
+	}
+
+	// Executing command
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	err = rootCmd.PersistentFlags().Set("config", configurationFilePath)
+	checkErr(t, err, "setting root command config flag")
+
+	rootCmd.SetArgs([]string{"local", testRepository.Path})
+
+	err = resetFlags(localCmd)
+	checkErr(t, err, "resetting local command flags")
+
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	expectedMasterVersion := "1.2.2"
+	expectedMasterTag := "v" + expectedMasterVersion
+	expectedMasterOut := cmdOutput{
+		Message:    "new release found",
+		Version:    expectedMasterVersion,
+		NewRelease: true,
+		Branch:     "master",
+	}
+	actualMasterOut := cmdOutput{}
+
+	expectedAlphaVersion := "1.3.0-alpha"
+	expectedAlphaTag := "v" + expectedAlphaVersion
+	expectedAlphaOut := cmdOutput{
+		Message:    "new release found",
+		Version:    expectedAlphaVersion,
+		NewRelease: true,
+		Branch:     "alpha",
+	}
+	actualAlphaOut := cmdOutput{}
+
+	outputs := make([]string, 0, 2)
+
+	scanner := bufio.NewScanner(buf)
+	for scanner.Scan() {
+		outputs = append(outputs, scanner.Text())
+	}
+
+	// Checking master
+	err = json.Unmarshal([]byte(outputs[0]), &actualMasterOut)
+	checkErr(t, err, "unmarshalling master output")
+
+	assert.Equal(expectedMasterOut, actualMasterOut, "localCmd output should be equal")
+
+	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
+	checkErr(t, err, "checking if master tag exists")
+
+	assert.Equal(true, exists, "master tag not found")
+
+	expectedTagRef, err := testRepository.Tag(expectedMasterTag)
+	checkErr(t, err, "getting master tag ref")
+
+	expectedTagObj, err := testRepository.TagObject(expectedTagRef.Hash())
+	checkErr(t, err, "getting master tag object")
+
+	assert.Equal(taggerName, expectedTagObj.Tagger.Name)
+	assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
+
+	// Checking alpha
+	err = json.Unmarshal([]byte(outputs[1]), &actualAlphaOut)
+	checkErr(t, err, "unmarshalling alpha output")
+
+	assert.Equal(expectedAlphaOut, actualAlphaOut, "localCmd output should be equal")
+
+	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
+	checkErr(t, err, "checking if alpha tag exists")
+
+	assert.Equal(true, exists, "alpha tag not found")
 }
 
 func TestLocalCmd_Release(t *testing.T) {
@@ -49,9 +204,7 @@ func TestLocalCmd_Release(t *testing.T) {
 		"style",    // 1.2.2
 	}
 
-	flags := map[string]string{
-		"tag-prefix": "v",
-	}
+	flags := map[string]string{}
 
 	buf := new(bytes.Buffer)
 
@@ -225,6 +378,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	}()
 
 	expectedVersion := "1.1.1" + "+" + metadata
+	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
 		Version:    expectedVersion,
@@ -238,7 +392,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
-	exists, err := tag.Exists(repository, expectedVersion)
+	exists, err := tag.Exists(repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
 
 	assert.Equal(true, exists)
@@ -266,6 +420,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 	}()
 
 	expectedVersion := "1.1.1-master"
+	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
 		Version:    expectedVersion,
@@ -279,7 +434,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 
 	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
 
-	exists, err := tag.Exists(repository, expectedVersion)
+	exists, err := tag.Exists(repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
 
 	assert.Equal(true, exists)
@@ -564,7 +719,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	}()
 
 	expectedVersion := "0.2.0"
-	expectedTag := expectedVersion
+	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
 		Version:    expectedVersion,
@@ -633,9 +788,9 @@ func checkErr(t *testing.T, err error, message string) {
 }
 
 func configSetBranches(branches []map[string]string) {
-	viper.Set("branches", branches)
+	viperInstance.Set("branches", branches)
 }
 
 func configSetRules(rules map[string][]string) {
-	viper.Set("rules", rules)
+	viperInstance.Set("rules", rules)
 }
