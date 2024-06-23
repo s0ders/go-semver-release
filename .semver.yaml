@@ -1,13 +1,8 @@
-git-name: Go SemVer Release
+git-name: Go Semver Release
 git-email: go-semver@release.ci
-
 tag-prefix: v
-
 branches:
   - name: main
-  - name: rc
-    prerelease: true
-
 rules:
   minor:
     - feat
