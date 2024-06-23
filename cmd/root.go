@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -54,23 +55,34 @@ func initializeConfig(cmd *cobra.Command) error {
 	}
 
 	if err := viperInstance.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+
+		if !errors.As(err, &configFileNotFoundError) {
 			return err
 		}
 	}
 
-	bindFlags(cmd, viperInstance)
+	if err := bindFlags(cmd, viperInstance); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func bindFlags(cmd *cobra.Command, v *viper.Viper) {
+func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
+	var err error
+
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		configName := f.Name
 
 		if !f.Changed && v.IsSet(configName) {
 			val := v.Get(configName)
-			cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
+			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
+			if err != nil {
+				return
+			}
 		}
 	})
+
+	return err
 }
