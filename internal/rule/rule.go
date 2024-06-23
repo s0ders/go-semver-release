@@ -1,13 +1,22 @@
-// Package rule provides functions to deal with release rule.
+// Package rule provides functions to handle release rule configuration.
 package rule
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 )
+
+type Rules struct {
+	Map map[string]string
+}
+
+var Default = Rules{
+	Map: map[string]string{
+		"feat":   "minor",
+		"fix":    "patch",
+		"perf":   "patch",
+		"revert": "patch",
+	},
+}
 
 var (
 	ErrInvalidCommitType    = errors.New("invalid commit type")
@@ -35,95 +44,31 @@ var validReleaseTypes = map[string]struct{}{
 	"patch": {},
 }
 
-type ReleaseRule struct {
-	CommitType  string `json:"type"`
-	ReleaseType string `json:"release"`
-}
+// Unmarshall takes a raw Viper configuration and returns a Rules struct representing release rules configuration.
+func Unmarshall(input map[string][]string) (Rules, error) {
+	var rules Rules
+	rules.Map = make(map[string]string)
 
-type ReleaseRules struct {
-	Rules []ReleaseRule `json:"rule"`
-}
-
-var Default = ReleaseRules{Rules: []ReleaseRule{
-	{"feat", "minor"},
-	{"fix", "patch"},
-	{"perf", "patch"},
-	{"revert", "patch"},
-}}
-
-type Options struct {
-	Reader io.Reader
-}
-
-type OptionFunc func(*Options)
-
-func WithReader(reader io.Reader) OptionFunc {
-	return func(o *Options) {
-		o.Reader = reader
-	}
-}
-
-// Map returns a flat map corresponding to the release rule with commit types as keys and release types as values.
-func (r *ReleaseRules) Map() map[string]string {
-	m := make(map[string]string, len(r.Rules))
-	for _, rule := range r.Rules {
-		m[rule.CommitType] = rule.ReleaseType
-	}
-	return m
-}
-
-// Init initialize a new set of release rule with the given options if any.
-func Init(options ...OptionFunc) (ReleaseRules, error) {
-
-	opts := &Options{}
-
-	for _, optionFunc := range options {
-		optionFunc(opts)
+	if len(input) == 0 {
+		return rules, ErrNoRules
 	}
 
-	if opts.Reader == nil {
-		return Default, nil
-	}
-
-	return Parse(opts.Reader)
-}
-
-// Parse reads a buffer a returns the corresponding release rule.
-func Parse(reader io.Reader) (ReleaseRules, error) {
-	var rules ReleaseRules
-	existingType := make(map[string]string)
-
-	buf, err := io.ReadAll(reader)
-	if err != nil {
-		return ReleaseRules{}, fmt.Errorf("failed to read rule file: %w", err)
-	}
-
-	bufReader := bytes.NewReader(buf)
-
-	decoder := json.NewDecoder(bufReader)
-	err = decoder.Decode(&rules)
-	if err != nil {
-		return ReleaseRules{}, fmt.Errorf("failed to decode JSON into rule: %w", err)
-	}
-
-	for _, rule := range rules.Rules {
-		if _, ok := validCommitTypes[rule.CommitType]; !ok {
-			return ReleaseRules{}, ErrInvalidCommitType
+	for releaseType, commitTypes := range input {
+		if _, ok := validReleaseTypes[releaseType]; !ok {
+			return rules, ErrInvalidReleaseType
 		}
 
-		if _, ok := validReleaseTypes[rule.ReleaseType]; !ok {
-			return ReleaseRules{}, ErrInvalidReleaseType
+		for _, commitType := range commitTypes {
+			if _, ok := validCommitTypes[commitType]; !ok {
+				return rules, ErrInvalidCommitType
+			}
+
+			if _, ok := rules.Map[commitType]; ok {
+				return rules, ErrDuplicateReleaseRule
+			}
+
+			rules.Map[commitType] = releaseType
 		}
-
-		if _, ok := existingType[rule.CommitType]; ok {
-			return ReleaseRules{}, ErrDuplicateReleaseRule
-		}
-
-		existingType[rule.CommitType] = rule.ReleaseType
-	}
-
-	if len(rules.Rules) == 0 {
-		return ReleaseRules{}, ErrNoRules
 	}
 
 	return rules, nil

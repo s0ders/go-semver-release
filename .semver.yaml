@@ -1,0 +1,12 @@
+git-name: Go Semver Release
+git-email: go-semver@release.ci
+tag-prefix: v
+branches:
+  - name: main
+rules:
+  minor:
+    - feat
+  patch:
+    - fix
+    - perf
+    - revert

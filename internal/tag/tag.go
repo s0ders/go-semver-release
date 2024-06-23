@@ -4,44 +4,59 @@ package tag
 import (
 	"errors"
 	"fmt"
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-
 	"github.com/s0ders/go-semver-release/v2/internal/semver"
 )
 
 var ErrTagAlreadyExists = errors.New("tag already exists")
 
-var GitSignature = object.Signature{
-	Name:  "Go Semver Release",
-	Email: "go-semver@release.ci",
-	When:  time.Now(),
-}
+type OptionFunc func(t *Tagger)
 
-type OptionFunc func(options *git.CreateTagOptions)
-
-func WithPrefix(prefix string) OptionFunc {
-	return func(c *git.CreateTagOptions) {
-		c.Message = prefix + c.Message
+func WithTagPrefix(prefix string) OptionFunc {
+	return func(t *Tagger) {
+		t.TagPrefix = prefix
 	}
 }
 
 func WithSignKey(key *openpgp.Entity) OptionFunc {
-	return func(c *git.CreateTagOptions) {
-		c.SignKey = key
+	return func(t *Tagger) {
+		t.SignKey = key
 	}
 }
 
-// NewFromSemver creates a new Git annotated tag from a semantic version number.
-func NewFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
+type Tagger struct {
+	TagPrefix    string
+	GitSignature object.Signature
+	SignKey      *openpgp.Entity
+}
+
+func NewTagger(name, email string, options ...OptionFunc) *Tagger {
+	tagger := &Tagger{
+		GitSignature: object.Signature{
+			Name:  name,
+			Email: email,
+			When:  time.Now(),
+		},
+	}
+
+	for _, option := range options {
+		option(tagger)
+	}
+
+	return tagger
+}
+
+// TagFromSemver creates a new Git annotated tag from a semantic version number.
+func (t *Tagger) TagFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
-		Tagger: GitSignature,
+		Tagger: t.GitSignature,
 	}
 
 	return tag
@@ -62,31 +77,27 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 	return exists, nil
 }
 
-// AddToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
+// TagRepository AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
-func AddToRepository(repository *git.Repository, semver *semver.Semver, options ...OptionFunc) error {
-	head, err := repository.Head()
-	if err != nil {
-		return fmt.Errorf("failed to fetch head: %w", err)
+func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver, commitHash plumbing.Hash) error {
+	if semver == nil {
+		return fmt.Errorf("semver is nil")
 	}
 
 	tagOpts := &git.CreateTagOptions{
-		Message: semver.String(),
-		Tagger:  &GitSignature,
-	}
-
-	for _, option := range options {
-		option(tagOpts)
+		Message: t.TagPrefix + semver.String(),
+		SignKey: t.SignKey,
+		Tagger:  &t.GitSignature,
 	}
 
 	if exists, err := Exists(repository, tagOpts.Message); err != nil {
-		return fmt.Errorf("failed to check if tag exists: %w", err)
+		return fmt.Errorf("checking if tag exists: %w", err)
 	} else if exists {
 		return ErrTagAlreadyExists
 	}
 
-	if _, err = repository.CreateTag(tagOpts.Message, head.Hash(), tagOpts); err != nil {
-		return fmt.Errorf("failed to create tag on repository: %w", err)
+	if _, err := repository.CreateTag(tagOpts.Message, commitHash, tagOpts); err != nil {
+		return fmt.Errorf("creating tag on repository: %w", err)
 	}
 
 	return nil
