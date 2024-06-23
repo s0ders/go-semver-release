@@ -1,16 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/s0ders/go-semver-release/v3/cmd"
+	"os"
 )
 
 func main() {
-	err := cmd.Execute()
-	if err != nil {
-		fmt.Println(err)
+	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
