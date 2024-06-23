@@ -105,21 +105,10 @@ jobs:
           git tag --sign --annotate ${{ env.VERSION }} --message "${{ env.VERSION }}"
           git push origin ${{ env.VERSION }}
 
-  release:
+  docker-release:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: write
-      actions: read
-    strategy:
-      matrix:
-        os:
-          - linux
-          - windows
-          - darwin
-        arch:
-          - amd64
-          - arm64
+      contents: read
     needs:
       - tag
       - versioning
@@ -149,10 +138,23 @@ jobs:
             APP_COMMIT_HASH="${{ github.sha }}"
           tags: s0ders/go-semver-release:${{ env.VERSION }}
 
-      - uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
-          evaluated-envs: "VERSION:${{ env.VERSION }}, COMMIT_HASH:${{ github.sha }}, BUILD_NUMBER:${{ github.run_id }}"
-          upload-assets: true
-          upload-tag-name: true
+  slsa-build:
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
+    needs:
+      - tag
+      - versioning
+    strategy:
+      matrix:
+        os:
+          - linux
+          - windows
+          - darwin
+        arch:
+          - amd64
+          - arm64
+    with:
+      go-version: ${{ env.GO_VERSION }}
+      config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
+      evaluated-envs: "VERSION:${{ needs.versioning.outputs.semver }}, COMMIT_HASH:${{ github.sha }}, BUILD_NUMBER:${{ github.run_id }}"
+      upload-assets: true
+      upload-tag-name: true
