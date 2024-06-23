@@ -2,53 +2,75 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-var (
-	cfgFile  string
-	verbose  bool
-	gitName  string
-	gitEmail string
+const (
+	defaultConfigFile = ".semver"
+	configFileFormat  = "yaml"
 )
 
-func init() {
-	cobra.OnInitialize(initConfig)
+var (
+	cfgFile   string
+	gitName   string
+	gitEmail  string
+	tagPrefix string
+	verbose   bool
+)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file path (default is ./.semver.yaml)")
+var viperInstance = viper.New()
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file path (default is ./"+defaultConfigFile+""+configFileFormat+")")
 	rootCmd.PersistentFlags().StringVar(&gitName, "git-name", "Go Semver Release", "Name used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&gitEmail, "git-email", "go-semver@release.ci", "Email used in semantic version tags")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose ci")
-
-	cobra.CheckErr(viper.BindPFlag("git-name", rootCmd.PersistentFlags().Lookup("git-name")))
-	cobra.CheckErr(viper.BindPFlag("git-email", rootCmd.PersistentFlags().Lookup("git-email")))
+	rootCmd.PersistentFlags().StringVar(&tagPrefix, "tag-prefix", "v", "Prefix added to the version tag name")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "go-semver-release",
-	Short: "go-semver-release - CLI to automate semantic versioning of git repositories",
+	Short: "go-semver-release - CLI to automate semantic versioning of Git repositories",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return initializeConfig(cmd)
+	},
 }
 
 func Execute() error {
 	return rootCmd.Execute()
 }
 
-func initConfig() {
+func initializeConfig(cmd *cobra.Command) error {
+
 	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
+		viperInstance.SetConfigFile(cfgFile)
 	} else {
-		wd, err := os.Getwd()
-		cobra.CheckErr(err)
-
-		viper.AddConfigPath(wd)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".semver")
+		viperInstance.AddConfigPath(".")
+		viperInstance.SetConfigType(configFileFormat)
+		viperInstance.SetConfigName(defaultConfigFile)
 	}
 
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	if err := viperInstance.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return err
+		}
 	}
+
+	bindFlags(cmd, viperInstance)
+
+	return nil
+}
+
+func bindFlags(cmd *cobra.Command, v *viper.Viper) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		configName := f.Name
+
+		if !f.Changed && v.IsSet(configName) {
+			val := v.Get(configName)
+			cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
+		}
+	})
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/s0ders/go-semver-release/v2/internal/branch"
 	"github.com/s0ders/go-semver-release/v2/internal/ci"
@@ -20,19 +19,15 @@ import (
 )
 
 var (
-	tagPrefix      string
 	armoredKeyPath string
 	buildMetadata  string
 	dryRun         bool
 )
 
 func init() {
-	localCmd.Flags().StringVarP(&tagPrefix, "tag-prefix", "t", "", "Prefix added to the version tag name")
 	localCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
 	localCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the SemVer")
 	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
-
-	cobra.CheckErr(viper.BindPFlag("tag-prefix", localCmd.Flags().Lookup("tag-prefix")))
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -136,7 +131,7 @@ var localCmd = &cobra.Command{
 }
 
 func configureRules() (rule.Rules, error) {
-	if !viper.IsSet("rules") {
+	if !viperInstance.IsSet("rules") {
 		return rule.Default, nil
 	}
 
@@ -145,7 +140,7 @@ func configureRules() (rule.Rules, error) {
 		rules           rule.Rules
 	)
 
-	err := viper.UnmarshalKey("rules", &rulesMarshalled)
+	err := viperInstance.UnmarshalKey("rules", &rulesMarshalled)
 	if err != nil {
 		return rules, fmt.Errorf("unmarshalling rules key: %w", err)
 	}
@@ -159,7 +154,7 @@ func configureRules() (rule.Rules, error) {
 }
 
 func configureBranches() ([]branch.Branch, error) {
-	if !viper.IsSet("branches") {
+	if !viperInstance.IsSet("branches") {
 		return nil, fmt.Errorf("missing branches key in configuration")
 	}
 
@@ -168,7 +163,7 @@ func configureBranches() ([]branch.Branch, error) {
 		branches           []branch.Branch
 	)
 
-	err := viper.UnmarshalKey("branches", &branchesMarshalled)
+	err := viperInstance.UnmarshalKey("branches", &branchesMarshalled)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling branches: %w", err)
 	}
