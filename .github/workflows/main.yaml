@@ -143,6 +143,7 @@ jobs:
     needs:
       - tag
       - versioning
+      - docker-release
     strategy:
       matrix:
         os:
