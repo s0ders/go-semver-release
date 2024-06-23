@@ -10,12 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v2/internal/branch"
-	"github.com/s0ders/go-semver-release/v2/internal/ci"
-	"github.com/s0ders/go-semver-release/v2/internal/gpg"
-	"github.com/s0ders/go-semver-release/v2/internal/parser"
-	"github.com/s0ders/go-semver-release/v2/internal/rule"
-	"github.com/s0ders/go-semver-release/v2/internal/tag"
+	"github.com/s0ders/go-semver-release/v3/internal/branch"
+	"github.com/s0ders/go-semver-release/v3/internal/ci"
+	"github.com/s0ders/go-semver-release/v3/internal/gpg"
+	"github.com/s0ders/go-semver-release/v3/internal/parser"
+	"github.com/s0ders/go-semver-release/v3/internal/rule"
+	"github.com/s0ders/go-semver-release/v3/internal/tag"
 )
 
 var (

@@ -72,7 +72,7 @@ jobs:
         id: go-semver
         run: |
           go install github.com/s0ders/go-semver-release/v2@latest
-          go-semver-release local . --config ./.semver.yaml --verbose --dry-run
+          go-semver-release local . --release-branch main --tag-prefix v --verbose --dry-run
 
   tag:
     runs-on: ubuntu-latest

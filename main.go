@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/s0ders/go-semver-release/v2/cmd"
+	"github.com/s0ders/go-semver-release/v3/cmd"
 )
 
 func main() {

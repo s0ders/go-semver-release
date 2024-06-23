@@ -9,7 +9,7 @@ WORKDIR /app
 COPY .. /app
 
 RUN go mod download
-RUN CGO_ENABLED=0 go build -ldflags="-X github.com/s0ders/go-semver-release/v2/cmd.version=$APP_VERSION -X github.com/s0ders/go-semver-release/v2/cmd.buildNumber=$APP_BUILD_NUMBER  -X github.com/s0ders/go-semver-release/v2/cmd.commitHash=$APP_COMMIT_HASH -w -s" -v -o app .
+RUN CGO_ENABLED=0 go build -ldflags="-X github.com/s0ders/go-semver-release/v3/cmd.version=$APP_VERSION -X github.com/s0ders/go-semver-release/v3/cmd.buildNumber=$APP_BUILD_NUMBER  -X github.com/s0ders/go-semver-release/v3/cmd.commitHash=$APP_COMMIT_HASH -w -s" -v -o app .
 
 # alpine:3.20.0
 FROM alpine@sha256:77726ef6b57ddf65bb551896826ec38bc3e53f75cdde31354fbffb4f25238ebd as vulnscan

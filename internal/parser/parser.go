@@ -16,9 +16,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
 
-	"github.com/s0ders/go-semver-release/v2/internal/rule"
-	"github.com/s0ders/go-semver-release/v2/internal/semver"
-	"github.com/s0ders/go-semver-release/v2/internal/tag"
+	"github.com/s0ders/go-semver-release/v3/internal/rule"
+	"github.com/s0ders/go-semver-release/v3/internal/semver"
+	"github.com/s0ders/go-semver-release/v3/internal/tag"
 )
 
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
