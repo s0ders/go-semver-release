@@ -1,5 +1,5 @@
 # golang:1.22.4-bookworm
-FROM golang@sha256:aec47843e52fee4436bdd3ce931417fa980e9055658b5142140925eea3044bea as builder
+FROM golang@sha256:a66eda637829ce891e9cf61ff1ee0edf544e1f6c5b0e666c7310dce231a66f28 as builder
 
 ARG APP_VERSION="v0.0.0+unknown"
 ARG APP_BUILD_NUMBER="unknown"
