@@ -153,7 +153,7 @@ jobs:
           - amd64
           - arm64
     with:
-      go-version: ${{ env.GO_VERSION }}
+      go-version: 1.22.4
       config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
       evaluated-envs: "VERSION:${{ needs.versioning.outputs.semver }}, COMMIT_HASH:${{ github.sha }}, BUILD_NUMBER:${{ github.run_id }}"
       upload-assets: true
