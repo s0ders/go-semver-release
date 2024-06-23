@@ -1,4 +1,4 @@
-// Package ci provides function to generate output for CI/CD pipelines.
+// Package ci provides function to generate output for CI/CD tools.
 package ci
 
 import (

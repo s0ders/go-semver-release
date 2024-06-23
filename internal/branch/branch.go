@@ -1,3 +1,4 @@
+// Package branch provides functions to handle branch configuration.
 package branch
 
 import (
@@ -14,6 +15,7 @@ type Branch struct {
 	Prerelease bool
 }
 
+// Unmarshall takes a raw Viper configuration and returns a slice of Branch representing a branch configuration.
 func Unmarshall(input []map[string]string) ([]Branch, error) {
 	if len(input) == 0 {
 		return nil, ErrNoBranch

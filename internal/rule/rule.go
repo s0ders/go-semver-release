@@ -1,3 +1,4 @@
+// Package rule provides functions to handle release rule configuration.
 package rule
 
 import (
@@ -43,6 +44,7 @@ var validReleaseTypes = map[string]struct{}{
 	"patch": {},
 }
 
+// Unmarshall takes a raw Viper configuration and returns a Rules struct representing release rules configuration.
 func Unmarshall(input map[string][]string) (Rules, error) {
 	var rules Rules
 	rules.Map = make(map[string]string)

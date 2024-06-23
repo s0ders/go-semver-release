@@ -1,3 +1,4 @@
+// Package gittest provides basic types and functions for testing operations related to Git repositories.
 package gittest
 
 import (
@@ -8,9 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-git/go-git/v5/plumbing"
-
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -24,6 +24,7 @@ type TestRepository struct {
 	Counter int
 }
 
+// NewRepository creates a new TestRepository.
 func NewRepository() (testRepository *TestRepository, err error) {
 	testRepository = &TestRepository{}
 
@@ -81,6 +82,7 @@ func NewRepository() (testRepository *TestRepository, err error) {
 	return testRepository, err
 }
 
+// AddCommit adds a new commit with a given conventional commit type to the underlying Git repository.
 func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 	var commitHash plumbing.Hash
 
@@ -124,6 +126,7 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 	return commitHash, nil
 }
 
+// AddTag adds a new tag to the underlying Git repository with a given name and pointing to a given hash.
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 	tagOpts := &git.CreateTagOptions{
 		Message: tagName,
@@ -139,10 +142,30 @@ func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 	return err
 }
 
+// Remove removes the underlying Git repository.
 func (r *TestRepository) Remove() error {
 	return os.RemoveAll(r.Path)
 }
 
+// CheckoutBranch creates a new branch with the given name and checkout to it.
+func (r *TestRepository) CheckoutBranch(name string) error {
+	head, err := r.Head()
+	if err != nil {
+		return err
+	}
+
+	refName := "refs/heads/" + name
+	ref := plumbing.NewHashReference(plumbing.ReferenceName(refName), head.Hash())
+
+	err = r.Storer.SetReference(ref)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// When returns a time.Time starting at 2000/01/01 00:00:00 and increasing of 10 second every new call.
 func (r *TestRepository) When() time.Time {
 	r.Counter++
 	return referenceTime.Add(time.Duration(r.Counter*10) * time.Second)
