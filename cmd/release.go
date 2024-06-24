@@ -10,35 +10,47 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v3/internal/branch"
-	"github.com/s0ders/go-semver-release/v3/internal/ci"
-	"github.com/s0ders/go-semver-release/v3/internal/gpg"
-	"github.com/s0ders/go-semver-release/v3/internal/parser"
-	"github.com/s0ders/go-semver-release/v3/internal/rule"
-	"github.com/s0ders/go-semver-release/v3/internal/tag"
+	"github.com/s0ders/go-semver-release/v4/internal/branch"
+	"github.com/s0ders/go-semver-release/v4/internal/ci"
+	"github.com/s0ders/go-semver-release/v4/internal/gpg"
+	"github.com/s0ders/go-semver-release/v4/internal/parser"
+	"github.com/s0ders/go-semver-release/v4/internal/remote"
+	"github.com/s0ders/go-semver-release/v4/internal/rule"
+	"github.com/s0ders/go-semver-release/v4/internal/tag"
 )
 
 var (
 	armoredKeyPath string
 	buildMetadata  string
+	accessToken    string
 	dryRun         bool
+	remoteMode     bool
 )
 
 func init() {
-	localCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
-	localCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the SemVer")
-	localCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
+	// TODO: should access-token be global (set in rootCmd) ?
+	releaseCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
+	releaseCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the SemVer")
+	releaseCmd.Flags().StringVar(&accessToken, "access-token", "", "Access token used to push tag to Git remote")
+	releaseCmd.Flags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
+	releaseCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
 
-	rootCmd.AddCommand(localCmd)
+	releaseCmd.MarkFlagsRequiredTogether("remote", "access-token")
+
+	rootCmd.AddCommand(releaseCmd)
 }
 
-var localCmd = &cobra.Command{
-	Use:   "local <REPOSITORY_PATH>",
+var releaseCmd = &cobra.Command{
+	Use:   "release <REPOSITORY_PATH_OR_URL>",
 	Short: "Version a local Git repository",
 	Long:  "Tag a Git repository with the new semantic version number if a new release is found",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		var entity *openpgp.Entity
+		var (
+			repository *git.Repository
+			origin     *remote.Remote
+			entity     *openpgp.Entity
+		)
 
 		logger := zerolog.New(cmd.OutOrStdout())
 
@@ -60,9 +72,17 @@ var localCmd = &cobra.Command{
 			}
 		}
 
-		repository, err := git.PlainOpen(args[0])
-		if err != nil {
-			return err
+		if remoteMode {
+			origin = remote.New(accessToken)
+			repository, err = origin.Clone(args[0])
+			if err != nil {
+				return err
+			}
+		} else {
+			repository, err = git.PlainOpen(args[0])
+			if err != nil {
+				return err
+			}
 		}
 
 		rules, err := configureRules()
@@ -121,7 +141,14 @@ var localCmd = &cobra.Command{
 					return fmt.Errorf("tagging repository: %w", err)
 				}
 
-				logger.Debug().Str("tag", tagPrefix+semver.String()).Msg("new tag added to repository")
+				logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
+
+				if remoteMode {
+					err = origin.PushTag(tagger.Format(semver))
+					if err != nil {
+						return fmt.Errorf("pushing tag to remote: %w", err)
+					}
+				}
 			}
 
 		}
