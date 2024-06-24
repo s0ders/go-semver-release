@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/s0ders/go-semver-release/v3/internal/semver"
+	"github.com/s0ders/go-semver-release/v4/internal/semver"
 )
 
 type GitHubOutput struct {

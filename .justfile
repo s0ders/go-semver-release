@@ -8,7 +8,7 @@ appVersion := "v0.0.0+local"
 buildNumber := "local"
 commitHash := "local"
 
-importPath := "github.com/s0ders/go-semver-release/v3/"
+importPath := "github.com/s0ders/go-semver-release/v4/"
 ldFlags := "-X " + importPath + "cmd.version=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.commitHash=" + commitHash + " -w -s"
 
 tests:

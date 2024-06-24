@@ -11,8 +11,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v3/internal/gittest"
-	"github.com/s0ders/go-semver-release/v3/internal/semver"
+	"github.com/s0ders/go-semver-release/v4/internal/gittest"
+	"github.com/s0ders/go-semver-release/v4/internal/semver"
 )
 
 var (
