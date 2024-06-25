@@ -23,6 +23,7 @@ var (
 	armoredKeyPath string
 	buildMetadata  string
 	accessToken    string
+	remoteName     string
 	dryRun         bool
 	remoteMode     bool
 )
@@ -32,10 +33,11 @@ func init() {
 	releaseCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
 	releaseCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the SemVer")
 	releaseCmd.Flags().StringVar(&accessToken, "access-token", "", "Access token used to push tag to Git remote")
+	releaseCmd.Flags().StringVar(&remoteName, "remote-name", "origin", "Name of the Git repository remote")
 	releaseCmd.Flags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	releaseCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
 
-	releaseCmd.MarkFlagsRequiredTogether("remote", "access-token")
+	releaseCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
 
 	rootCmd.AddCommand(releaseCmd)
 }
@@ -73,7 +75,7 @@ var releaseCmd = &cobra.Command{
 		}
 
 		if remoteMode {
-			origin = remote.New(accessToken)
+			origin = remote.New(remoteName, accessToken)
 			repository, err = origin.Clone(args[0])
 			if err != nil {
 				return err

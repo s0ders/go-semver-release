@@ -1,3 +1,4 @@
+// Package remote provides basic functions to work with Git remotes.
 package remote
 
 import (
@@ -9,12 +10,14 @@ import (
 )
 
 type Remote struct {
+	name       string
 	auth       *http.BasicAuth
 	repository *git.Repository
 }
 
-func New(token string) *Remote {
+func New(name string, token string) *Remote {
 	return &Remote{
+		name: name,
 		auth: &http.BasicAuth{
 			Username: "go-semver-release",
 			Password: token,
@@ -22,6 +25,7 @@ func New(token string) *Remote {
 	}
 }
 
+// Clone clones a given remote repository to a temporary directory.
 func (r *Remote) Clone(url string) (*git.Repository, error) {
 	tempDir, err := os.MkdirTemp("", "*")
 	if err != nil {
@@ -29,9 +33,10 @@ func (r *Remote) Clone(url string) (*git.Repository, error) {
 	}
 
 	repository, err := git.PlainClone(tempDir, false, &git.CloneOptions{
-		Auth:     r.auth,
-		URL:      url,
-		Progress: os.Stdout,
+		RemoteName: r.name,
+		Auth:       r.auth,
+		URL:        url,
+		Progress:   os.Stdout,
 	})
 
 	r.repository = repository
@@ -39,11 +44,12 @@ func (r *Remote) Clone(url string) (*git.Repository, error) {
 	return repository, nil
 }
 
+// PushTag pushes a given tag to the previously cloned repository's remote.
 func (r *Remote) PushTag(tagName string) error {
 	po := &git.PushOptions{
-		RemoteName: "origin",
+		RemoteName: r.name,
 		Progress:   os.Stdout,
-		RefSpecs:   []config.RefSpec{config.RefSpec("refs/tags/*:refs/tags/*")},
+		RefSpecs:   []config.RefSpec{config.RefSpec(fmt.Sprintf("refs/tags/%s:refs/tags/%s", tagName, tagName))},
 		Auth:       r.auth,
 	}
 
