@@ -256,7 +256,7 @@ func TestLocalCmd_MultiBranchRelease(t *testing.T) {
 
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"local", testRepository.Path})
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
 	// Create commits on master
 	masterCommits := []string{
