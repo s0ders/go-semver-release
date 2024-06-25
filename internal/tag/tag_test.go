@@ -183,11 +183,12 @@ func TestTag_SignKey(t *testing.T) {
 func TestTag_Format(t *testing.T) {
 	assert := assertion.New(t)
 
+	tagPrefix := "v"
 	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
 
-	tagger := NewTagger(taggerName, taggerEmail)
+	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(tagPrefix))
 
-	want := "v1.2.3"
+	want := tagPrefix + "1.2.3"
 	got := tagger.Format(version)
 
 	assert.Equal(want, got)
