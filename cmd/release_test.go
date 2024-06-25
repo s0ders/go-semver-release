@@ -279,9 +279,14 @@ func TestLocalCmd_RemoteRelease(t *testing.T) {
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 
-	rootCmd.PersistentFlags().Set("remote", "true")
-	rootCmd.PersistentFlags().Set("remote-name", "origin")
-	rootCmd.PersistentFlags().Set("access-token", "")
+	err = rootCmd.PersistentFlags().Set("remote", "true")
+	checkErr(t, err, "setting remote flag")
+
+	err = rootCmd.PersistentFlags().Set("remote-name", "origin")
+	checkErr(t, err, "setting remote-name flag")
+
+	err = rootCmd.PersistentFlags().Set("access-token", "")
+	checkErr(t, err, "setting access-token flag")
 
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
@@ -821,14 +826,6 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 }
 
 type CommandFlagOptions func()
-
-func WithRootPersistentFlags(flags map[string]string) CommandFlagOptions {
-	return func() {
-		for k, v := range flags {
-			rootCmd.PersistentFlags().Set(k, v)
-		}
-	}
-}
 
 func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
 	return func() {
