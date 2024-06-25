@@ -204,11 +204,9 @@ func TestLocalCmd_Release(t *testing.T) {
 		"style",    // 1.2.2
 	}
 
-	flags := map[string]string{}
-
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, flags, commits)
+	repository, path := setup(t, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -236,6 +234,81 @@ func TestLocalCmd_Release(t *testing.T) {
 	assert.Equal(true, exists, "tag not found")
 }
 
+func TestLocalCmd_RemoteRelease(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetBranches([]map[string]string{{"name": "master"}})
+
+	commits := []string{
+		"fix",      // 0.0.1
+		"feat!",    // 1.0.0 (breaking change)
+		"feat",     // 1.1.0
+		"fix",      // 1.1.1
+		"fix",      // 1.1.2
+		"chores",   // 1.1.2
+		"refactor", // 1.1.2
+		"test",     // 1.1.2
+		"ci",       // 1.1.2
+		"feat",     // 1.2.0
+		"perf",     // 1.2.1
+		"revert",   // 1.2.2
+		"style",    // 1.2.2
+	}
+
+	buf := new(bytes.Buffer)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = os.RemoveAll(testRepository.Path)
+		checkErr(t, err, "removing repository")
+	}()
+
+	for _, commit := range commits {
+		_, err = testRepository.AddCommit(commit)
+		checkErr(t, err, "creating sample commit")
+	}
+
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+
+	rootCmd.PersistentFlags().Set("remote", "true")
+	rootCmd.PersistentFlags().Set("remote-name", "origin")
+	rootCmd.PersistentFlags().Set("access-token", "")
+
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
+
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	expectedVersion := "1.2.2"
+	expectedTag := "v" + expectedVersion
+	expectedOut := cmdOutput{
+		Message:    "new release found",
+		Version:    expectedVersion,
+		NewRelease: true,
+		Branch:     "master",
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(buf.Bytes(), &actualOut)
+	checkErr(t, err, "unmarshalling output")
+
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+
+	exists, err := tag.Exists(testRepository.Repository, expectedTag)
+	checkErr(t, err, "checking if tag exists")
+
+	assert.Equal(true, exists, "tag not found")
+}
+
 func TestLocalCmd_MultiBranchRelease(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -253,6 +326,12 @@ func TestLocalCmd_MultiBranchRelease(t *testing.T) {
 		err = testRepository.Remove()
 		checkErr(t, err, "removing repository")
 	}()
+
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
 
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
@@ -370,7 +449,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 		"build-metadata": metadata,
 	}
 
-	repository, path := setup(t, buf, flags, commits)
+	repository, path := setup(t, buf, commits, WithReleaseFlags(flags))
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -412,7 +491,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, nil, commits)
+	repository, path := setup(t, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -450,13 +529,13 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 		"feat!", // 1.0.0 (breaking change)
 	}
 
-	flags := map[string]string{
+	releaseFlags := map[string]string{
 		"dry-run": "true",
 	}
 
 	actual := new(bytes.Buffer)
 
-	repository, path := setup(t, actual, flags, commits)
+	repository, path := setup(t, actual, commits, WithReleaseFlags(releaseFlags))
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -491,7 +570,7 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 
 	actual := new(bytes.Buffer)
 
-	_, path := setup(t, actual, nil, []string{})
+	_, path := setup(t, actual, []string{})
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -711,7 +790,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, nil, commits)
+	repository, path := setup(t, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -741,7 +820,25 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.Equal(true, exists, "tag should exist")
 }
 
-func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []string) (*git.Repository, string) {
+type CommandFlagOptions func()
+
+func WithRootPersistentFlags(flags map[string]string) CommandFlagOptions {
+	return func() {
+		for k, v := range flags {
+			rootCmd.PersistentFlags().Set(k, v)
+		}
+	}
+}
+
+func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
+	return func() {
+		for k, v := range flags {
+			releaseCmd.Flags().Set(k, v)
+		}
+	}
+}
+
+func setup(t *testing.T, buf io.Writer, commits []string, commandFlagOptions ...CommandFlagOptions) (*git.Repository, string) {
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
@@ -752,17 +849,19 @@ func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []strin
 		}
 	}
 
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
+	for _, option := range commandFlagOptions {
+		option()
+	}
+
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting flags")
-
-	for k, v := range flags {
-		err = releaseCmd.Flags().Set(k, v)
-		checkErr(t, err, "setting "+k)
-	}
 
 	err = rootCmd.Execute()
 	checkErr(t, err, "executing command")
@@ -772,6 +871,17 @@ func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []strin
 
 func resetFlags(cmd *cobra.Command) (err error) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		err = f.Value.Set(f.DefValue)
+		if err != nil {
+			return
+		}
+	})
+
+	return err
+}
+
+func resetPersistentFlags(cmd *cobra.Command) (err error) {
+	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
 		err = f.Value.Set(f.DefValue)
 		if err != nil {
 			return
