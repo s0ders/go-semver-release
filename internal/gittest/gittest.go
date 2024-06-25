@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,8 +21,7 @@ var referenceTime = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 type TestRepository struct {
 	*git.Repository
-	RemoteServer *httptest.Server
-	RemoteClient *http.Client
+	RemoteServer *http.Server
 	RemoteURL    string
 	Path         string
 	Counter      uint
@@ -177,7 +175,8 @@ func (r *TestRepository) CheckoutBranch(name string) error {
 		return err
 	}
 
-	if err := worktree.Checkout(branchCoOpts); err != nil {
+	err = worktree.Checkout(branchCoOpts)
+	if err != nil {
 		return err
 	}
 
@@ -188,30 +187,4 @@ func (r *TestRepository) CheckoutBranch(name string) error {
 func (r *TestRepository) When() time.Time {
 	r.Counter++
 	return referenceTime.Add(time.Duration(r.Counter*10) * time.Second)
-}
-
-// StartRemoteWithAuth starts an HTTP server serving the Git repository using basic HTTP authentication.
-func (r *TestRepository) StartRemoteWithAuth(username, password string) {
-	handler := httpAuthentication(http.FileServer(http.Dir(r.Path)), username, password)
-
-	r.RemoteServer = httptest.NewServer(handler)
-	r.RemoteClient = r.RemoteServer.Client()
-	r.RemoteURL = r.RemoteServer.URL
-}
-
-// StopRemote stops the underlying HTTP server used to serve the Git repository.
-func (r *TestRepository) StopRemote() {
-	r.RemoteServer.Close()
-}
-
-func httpAuthentication(next http.Handler, username, password string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != username || pass != password {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }
