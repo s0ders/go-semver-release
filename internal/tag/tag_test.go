@@ -180,6 +180,19 @@ func TestTag_SignKey(t *testing.T) {
 	assert.NotEqual("", actualTag.PGPSignature, "PGP signature should not be empty")
 }
 
+func TestTag_Format(t *testing.T) {
+	assert := assertion.New(t)
+
+	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+
+	tagger := NewTagger(taggerName, taggerEmail)
+
+	want := "v1.2.3"
+	got := tagger.Format(version)
+
+	assert.Equal(want, got)
+}
+
 func checkErr(t *testing.T, msg string, err error) {
 	if err != nil {
 		t.Fatalf("%s: %s", msg, err)
