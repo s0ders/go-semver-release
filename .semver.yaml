@@ -2,7 +2,6 @@ remote: true
 remote-name: origin
 git-name: Go Semver Release
 git-email: go-semver@release.ci
-gpg-key-path: ./private.asc
 tag-prefix: v
 branches:
   - name: main
