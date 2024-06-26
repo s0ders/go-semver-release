@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/s0ders/go-semver-release/v3/cmd"
 	"os"
+
+	"github.com/s0ders/go-semver-release/v4/cmd"
 )
 
 func main() {
-	if err := cmd.Execute(); err != nil {
+	err := cmd.Execute(); 
+  if err != nil {
 		os.Exit(1)
 	}
 }

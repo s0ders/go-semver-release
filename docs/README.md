@@ -1,9 +1,9 @@
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 ![GitHub Tag](https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release)
-[![Go Reference](https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg)](https://pkg.go.dev/github.com/s0ders/go-semver-release/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg)](https://pkg.go.dev/github.com/s0ders/go-semver-release/v4)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI)
-[![Go Report Card](https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v2)](https://goreportcard.com/report/github.com/s0ders/go-semver-release/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v2)](https://goreportcard.com/report/github.com/s0ders/go-semver-release/v4)
 ![Codecov](https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage)
 ![GitHub License](https://img.shields.io/github/license/s0ders/go-semver-release?label=License)
 
@@ -44,7 +44,7 @@ support plugins to help in formatting your commit messages (e.g.,
 If [Go](https://go.dev) is installed on your machine, you can install from source:
 
 ```bash
-$ go install github.com/s0ders/go-semver-release@latest
+$ go install github.com/s0ders/go-semver-release/v4@latest
 $ go-semver-release --help
 ```
 
@@ -57,12 +57,12 @@ $ docker run --rm s0ders/go-semver-release --help
 
 ## Usage
 
-Documentation about the CLI usage can be found [here](docs/usage.md).
+Documentation about the CLI usage can be found [here](usage.md).
 
 ## CI workflow examples
 
 This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be
-found [here](docs/workflows.md).
+found [here](workflows.md).
 
 ## How is this tool different from X ?
 
@@ -73,6 +73,6 @@ If you want a simple tool that handle the generation of the next semantic versio
 the right place. This allows the program to work with minimal dependencies and to avoid requiring the use of secret 
 tokens on user-end.
 
-As stated above, `go-semver-release` is agnostic of which CI tool you use or which branch you use it on. You define the
+As stated above, Go Semver Release is agnostic of which CI tool you use or which branch you use it on. You define the
 configuration using flags, environment variables or configurations file however you please on your CI for maximized
 modularity.

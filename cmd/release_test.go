@@ -15,9 +15,9 @@ import (
 	"github.com/spf13/pflag"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v3/internal/gittest"
-	"github.com/s0ders/go-semver-release/v3/internal/rule"
-	"github.com/s0ders/go-semver-release/v3/internal/tag"
+	"github.com/s0ders/go-semver-release/v4/internal/gittest"
+	"github.com/s0ders/go-semver-release/v4/internal/rule"
+	"github.com/s0ders/go-semver-release/v4/internal/tag"
 )
 
 type cmdOutput struct {
@@ -116,9 +116,9 @@ rules:
 	err = rootCmd.PersistentFlags().Set("config", configurationFilePath)
 	checkErr(t, err, "setting root command config flag")
 
-	rootCmd.SetArgs([]string{"local", testRepository.Path})
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
-	err = resetFlags(localCmd)
+	err = resetFlags(releaseCmd)
 	checkErr(t, err, "resetting local command flags")
 
 	err = rootCmd.Execute()
@@ -155,7 +155,7 @@ rules:
 	err = json.Unmarshal([]byte(outputs[0]), &actualMasterOut)
 	checkErr(t, err, "unmarshalling master output")
 
-	assert.Equal(expectedMasterOut, actualMasterOut, "localCmd output should be equal")
+	assert.Equal(expectedMasterOut, actualMasterOut, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
 	checkErr(t, err, "checking if master tag exists")
@@ -175,7 +175,7 @@ rules:
 	err = json.Unmarshal([]byte(outputs[1]), &actualAlphaOut)
 	checkErr(t, err, "unmarshalling alpha output")
 
-	assert.Equal(expectedAlphaOut, actualAlphaOut, "localCmd output should be equal")
+	assert.Equal(expectedAlphaOut, actualAlphaOut, "releaseCmd output should be equal")
 
 	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
 	checkErr(t, err, "checking if alpha tag exists")
@@ -204,11 +204,9 @@ func TestLocalCmd_Release(t *testing.T) {
 		"style",    // 1.2.2
 	}
 
-	flags := map[string]string{}
-
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, flags, commits)
+	repository, path := setup(t, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -228,9 +226,89 @@ func TestLocalCmd_Release(t *testing.T) {
 	err := json.Unmarshal(buf.Bytes(), &actualOut)
 	checkErr(t, err, "unmarshalling output")
 
-	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedTag)
+	checkErr(t, err, "checking if tag exists")
+
+	assert.Equal(true, exists, "tag not found")
+}
+
+func TestLocalCmd_RemoteRelease(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetBranches([]map[string]string{{"name": "master"}})
+
+	commits := []string{
+		"fix",      // 0.0.1
+		"feat!",    // 1.0.0 (breaking change)
+		"feat",     // 1.1.0
+		"fix",      // 1.1.1
+		"fix",      // 1.1.2
+		"chores",   // 1.1.2
+		"refactor", // 1.1.2
+		"test",     // 1.1.2
+		"ci",       // 1.1.2
+		"feat",     // 1.2.0
+		"perf",     // 1.2.1
+		"revert",   // 1.2.2
+		"style",    // 1.2.2
+	}
+
+	buf := new(bytes.Buffer)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = os.RemoveAll(testRepository.Path)
+		checkErr(t, err, "removing repository")
+	}()
+
+	for _, commit := range commits {
+		_, err = testRepository.AddCommit(commit)
+		checkErr(t, err, "creating sample commit")
+	}
+
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+
+	err = rootCmd.PersistentFlags().Set("remote", "true")
+	checkErr(t, err, "setting remote flag")
+
+	err = rootCmd.PersistentFlags().Set("remote-name", "origin")
+	checkErr(t, err, "setting remote-name flag")
+
+	err = rootCmd.PersistentFlags().Set("access-token", "")
+	checkErr(t, err, "setting access-token flag")
+
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
+
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	expectedVersion := "1.2.2"
+	expectedTag := "v" + expectedVersion
+	expectedOut := cmdOutput{
+		Message:    "new release found",
+		Version:    expectedVersion,
+		NewRelease: true,
+		Branch:     "master",
+	}
+	actualOut := cmdOutput{}
+
+	err = json.Unmarshal(buf.Bytes(), &actualOut)
+	checkErr(t, err, "unmarshalling output")
+
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+
+	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
 
 	assert.Equal(true, exists, "tag not found")
@@ -254,9 +332,15 @@ func TestLocalCmd_MultiBranchRelease(t *testing.T) {
 		checkErr(t, err, "removing repository")
 	}()
 
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"local", testRepository.Path})
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
 	// Create commits on master
 	masterCommits := []string{
@@ -370,7 +454,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 		"build-metadata": metadata,
 	}
 
-	repository, path := setup(t, buf, flags, commits)
+	repository, path := setup(t, buf, commits, WithReleaseFlags(flags))
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -390,7 +474,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	err := json.Unmarshal(buf.Bytes(), &actualOut)
 	checkErr(t, err, "unmarshalling output")
 
-	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -412,7 +496,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, nil, commits)
+	repository, path := setup(t, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -432,7 +516,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 	err := json.Unmarshal(buf.Bytes(), &actualOut)
 	checkErr(t, err, "unmarshalling output")
 
-	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -450,13 +534,13 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 		"feat!", // 1.0.0 (breaking change)
 	}
 
-	flags := map[string]string{
+	releaseFlags := map[string]string{
 		"dry-run": "true",
 	}
 
 	actual := new(bytes.Buffer)
 
-	repository, path := setup(t, actual, flags, commits)
+	repository, path := setup(t, actual, commits, WithReleaseFlags(releaseFlags))
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -476,7 +560,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	err := json.Unmarshal(actual.Bytes(), &actualOut)
 	checkErr(t, err, "unmarshalling output")
 
-	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -491,7 +575,7 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 
 	actual := new(bytes.Buffer)
 
-	_, path := setup(t, actual, nil, []string{})
+	_, path := setup(t, actual, []string{})
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -509,7 +593,7 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	err := json.Unmarshal(actual.Bytes(), &actualOut)
 	checkErr(t, err, "removing temporary directory")
 
-	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 }
 
 func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
@@ -558,10 +642,10 @@ func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", testRepository.Path})
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
+	err = resetFlags(releaseCmd)
+	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to write GitHub output to read-only file")
@@ -573,10 +657,10 @@ func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", "./does/not/exist"})
+	rootCmd.SetArgs([]string{"release", "./does/not/exist"})
 
-	err := resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
+	err := resetFlags(releaseCmd)
+	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to open inexisting Git repository")
@@ -588,10 +672,10 @@ func TestLocalCmd_InvalidArmoredKeyPath(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", ".", "--gpg-key-path", "./fake.asc"})
+	rootCmd.SetArgs([]string{"release", ".", "--gpg-key-path", "./fake.asc"})
 
-	err := resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
+	err := resetFlags(releaseCmd)
+	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to open inexisting armored GPG key")
@@ -629,10 +713,10 @@ func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", ".", "--gpg-key-path", keyFilePath})
+	rootCmd.SetArgs([]string{"release", ".", "--gpg-key-path", keyFilePath})
 
-	err = resetFlags(localCmd)
-	assert.NoError(err, "failed to reset localCmd flags")
+	err = resetFlags(releaseCmd)
+	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to read armored key ring from empty file")
@@ -663,9 +747,9 @@ func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", tempDirPath})
+	rootCmd.SetArgs([]string{"release", tempDirPath})
 
-	err = resetFlags(localCmd)
+	err = resetFlags(releaseCmd)
 	assert.NoError(err, "resetting command flags")
 
 	err = rootCmd.Execute()
@@ -689,9 +773,9 @@ func TestLocalCmd_InvalidCustomRules(t *testing.T) {
 	actual := new(bytes.Buffer)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"local", testRepository.Path})
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
-	err = resetFlags(localCmd)
+	err = resetFlags(releaseCmd)
 	checkErr(t, err, "resetting flags")
 
 	err = rootCmd.Execute()
@@ -711,7 +795,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, nil, commits)
+	repository, path := setup(t, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -732,7 +816,7 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.NoError(err, "failed to unmarshal json")
 
 	// Check that the JSON output is correct
-	assert.Equal(expectedOut, actualOut, "localCmd output should be equal")
+	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 
 	// Check that the tag was actually created on the repository
 	exists, err := tag.Exists(repository, expectedTag)
@@ -741,7 +825,17 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.Equal(true, exists, "tag should exist")
 }
 
-func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []string) (*git.Repository, string) {
+type CommandFlagOptions func()
+
+func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
+	return func() {
+		for k, v := range flags {
+			_ = releaseCmd.Flags().Set(k, v)
+		}
+	}
+}
+
+func setup(t *testing.T, buf io.Writer, commits []string, commandFlagOptions ...CommandFlagOptions) (*git.Repository, string) {
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
@@ -752,17 +846,19 @@ func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []strin
 		}
 	}
 
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
+	for _, option := range commandFlagOptions {
+		option()
+	}
+
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"local", testRepository.Path})
-
-	err = resetFlags(localCmd)
-	checkErr(t, err, "resetting flags")
-
-	for k, v := range flags {
-		err = localCmd.Flags().Set(k, v)
-		checkErr(t, err, "setting "+k)
-	}
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
 	err = rootCmd.Execute()
 	checkErr(t, err, "executing command")
@@ -772,6 +868,17 @@ func setup(t *testing.T, buf io.Writer, flags map[string]string, commits []strin
 
 func resetFlags(cmd *cobra.Command) (err error) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		err = f.Value.Set(f.DefValue)
+		if err != nil {
+			return
+		}
+	})
+
+	return err
+}
+
+func resetPersistentFlags(cmd *cobra.Command) (err error) {
+	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
 		err = f.Value.Set(f.DefValue)
 		if err != nil {
 			return

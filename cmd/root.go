@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -12,24 +13,35 @@ import (
 const (
 	defaultConfigFile = ".semver"
 	configFileFormat  = "yaml"
+	envPrefix         = "GO_SEMVER_RELEASE"
 )
 
 var (
-	cfgFile   string
-	gitName   string
-	gitEmail  string
-	tagPrefix string
-	verbose   bool
+	cfgFile        string
+	gitName        string
+	gitEmail       string
+	tagPrefix      string
+	accessToken    string
+	remoteName     string
+	armoredKeyPath string
+	verbose        bool
+	remoteMode     bool
 )
 
 var viperInstance = viper.New()
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file path (default is ./"+defaultConfigFile+""+configFileFormat+")")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Configuration file path (default is ./"+defaultConfigFile+""+configFileFormat+")")
 	rootCmd.PersistentFlags().StringVar(&gitName, "git-name", "Go Semver Release", "Name used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&gitEmail, "git-email", "go-semver@release.ci", "Email used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&tagPrefix, "tag-prefix", "v", "Prefix added to the version tag name")
+	rootCmd.PersistentFlags().StringVar(&accessToken, "access-token", "", "Access token used to push tag to Git remote")
+	rootCmd.PersistentFlags().StringVar(&remoteName, "remote-name", "origin", "Name of the Git repository remote")
+	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
+	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+
+	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
 }
 
 var rootCmd = &cobra.Command{
@@ -45,7 +57,6 @@ func Execute() error {
 }
 
 func initializeConfig(cmd *cobra.Command) error {
-
 	if cfgFile != "" {
 		viperInstance.SetConfigFile(cfgFile)
 	} else {
@@ -61,6 +72,10 @@ func initializeConfig(cmd *cobra.Command) error {
 			return err
 		}
 	}
+
+	viperInstance.SetEnvPrefix(envPrefix)
+	viperInstance.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viperInstance.AutomaticEnv()
 
 	if err := bindFlags(cmd, viperInstance); err != nil {
 		return err

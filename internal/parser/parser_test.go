@@ -6,16 +6,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/s0ders/go-semver-release/v3/internal/gittest"
+	"github.com/s0ders/go-semver-release/v4/internal/gittest"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/rs/zerolog"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v3/internal/rule"
-	"github.com/s0ders/go-semver-release/v3/internal/semver"
-	"github.com/s0ders/go-semver-release/v3/internal/tag"
+	"github.com/s0ders/go-semver-release/v4/internal/rule"
+	"github.com/s0ders/go-semver-release/v4/internal/semver"
+	"github.com/s0ders/go-semver-release/v4/internal/tag"
 )
 
 var (

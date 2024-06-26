@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/s0ders/go-semver-release/v3/internal/semver"
+	"github.com/s0ders/go-semver-release/v4/internal/semver"
 )
 
 var ErrTagAlreadyExists = errors.New("tag already exists")
@@ -102,4 +102,8 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver
 	}
 
 	return nil
+}
+
+func (t *Tagger) Format(semver *semver.Semver) string {
+	return t.TagPrefix + semver.String()
 }

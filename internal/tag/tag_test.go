@@ -11,8 +11,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v3/internal/gittest"
-	"github.com/s0ders/go-semver-release/v3/internal/semver"
+	"github.com/s0ders/go-semver-release/v4/internal/gittest"
+	"github.com/s0ders/go-semver-release/v4/internal/semver"
 )
 
 var (
@@ -178,6 +178,20 @@ func TestTag_SignKey(t *testing.T) {
 	checkErr(t, "fetching tag from reference", err)
 
 	assert.NotEqual("", actualTag.PGPSignature, "PGP signature should not be empty")
+}
+
+func TestTag_Format(t *testing.T) {
+	assert := assertion.New(t)
+
+	tagPrefix := "v"
+	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+
+	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(tagPrefix))
+
+	want := tagPrefix + "1.2.3"
+	got := tagger.Format(version)
+
+	assert.Equal(want, got)
 }
 
 func checkErr(t *testing.T, msg string, err error) {

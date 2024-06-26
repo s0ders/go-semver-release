@@ -4,6 +4,7 @@ package gittest
 import (
 	"fmt"
 	"math/rand/v2"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,8 +21,10 @@ var referenceTime = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 type TestRepository struct {
 	*git.Repository
-	Path    string
-	Counter int
+	RemoteServer *http.Server
+	RemoteURL    string
+	Path         string
+	Counter      uint
 }
 
 // NewRepository creates a new TestRepository.
@@ -172,7 +175,8 @@ func (r *TestRepository) CheckoutBranch(name string) error {
 		return err
 	}
 
-	if err := worktree.Checkout(branchCoOpts); err != nil {
+	err = worktree.Checkout(branchCoOpts)
+	if err != nil {
 		return err
 	}
 
