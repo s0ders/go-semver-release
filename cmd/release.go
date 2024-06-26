@@ -20,13 +20,11 @@ import (
 )
 
 var (
-	armoredKeyPath string
-	buildMetadata  string
-	dryRun         bool
+	buildMetadata string
+	dryRun        bool
 )
 
 func init() {
-	releaseCmd.Flags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
 	releaseCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the SemVer")
 	releaseCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
 

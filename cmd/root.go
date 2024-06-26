@@ -17,14 +17,15 @@ const (
 )
 
 var (
-	cfgFile     string
-	gitName     string
-	gitEmail    string
-	tagPrefix   string
-	accessToken string
-	remoteName  string
-	verbose     bool
-	remoteMode  bool
+	cfgFile        string
+	gitName        string
+	gitEmail       string
+	tagPrefix      string
+	accessToken    string
+	remoteName     string
+	armoredKeyPath string
+	verbose        bool
+	remoteMode     bool
 )
 
 var viperInstance = viper.New()
@@ -36,6 +37,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&tagPrefix, "tag-prefix", "v", "Prefix added to the version tag name")
 	rootCmd.PersistentFlags().StringVar(&accessToken, "access-token", "", "Access token used to push tag to Git remote")
 	rootCmd.PersistentFlags().StringVar(&remoteName, "remote-name", "origin", "Name of the Git repository remote")
+	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
 	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
