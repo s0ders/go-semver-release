@@ -830,7 +830,7 @@ type CommandFlagOptions func()
 func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
 	return func() {
 		for k, v := range flags {
-			releaseCmd.Flags().Set(k, v)
+			_ = releaseCmd.Flags().Set(k, v)
 		}
 	}
 }
