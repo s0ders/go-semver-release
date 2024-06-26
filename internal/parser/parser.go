@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -152,10 +153,10 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 		return nil
 	})
 
-	// Reverse commit history to go from oldest to newest
-	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
-		history[i], history[j] = history[j], history[i]
-	}
+	// Sort commit history from oldest to most recent
+	sort.Slice(history, func(i, j int) bool {
+		return history[i].Committer.When.Before(history[j].Committer.When)
+	})
 
 	newRelease, commitHash, err := p.ParseHistory(history, latestSemver)
 	if err != nil {
