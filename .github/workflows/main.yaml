@@ -62,8 +62,6 @@ jobs:
       - lint
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
@@ -71,47 +69,18 @@ jobs:
 
       - name: Go Semver Release
         id: go-semver
+        env:
+          GO_SEMVER_RELEASE_ACCESS_TOKEN: ${{ secrets.GO_SEMVER_RELEASE_ACCESS_TOKEN }}
         run: |
+          echo ${{ secrets.GPG_PRIVATE_KEY }} > ./private.asc
           go install .
-          go-semver-release local . --config .semver.yaml --verbose --dry-run
-
-  tag:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    needs:
-      - versioning
-    if: ${{needs.versioning.outputs.release == 'true'}}
-    env:
-      VERSION: ${{needs.versioning.outputs.semver}}
-    steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-
-      - name: Import GPG Key
-        uses: crazy-max/ghaction-import-gpg@01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6.1.0
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          git_user_signingkey: true
-          git_tag_gpgsign: true
-          trust_level: 5
-
-      - name: Git Configuration
-        run: |
-          git config --global user.email "${{ env.GIT_CI_EMAIL }}"
-          git config --global user.name "${{ env.GIT_CI_USERNAME }}"
-          git config --global user.signkey ${{ secrets.GPG_PRIVATE_KEY_ID }}
-
-      - name: Sign Tag and Push
-        run: |
-          git tag --sign --annotate ${{ env.VERSION }} --message "${{ env.VERSION }}"
-          git push origin ${{ env.VERSION }}
+          go-semver-release release https://github.com/s0ders/go-semver-release.git --config .semver.yaml --verbose
 
   docker-release:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     needs:
-      - tag
       - versioning
     env:
       VERSION: ${{needs.versioning.outputs.semver}}
@@ -143,7 +112,6 @@ jobs:
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     needs:
       - versioning
-      - tag
       - docker-release
     strategy:
       matrix:
