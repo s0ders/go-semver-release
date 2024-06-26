@@ -22,8 +22,6 @@ jobs:
       semver: ${{ steps.go-semver.outputs.SEMVER }}
     steps:
       - uses: actions/checkout@v4.1.4
-        with:
-          fetch-depth: 0 # Fetches tags, required for the program to detect previous tags
 
       # Install Go Semver Release
       - name: Set up Go
