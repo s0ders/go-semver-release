@@ -1,3 +1,5 @@
+remote: true
+remote-name: origin
 git-name: Go Semver Release
 git-email: go-semver@release.ci
 tag-prefix: v
