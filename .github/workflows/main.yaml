@@ -83,6 +83,7 @@ jobs:
       contents: read
     needs:
       - versioning
+    if: ${{needs.versioning.outputs.release == 'true'}}
     env:
       VERSION: ${{needs.versioning.outputs.semver}}
     steps:
@@ -114,6 +115,7 @@ jobs:
     needs:
       - versioning
       - docker-release
+    if: ${{needs.versioning.outputs.release == 'true'}}
     strategy:
       matrix:
         os:
