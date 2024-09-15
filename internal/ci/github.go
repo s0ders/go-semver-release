@@ -73,5 +73,5 @@ func GenerateGitHubOutput(semver *semver.Semver, branch string, options ...Optio
 		return fmt.Errorf("writing to ci file: %w", err)
 	}
 
-	return nil
+	return
 }
