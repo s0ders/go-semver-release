@@ -79,7 +79,9 @@ func TestParser_FetchLatestSemverTag_NoTag(t *testing.T) {
 		_ = testRepository.Remove()
 	})
 
-	latest, err := FetchLatestSemverTag(testRepository.Repository)
+	parser := New(logger, tagger, rules)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Nil(latest, "latest semver tag should be nil")
@@ -103,7 +105,9 @@ func TestParser_FetchLatestSemverTag_OneTag(t *testing.T) {
 	err = testRepository.AddTag(tagName, head.Hash())
 	checkErr(t, "creating tag", err)
 
-	latest, err := FetchLatestSemverTag(testRepository.Repository)
+	parser := New(logger, tagger, rules)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Equal(tagName, latest.Name, "latest semver tagName should be equal")
@@ -131,7 +135,9 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 		checkErr(t, "creating tag", err)
 	}
 
-	latest, err := FetchLatestSemverTag(testRepository.Repository)
+	parser := New(logger, tagger, rules)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want := "3.0.0"

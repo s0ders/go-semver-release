@@ -13,6 +13,7 @@ import (
 	"github.com/s0ders/go-semver-release/v4/internal/branch"
 	"github.com/s0ders/go-semver-release/v4/internal/ci"
 	"github.com/s0ders/go-semver-release/v4/internal/gpg"
+	"github.com/s0ders/go-semver-release/v4/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v4/internal/parser"
 	"github.com/s0ders/go-semver-release/v4/internal/remote"
 	"github.com/s0ders/go-semver-release/v4/internal/rule"
@@ -41,6 +42,7 @@ var releaseCmd = &cobra.Command{
 			repository *git.Repository
 			origin     *remote.Remote
 			entity     *openpgp.Entity
+			projects   []monorepo.Project
 		)
 
 		logger := zerolog.New(cmd.OutOrStdout())
@@ -86,18 +88,26 @@ var releaseCmd = &cobra.Command{
 			return fmt.Errorf("loading branches configuration: %w", err)
 		}
 
+		if monorepository {
+			projects, err = configureProjects()
+			if err != nil {
+				return fmt.Errorf("loading projects configuration: %w", err)
+			}
+		}
+
 		tagger := tag.NewTagger(gitName, gitEmail, tag.WithTagPrefix(tagPrefix), tag.WithSignKey(entity))
 
 		// Launch a parser per branch to analyze
 		for _, branch := range branches {
-			// TODO: optimize parser creation, create one and update branch
 			parser := parser.New(logger, tagger, rules,
 				parser.WithReleaseBranch(branch.Name),
 				parser.WithPrereleaseMode(branch.Prerelease),
 				parser.WithPrereleaseIdentifier(branch.Name),
 				parser.WithBuildMetadata(buildMetadata),
+				parser.WithProjects(projects),
 			)
 
+			// For projects, would have a slice of semver
 			computeSemverOutput, err := parser.ComputeNewSemver(repository)
 			if err != nil {
 				return fmt.Errorf("computing new semver: %w", err)
@@ -192,4 +202,27 @@ func configureBranches() ([]branch.Branch, error) {
 	}
 
 	return branches, nil
+}
+
+func configureProjects() ([]monorepo.Project, error) {
+	if !viperInstance.IsSet("projects") {
+		return nil, fmt.Errorf("missing projects key in configuration")
+	}
+
+	var (
+		projectsMarshalled []map[string]string
+		projects           []monorepo.Project
+	)
+
+	err := viperInstance.UnmarshalKey("projects", &projectsMarshalled)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling projects: %w", err)
+	}
+
+	projects, err = monorepo.Unmarshall(projectsMarshalled)
+	if err != nil {
+		return nil, fmt.Errorf("parsing projects: %w", err)
+	}
+
+	return projects, nil
 }

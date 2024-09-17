@@ -17,6 +17,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
 
+	"github.com/s0ders/go-semver-release/v4/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v4/internal/rule"
 	"github.com/s0ders/go-semver-release/v4/internal/semver"
 	"github.com/s0ders/go-semver-release/v4/internal/tag"
@@ -32,6 +33,7 @@ type Parser struct {
 	buildMetadata        string
 	prereleaseIdentifier string
 	prereleaseMode       bool
+	projects             []monorepo.Project
 }
 
 type OptionFunc func(*Parser)
@@ -39,6 +41,12 @@ type OptionFunc func(*Parser)
 func WithReleaseBranch(branch string) OptionFunc {
 	return func(p *Parser) {
 		p.releaseBranch = branch
+	}
+}
+
+func WithProjects(projects []monorepo.Project) OptionFunc {
+	return func(p *Parser) {
+		p.projects = projects
 	}
 }
 
@@ -85,7 +93,31 @@ type ComputeNewSemverOutput struct {
 func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverOutput, error) {
 	output := ComputeNewSemverOutput{}
 
-	latestSemverTag, err := FetchLatestSemverTag(repository)
+	worktree, err := repository.Worktree()
+	if err != nil {
+		return output, fmt.Errorf("fetching worktree: %w", err)
+	}
+
+	if worktree == nil {
+		return output, fmt.Errorf("no worktree, check that repository is initialized")
+	}
+
+	// Checkout to release branch
+	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
+	branchCheckOutOpts := git.CheckoutOptions{
+		Branch: releaseBranchRef,
+		Force:  true,
+	}
+
+	err = worktree.Checkout(&branchCheckOutOpts)
+	if err != nil {
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return output, fmt.Errorf("branch %q does not exist: %w", p.releaseBranch, err)
+		}
+		return output, fmt.Errorf("checking out to release branch: %w", err)
+	}
+
+	latestSemverTag, err := p.FetchLatestSemverTag(repository)
 	if err != nil {
 		return output, fmt.Errorf("fetching latest semver tag: %w", err)
 	}
@@ -116,30 +148,6 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository) (ComputeNewSemverO
 		// Show all commit that are at least one second older than the latest one pointed by SemVer tag
 		since := latestSemverTagCommit.Committer.When.Add(time.Second)
 		logOptions.Since = &since
-	}
-
-	worktree, err := repository.Worktree()
-	if err != nil {
-		return output, fmt.Errorf("fetching worktree: %w", err)
-	}
-
-	if worktree == nil {
-		return output, fmt.Errorf("no worktree, check that repository is initialized")
-	}
-
-	// Checkout to release branch
-	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
-	branchCheckOutOpts := git.CheckoutOptions{
-		Branch: releaseBranchRef,
-		Force:  true,
-	}
-
-	err = worktree.Checkout(&branchCheckOutOpts)
-	if err != nil {
-		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return output, fmt.Errorf("branch %q does not exist: %w", p.releaseBranch, err)
-		}
-		return output, fmt.Errorf("checking out to release branch: %w", err)
 	}
 
 	repositoryLogs, err := repository.Log(&logOptions)
@@ -228,7 +236,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
-func FetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
+func (p *Parser) FetchLatestSemverTag(repository *git.Repository) (*object.Tag, error) {
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, fmt.Errorf("fetching tag objects: %w", err)
