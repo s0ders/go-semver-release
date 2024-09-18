@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -133,7 +134,7 @@ func (p *Parser) FetchLatestSemverTagPerProjects(repository *git.Repository) (ma
 	latestProjectSemver := make(map[monorepo.Project]*object.Tag)
 
 	// Find all semver tags
-	err = tags.ForEach(func(tag *object.Tag) error {
+	_ = tags.ForEach(func(tag *object.Tag) error {
 		if semver.Regex.MatchString(tag.Name) {
 			semverTags = append(semverTags, tag)
 		}
@@ -194,6 +195,15 @@ func (p *Parser) ParseHistoryForGivenProject(commits []*object.Commit, latestSem
 			continue
 		}
 
+		containsProjectFiles, err := commitContainsProjectFiles(commit, project.Path)
+		if err != nil {
+			return false, latestReleaseCommitHash, fmt.Errorf("checking if commit contains project files: %w", err)
+		}
+
+		if !containsProjectFiles {
+			continue
+		}
+
 		match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
 		breakingChange := match[3] == "!" || strings.Contains(match[0], "BREAKING CHANGE")
 		commitType := match[1]
@@ -232,22 +242,19 @@ func (p *Parser) ParseHistoryForGivenProject(commits []*object.Commit, latestSem
 	return newRelease, latestReleaseCommitHash, nil
 }
 
-func commitContainsProjectFiles(hash plumbing.Hash, repository *git.Repository) (bool, error) {
-	files := make([]string, 0)
-
-	// Retrieve the commit object
-	commit, err := repository.CommitObject(hash)
+// commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the
+// given project's path.
+func commitContainsProjectFiles(commit *object.Commit, projectPath string) (bool, error) {
+	regex, err := regexp.Compile(fmt.Sprintf("^%s", projectPath))
 	if err != nil {
-		return false, fmt.Errorf("looking for commit with given hash: %w", err)
+		return false, fmt.Errorf("compiling project's path regexp: %w", err)
 	}
 
-	// Get the tree of the commit
 	commitTree, err := commit.Tree()
 	if err != nil {
 		return false, fmt.Errorf("getting commit tree: %w", err)
 	}
 
-	// Get the parent commit's tree
 	parentCommit := commit.Parents()
 	parentTree := &object.Tree{}
 	if parentCommit != nil {
@@ -255,20 +262,20 @@ func commitContainsProjectFiles(hash plumbing.Hash, repository *git.Repository) 
 		if err == nil {
 			parentTree, err = parent.Tree()
 			if err != nil {
-				return false, fmt.Errorf("getting parrent tree: %w", err)
+				return false, fmt.Errorf("getting parent tree: %w", err)
 			}
 		}
 	}
 
-	// Get the diff between the trees
 	changes, err := object.DiffTree(parentTree, commitTree)
 	if err != nil {
 		return false, fmt.Errorf("getting diff tree: %w", err)
 	}
 
-	// Iterate over the changes and print the modified files
 	for _, change := range changes {
-		files = append(files, change.To.Name)
+		if regex.MatchString(filepath.Dir(change.To.Name)) {
+			return true, nil
+		}
 	}
 
 	return false, nil

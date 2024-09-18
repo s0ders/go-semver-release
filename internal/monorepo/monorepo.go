@@ -1,6 +1,9 @@
 package monorepo
 
-import "errors"
+import (
+	"errors"
+	"path/filepath"
+)
 
 var (
 	ErrNoProjects = errors.New("no projects found in configuration file despite operating in monorepo mode")
@@ -36,7 +39,7 @@ func Unmarshall(input []map[string]string) ([]Project, error) {
 
 		project := Project{
 			Name: name,
-			Path: path,
+			Path: filepath.Clean(path),
 		}
 
 		projects[i] = project
