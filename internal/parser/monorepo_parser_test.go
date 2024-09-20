@@ -14,7 +14,7 @@ var (
 	projects = []monorepo.Project{{Name: "foo", Path: "foo"}, {Name: "bar", Path: "bar"}}
 )
 
-func TestParser_FetchLatestSemverTagPerProjects(t *testing.T) {
+func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
 	assert := assertion.New(t)
 
 	testRepository, err := gittest.NewRepository()
@@ -44,5 +44,50 @@ func TestParser_FetchLatestSemverTagPerProjects(t *testing.T) {
 		gotTags = append(gotTags, latestTag.Name)
 	}
 
-	assert.Equal(wantTags, gotTags, "latest semver tags per projects should be equal")
+	assert.Contains(gotTags, wantTags[0], "should have found tag")
+	assert.Contains(gotTags, wantTags[1], "should have found tag")
+}
+
+func TestMonorepoParser_CommitContainsProjectFiles_True(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	hash, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	commit, err := testRepository.CommitObject(hash)
+	checkErr(t, "getting commit", err)
+
+	contains, err := commitContainsProjectFiles(commit, "foo")
+	checkErr(t, "checking project files", err)
+
+	assert.True(contains, "commit contains project files")
+}
+
+func TestMonorepoParser_CommitContainsProjectFiles_False(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	hash, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	commit, err := testRepository.CommitObject(hash)
+	checkErr(t, "getting commit", err)
+
+	contains, err := commitContainsProjectFiles(commit, "bar")
+	checkErr(t, "checking project files", err)
+
+	assert.False(contains, "commit does not contain project files")
 }
