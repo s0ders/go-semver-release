@@ -141,8 +141,12 @@ func (p *Parser) FetchLatestSemverTagPerProjects(repository *git.Repository) (ma
 		return nil
 	})
 
-	// Sort every semver tags per project by checking if semver tags match the pattern "<project>-<semver>"
+	// Sort every semver tags per project by checking if semver tags match the pattern "<project>-<semver>" and
+	// initialize output
 	for _, project := range p.projects {
+
+		latestProjectSemver[project] = nil
+
 		for _, semverTag := range semverTags {
 			match, err := regexp.MatchString(fmt.Sprintf(`^%s\-.*`, project.Name), semverTag.Name)
 			if err != nil {
