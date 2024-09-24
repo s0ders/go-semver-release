@@ -105,7 +105,7 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 		return []ComputeNewSemverOutput{computerNewSemverOutput}, nil
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, _ := errgroup.WithContext(ctx)
 
 	for i, project := range p.projects {
 		g.Go(func() error {
