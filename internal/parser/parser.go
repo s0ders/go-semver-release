@@ -89,6 +89,11 @@ func (p *Parser) SetPrereleaseIdentifier(preleaseID string) {
 func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	output := make([]ComputeNewSemverOutput, len(p.projects))
 
+	err := p.checkoutBranch(repository)
+	if err != nil {
+		return output, err
+	}
+
 	if len(p.projects) == 0 {
 		computerNewSemverOutput, err := p.ComputeNewSemver(repository, monorepo.Project{})
 		if err != nil {
@@ -126,30 +131,6 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 
 	if project.Name != "" {
 		output.Project = project
-	}
-
-	worktree, err := repository.Worktree()
-	if err != nil {
-		return output, fmt.Errorf("fetching worktree: %w", err)
-	}
-
-	if worktree == nil {
-		return output, fmt.Errorf("no worktree, check that repository is initialized")
-	}
-
-	// Checkout to release branch
-	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
-	branchCheckOutOpts := git.CheckoutOptions{
-		Branch: releaseBranchRef,
-		Force:  true,
-	}
-
-	err = worktree.Checkout(&branchCheckOutOpts)
-	if err != nil {
-		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return output, fmt.Errorf("branch %q does not exist: %w", p.releaseBranch, err)
-		}
-		return output, fmt.Errorf("checking out to release branch: %w", err)
 	}
 
 	latestSemverTag, err := p.FetchLatestSemverTag(repository, project)
@@ -327,12 +308,32 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	return latestTag, nil
 }
 
-func shortenMessage(message string) string {
-	if len(message) > 50 {
-		return fmt.Sprintf("%s...", message[0:47])
+func (p *Parser) checkoutBranch(repository *git.Repository) error {
+	worktree, err := repository.Worktree()
+	if err != nil {
+		return fmt.Errorf("fetching worktree: %w", err)
 	}
 
-	return message
+	if worktree == nil {
+		return fmt.Errorf("no worktree, check that repository is initialized")
+	}
+
+	// Checkout to release branch
+	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
+	branchCheckOutOpts := git.CheckoutOptions{
+		Branch: releaseBranchRef,
+		Force:  true,
+	}
+
+	err = worktree.Checkout(&branchCheckOutOpts)
+	if err != nil {
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return fmt.Errorf("branch %q does not exist: %w", p.releaseBranch, err)
+		}
+		return fmt.Errorf("checking out to release branch: %w", err)
+	}
+
+	return nil
 }
 
 // commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the
@@ -372,4 +373,12 @@ func commitContainsProjectFiles(commit *object.Commit, projectPath string) (bool
 	}
 
 	return false, nil
+}
+
+func shortenMessage(message string) string {
+	if len(message) > 50 {
+		return fmt.Sprintf("%s...", message[0:47])
+	}
+
+	return message
 }
