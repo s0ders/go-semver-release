@@ -100,7 +100,7 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
-func TestTag_NewTagFromServer(t *testing.T) {
+func TestTag_NewTagFromSemver(t *testing.T) {
 	assert := assertion.New(t)
 
 	var b [20]byte
@@ -192,6 +192,37 @@ func TestTag_Format(t *testing.T) {
 	got := tagger.Format(version)
 
 	assert.Equal(want, got)
+}
+
+func TestTag_AddTagToRepositoryWithProject(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	head, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	version := &semver.Semver{Major: 1}
+	prefix := "v"
+	projectName := "foo"
+
+	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(prefix))
+	tagger.SetProjectName(projectName)
+
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
+	checkErr(t, "tagging repository", err)
+
+	wantTag := projectName + "-" + prefix + version.String()
+
+	tagExists, err := Exists(testRepository.Repository, wantTag)
+	checkErr(t, "checking if tag exists", err)
+
+	assert.Equal(tagExists, true, "tag should have been found")
 }
 
 func checkErr(t *testing.T, msg string, err error) {

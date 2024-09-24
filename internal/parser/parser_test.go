@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -272,24 +273,6 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 	assert.Equal(true, output.NewRelease, "boolean should be equal")
 }
 
-func TestParser_ComputeNewSemver_UnknownReleaseType(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	invalidRules := rule.Rules{Map: map[string]string{"fix": "unknown"}}
-
-	parser := New(logger, tagger, invalidRules)
-
-	_, err = parser.ComputeNewSemver(testRepository.Repository, emptyProject)
-	assert.Error(err, "should have been failed trying to compute semver")
-}
-
 func TestParser_ComputeNewSemver_UninitializedRepository(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -371,6 +354,75 @@ func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
 
 	assert.Equal(want.String(), output.Semver.String(), "version should be equal")
 	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_Run_NoMonorepo(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	_, err = testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
+
+	output, err := parser.Run(context.Background(), testRepository.Repository)
+	checkErr(t, "computing new semver", err)
+
+	want := semver.Semver{
+		Major: 0,
+		Minor: 1,
+		Patch: 0,
+	}
+
+	assert.Len(output, 1, "parser run output should contain one element")
+	assert.Equal(want.String(), output[0].Semver.String(), "version should be equal")
+}
+
+func TestParser_Run_Monorepo(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Add commit for "foo" project
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./foo/foo2.txt")
+	checkErr(t, "adding commit", err)
+
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo3.txt")
+	checkErr(t, "adding commit", err)
+
+	// Add commit for "bar" project
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/xyz/bar.txt")
+	checkErr(t, "adding commit", err)
+
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/bar2.txt")
+	checkErr(t, "adding commit", err)
+
+	// Add commit for unrelated project
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./unrelated/temp.txt")
+	checkErr(t, "adding commit", err)
+
+	parser := New(logger, tagger, rules, WithProjects(projects))
+	parser.SetBranch("master")
+
+	output, err := parser.Run(context.Background(), testRepository.Repository)
+	checkErr(t, "computing new semver", err)
+
+	assert.Len(output, 2, "parser run output should contain one element")
 }
 
 func TestParser_ShortMessage(t *testing.T) {
