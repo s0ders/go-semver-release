@@ -2,6 +2,7 @@
 package ci
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -62,10 +63,7 @@ func GenerateGitHubOutput(semver *semver.Semver, branch string, options ...Optio
 	}
 
 	defer func() {
-		err = f.Close()
-		if err != nil {
-			return
-		}
+		err = errors.Join(err, f.Close())
 	}()
 
 	_, err = f.WriteString(output.String())
