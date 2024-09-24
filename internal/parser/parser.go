@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -37,6 +38,7 @@ type Parser struct {
 	prereleaseIdentifier string
 	prereleaseMode       bool
 	projects             []monorepo.Project
+	mu                   sync.Mutex
 }
 
 type OptionFunc func(*Parser)
@@ -166,6 +168,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 		logOptions.Since = &since
 	}
 
+	p.mu.Lock()
 	repositoryLogs, err := repository.Log(&logOptions)
 	if err != nil {
 		return output, fmt.Errorf("fetching commit history: %w", err)
@@ -181,6 +184,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	sort.Slice(history, func(i, j int) bool {
 		return history[i].Committer.When.Before(history[j].Committer.When)
 	})
+	p.mu.Unlock()
 
 	newRelease, commitHash, err := p.ParseHistory(history, latestSemver, project)
 	if err != nil {
@@ -213,10 +217,12 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 		}
 
 		if project.Name != "" {
+			p.mu.Lock()
 			containsProjectFiles, err := commitContainsProjectFiles(commit, project.Path)
 			if err != nil {
 				return false, latestReleaseCommitHash, fmt.Errorf("checking if commit contains project files: %w", err)
 			}
+			p.mu.Unlock()
 
 			if !containsProjectFiles {
 				continue
@@ -274,6 +280,7 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		latestTag    *object.Tag
 	)
 
+	p.mu.Lock()
 	err = tags.ForEach(func(tag *object.Tag) error {
 		if !semver.Regex.MatchString(tag.Name) {
 			return nil
@@ -304,6 +311,7 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
+	p.mu.Unlock()
 
 	return latestTag, nil
 }
