@@ -82,8 +82,8 @@ func (p *Parser) SetPrerelease(b bool) {
 	p.prereleaseMode = b
 }
 
-func (p *Parser) SetPrereleaseIdentifier(preleaseID string) {
-	p.prereleaseIdentifier = preleaseID
+func (p *Parser) SetPrereleaseIdentifier(prereleaseID string) {
+	p.prereleaseIdentifier = prereleaseID
 }
 
 func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]ComputeNewSemverOutput, error) {
