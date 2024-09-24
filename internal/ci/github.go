@@ -11,10 +11,11 @@ import (
 )
 
 type GitHubOutput struct {
-	Semver     *semver.Semver
-	Branch     string
-	TagPrefix  string
-	NewRelease bool
+	Semver      *semver.Semver
+	Branch      string
+	TagPrefix   string
+	ProjectName string
+	NewRelease  bool
 }
 
 func (g GitHubOutput) String() string {
@@ -22,8 +23,14 @@ func (g GitHubOutput) String() string {
 
 	versionKey := branch + "_SEMVER"
 	releaseKey := branch + "_NEW_RELEASE"
+	projectKey := branch + "_PROJECT"
 
 	str := "\n"
+
+	if g.ProjectName != "" {
+		str += fmt.Sprintf("%s=%s\n", projectKey, g.ProjectName)
+	}
+
 	str += fmt.Sprintf("%s=%s\n", versionKey, g.TagPrefix+g.Semver.String())
 	str += fmt.Sprintf("%s=%t\n", releaseKey, g.NewRelease)
 
@@ -41,6 +48,12 @@ func WithNewRelease(b bool) OptionFunc {
 func WithTagPrefix(tagPrefix string) OptionFunc {
 	return func(o *GitHubOutput) {
 		o.TagPrefix = tagPrefix
+	}
+}
+
+func WithProject(project string) OptionFunc {
+	return func(o *GitHubOutput) {
+		o.ProjectName = project
 	}
 }
 

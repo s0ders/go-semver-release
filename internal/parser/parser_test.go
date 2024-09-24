@@ -1,27 +1,30 @@
 package parser
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/s0ders/go-semver-release/v4/internal/gittest"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/rs/zerolog"
 	assertion "github.com/stretchr/testify/assert"
 
+	"github.com/s0ders/go-semver-release/v4/internal/gittest"
+	"github.com/s0ders/go-semver-release/v4/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v4/internal/rule"
 	"github.com/s0ders/go-semver-release/v4/internal/semver"
 	"github.com/s0ders/go-semver-release/v4/internal/tag"
 )
 
 var (
-	logger = zerolog.New(io.Discard)
-	tagger = tag.NewTagger("foo", "foo")
-	rules  = rule.Default
+	logger       = zerolog.New(io.Discard)
+	tagger       = tag.NewTagger("foo", "foo")
+	rules        = rule.Default
+	projects     = []monorepo.Project{{Name: "foo", Path: "foo"}, {Name: "bar", Path: "bar"}}
+	emptyProject = monorepo.Project{}
 )
 
 func TestParser_CommitTypeRegex(t *testing.T) {
@@ -81,7 +84,7 @@ func TestParser_FetchLatestSemverTag_NoTag(t *testing.T) {
 
 	parser := New(logger, tagger, rules)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository)
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, emptyProject)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Nil(latest, "latest semver tag should be nil")
@@ -107,7 +110,7 @@ func TestParser_FetchLatestSemverTag_OneTag(t *testing.T) {
 
 	parser := New(logger, tagger, rules)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository)
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, emptyProject)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Equal(tagName, latest.Name, "latest semver tagName should be equal")
@@ -137,7 +140,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 
 	parser := New(logger, tagger, rules)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository)
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, emptyProject)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want := "3.0.0"
@@ -154,9 +157,10 @@ func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
 		_ = testRepository.Remove()
 	})
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
 	want := "0.0.0"
@@ -177,9 +181,10 @@ func TestParser_ComputeNewSemver_UntaggedRepository_PatchRelease(t *testing.T) {
 	_, err = testRepository.AddCommit("fix")
 	checkErr(t, "adding commit", err)
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
 	want := "0.0.1"
@@ -199,9 +204,10 @@ func TestParser_ComputeNewSemver_UntaggedRepository_MinorRelease(t *testing.T) {
 	_, err = testRepository.AddCommit("feat")
 	checkErr(t, "adding commit", err)
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
 	want := "0.1.0"
@@ -221,9 +227,10 @@ func TestParser_ComputeNewSemver_UntaggedRepository_MajorRelease(t *testing.T) {
 	_, err = testRepository.AddCommit("feat!")
 	checkErr(t, "adding commit", err)
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver ", err)
 
 	want := "1.0.0"
@@ -253,9 +260,10 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 	_, err = testRepository.AddCommit("fix") // 1.1.1
 	checkErr(t, "adding commit", err)
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"))
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver ", err)
 
 	want := "1.1.1"
@@ -278,7 +286,7 @@ func TestParser_ComputeNewSemver_UnknownReleaseType(t *testing.T) {
 
 	parser := New(logger, tagger, invalidRules)
 
-	_, err = parser.ComputeNewSemver(testRepository.Repository)
+	_, err = parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	assert.Error(err, "should have been failed trying to compute semver")
 }
 
@@ -297,7 +305,7 @@ func TestParser_ComputeNewSemver_UninitializedRepository(t *testing.T) {
 
 	parser := New(logger, tagger, rules)
 
-	_, err = parser.ComputeNewSemver(repository)
+	_, err = parser.ComputeNewSemver(repository, emptyProject)
 	assert.ErrorIs(err, plumbing.ErrReferenceNotFound)
 }
 
@@ -314,9 +322,10 @@ func TestParser_ComputeNewSemver_BuildMetadata(t *testing.T) {
 	_, err = testRepository.AddCommit("feat")
 	checkErr(t, "adding commit", err)
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"), WithBuildMetadata("metadata"))
+	parser := New(logger, tagger, rules, WithBuildMetadata("metadata"))
+	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Semver{
@@ -343,11 +352,14 @@ func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
 	_, err = testRepository.AddCommit("feat")
 	checkErr(t, "adding commit", err)
 
-	prereleaseID := "rc"
+	prereleaseID := "master"
 
-	parser := New(logger, tagger, rules, WithReleaseBranch("master"), WithPrereleaseMode(true), WithPrereleaseIdentifier(prereleaseID))
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("master")
+	parser.SetPrerelease(true)
+	parser.SetPrereleaseIdentifier("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository)
+	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Semver{
@@ -370,6 +382,115 @@ func TestParser_ShortMessage(t *testing.T) {
 	expected := "This is a very long commit message that is over..."
 
 	assert.Equal(expected, short, "short message should be equal")
+}
+
+func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	head, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	wantTag := "foo-1.0.0"
+
+	err = testRepository.AddTag(wantTag, head.Hash())
+	checkErr(t, fmt.Sprintf("creating tag %q", wantTag), err)
+
+	parser := New(logger, tagger, rules, WithProjects(projects))
+
+	gotTag, err := parser.FetchLatestSemverTag(testRepository.Repository, projects[0])
+	checkErr(t, "fetching latest semver tag", err)
+
+	assert.Equal(gotTag.Name, wantTag, "should have found tag")
+}
+
+func TestMonorepoParser_CommitContainsProjectFiles_True(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	hash, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	commit, err := testRepository.CommitObject(hash)
+	checkErr(t, "getting commit", err)
+
+	contains, err := commitContainsProjectFiles(commit, "foo")
+	checkErr(t, "checking project files", err)
+
+	assert.True(contains, "commit contains project files")
+}
+
+func TestMonorepoParser_CommitContainsProjectFiles_False(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	hash, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	commit, err := testRepository.CommitObject(hash)
+	checkErr(t, "getting commit", err)
+
+	contains, err := commitContainsProjectFiles(commit, "bar")
+	checkErr(t, "checking project files", err)
+
+	assert.False(contains, "commit does not contain project files")
+}
+
+func TestMonorepoParser_ComputeProjectsNewSemver(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Adding "foo" project commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt")
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	// Adding "bar" project commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/foo.txt")
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt")
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt")
+	checkErr(t, "adding commit", err)
+
+	// Adding unrelated commits
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./unknown/a.txt")
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./temp/abc/b.txt")
+	checkErr(t, "adding commit", err)
+
+	parser := New(logger, tagger, rules, WithProjects(projects))
+	parser.SetBranch("master")
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository, projects[0])
+	checkErr(t, "computing projects new semver", err)
+
+	assert.NotEmpty(output, "projects new semver output should not be empty")
 }
 
 func checkErr(t *testing.T, msg string, err error) {

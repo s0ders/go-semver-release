@@ -32,6 +32,7 @@ func WithSignKey(key *openpgp.Entity) OptionFunc {
 
 type Tagger struct {
 	TagPrefix    string
+	ProjectName  string
 	GitSignature object.Signature
 	SignKey      *openpgp.Entity
 }
@@ -50,6 +51,10 @@ func NewTagger(name, email string, options ...OptionFunc) *Tagger {
 	}
 
 	return tagger
+}
+
+func (t *Tagger) SetProjectName(name string) {
+	t.ProjectName = name
 }
 
 // TagFromSemver creates a new Git annotated tag from a semantic version number.
@@ -85,8 +90,14 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver
 		return fmt.Errorf("semver is nil")
 	}
 
+	tagMessage := t.TagPrefix + semver.String()
+
+	if t.ProjectName != "" {
+		tagMessage = t.ProjectName + "-" + tagMessage
+	}
+
 	tagOpts := &git.CreateTagOptions{
-		Message: t.TagPrefix + semver.String(),
+		Message: tagMessage,
 		SignKey: t.SignKey,
 		Tagger:  &t.GitSignature,
 	}

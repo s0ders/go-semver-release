@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 
@@ -96,62 +97,67 @@ var releaseCmd = &cobra.Command{
 		}
 
 		tagger := tag.NewTagger(gitName, gitEmail, tag.WithTagPrefix(tagPrefix), tag.WithSignKey(entity))
+		semverParser := parser.New(logger, tagger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithProjects(projects))
 
 		// Launch a parser per branch to analyze
 		for _, branch := range branches {
-			parser := parser.New(logger, tagger, rules,
-				parser.WithReleaseBranch(branch.Name),
-				parser.WithPrereleaseMode(branch.Prerelease),
-				parser.WithPrereleaseIdentifier(branch.Name),
-				parser.WithBuildMetadata(buildMetadata),
-				parser.WithProjects(projects),
-			)
+			semverParser.SetBranch(branch.Name)
+			semverParser.SetPrerelease(branch.Prerelease)
+			semverParser.SetPrereleaseIdentifier(branch.Name)
 
 			// For projects, would have a slice of semver
-			computeSemverOutput, err := parser.ComputeNewSemver(repository)
+			outputs, err := semverParser.Run(context.Background(), repository)
 			if err != nil {
 				return fmt.Errorf("computing new semver: %w", err)
 			}
 
-			semver := computeSemverOutput.Semver
-			release := computeSemverOutput.NewRelease
-			commitHash := computeSemverOutput.CommitHash
+			for _, output := range outputs {
+				semver := output.Semver
+				release := output.NewRelease
+				commitHash := output.CommitHash
+				project := output.Project.Name
 
-			err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix))
-			if err != nil {
-				return fmt.Errorf("generating github output: %w", err)
-			}
-
-			logEvent := logger.Info()
-			logEvent.Bool("new-release", release)
-			logEvent.Str("version", semver.String())
-			logEvent.Str("branch", branch.Name)
-
-			switch {
-			case !release:
-				logEvent.Msg("no new release")
-				return nil
-			case release && dryRun:
-				logEvent.Msg("dry-run enabled, next release found")
-				return nil
-			default:
-				logEvent.Msg("new release found")
-
-				err = tagger.TagRepository(repository, semver, commitHash)
+				err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix), ci.WithProject(project))
 				if err != nil {
-					return fmt.Errorf("tagging repository: %w", err)
+					return fmt.Errorf("generating github output: %w", err)
 				}
 
-				logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
+				logEvent := logger.Info()
+				logEvent.Bool("new-release", release)
+				logEvent.Str("version", semver.String())
+				logEvent.Str("branch", branch.Name)
 
-				if remoteMode {
-					err = origin.PushTag(tagger.Format(semver))
+				if project != "" {
+					logEvent.Str("project", project)
+
+					tagger.SetProjectName(project)
+				}
+
+				switch {
+				case !release:
+					logEvent.Msg("no new release")
+					return nil
+				case release && dryRun:
+					logEvent.Msg("dry-run enabled, next release found")
+					return nil
+				default:
+					logEvent.Msg("new release found")
+
+					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
-						return fmt.Errorf("pushing tag to remote: %w", err)
+						return fmt.Errorf("tagging repository: %w", err)
+					}
+
+					logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
+
+					if remoteMode {
+						err = origin.PushTag(tagger.Format(semver))
+						if err != nil {
+							return fmt.Errorf("pushing tag to remote: %w", err)
+						}
 					}
 				}
 			}
-
 		}
 
 		return nil
