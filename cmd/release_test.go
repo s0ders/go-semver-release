@@ -15,9 +15,9 @@ import (
 	"github.com/spf13/pflag"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v4/internal/gittest"
-	"github.com/s0ders/go-semver-release/v4/internal/rule"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 type cmdOutput struct {

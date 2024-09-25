@@ -21,10 +21,10 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/s0ders/go-semver-release/v4/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v4/internal/rule"
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)

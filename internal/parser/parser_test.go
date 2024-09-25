@@ -13,11 +13,11 @@ import (
 	"github.com/rs/zerolog"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v4/internal/gittest"
-	"github.com/s0ders/go-semver-release/v4/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v4/internal/rule"
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 var (

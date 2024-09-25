@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
 )
 
 var ErrTagAlreadyExists = errors.New("tag already exists")

@@ -3,13 +3,13 @@ package remote
 import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 	"testing"
 	"time"
 
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v4/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/gittest"
 )
 
 func TestRemote_Clone_HappyScenario(t *testing.T) {

@@ -11,14 +11,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v4/internal/branch"
-	"github.com/s0ders/go-semver-release/v4/internal/ci"
-	"github.com/s0ders/go-semver-release/v4/internal/gpg"
-	"github.com/s0ders/go-semver-release/v4/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v4/internal/parser"
-	"github.com/s0ders/go-semver-release/v4/internal/remote"
-	"github.com/s0ders/go-semver-release/v4/internal/rule"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
+	"github.com/s0ders/go-semver-release/v5/internal/ci"
+	"github.com/s0ders/go-semver-release/v5/internal/gpg"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v5/internal/parser"
+	"github.com/s0ders/go-semver-release/v5/internal/remote"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 var (
