@@ -38,7 +38,7 @@ type Parser struct {
 	prereleaseIdentifier string
 	prereleaseMode       bool
 	projects             []monorepo.Project
-	mu                   sync.Mutex
+	mu                   sync.RWMutex
 }
 
 type OptionFunc func(*Parser)
