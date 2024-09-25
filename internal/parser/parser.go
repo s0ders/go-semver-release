@@ -38,7 +38,7 @@ type Parser struct {
 	prereleaseIdentifier string
 	prereleaseMode       bool
 	projects             []monorepo.Project
-	mu                   sync.Mutex
+	mu                   sync.RWMutex
 }
 
 type OptionFunc func(*Parser)
@@ -270,10 +270,12 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project) (*object.Tag, error) {
+	p.mu.RLock()
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, fmt.Errorf("fetching tag objects: %w", err)
 	}
+	p.mu.RUnlock()
 
 	var (
 		latestSemver *semver.Semver
