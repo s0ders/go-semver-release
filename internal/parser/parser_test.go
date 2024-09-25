@@ -546,6 +546,7 @@ func TestMonorepoParser_ComputeProjectsNewSemver(t *testing.T) {
 }
 
 func checkErr(t *testing.T, msg string, err error) {
+	t.Helper()
 	if err != nil {
 		t.Fatalf("%s: %s", msg, err.Error())
 	}

@@ -115,6 +115,7 @@ func TestRemote_PushTag_UnavailableRemote(t *testing.T) {
 }
 
 func checkErr(t *testing.T, err error, msg string) {
+	t.Helper()
 	if err != nil {
 		t.Fatalf("%s: %s", msg, err)
 	}
