@@ -832,6 +832,7 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	configSetMonorepo()
 	configSetBranches([]map[string]string{{"name": "master"}})
 	configSetProjects([]map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
+	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
 
 	buf := new(bytes.Buffer)
 
@@ -843,18 +844,6 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 		checkErr(t, err, "removing repository")
 	}()
 
-	_, err = testRepository.AddCommitWithSpecificFile("feat", "./foo/foo.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo2.txt")
-	checkErr(t, err, "adding commit")
-
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo2.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo2.txt")
-	checkErr(t, err, "adding commit")
-
 	err = resetPersistentFlags(rootCmd)
 	checkErr(t, err, "resetting root command flags")
 
@@ -864,6 +853,20 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
+
+	// "foo" commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./foo/foo.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo2.txt")
+	checkErr(t, err, "adding commit")
+
+	// "bar" commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
+	checkErr(t, err, "adding commit")
 
 	// Executing command
 	err = rootCmd.Execute()
@@ -987,5 +990,5 @@ func configSetMonorepo() {
 }
 
 func configSetProjects(projects []map[string]string) {
-	viperInstance.Set("monorepo", projects)
+	viperInstance.Set("projects", projects)
 }
