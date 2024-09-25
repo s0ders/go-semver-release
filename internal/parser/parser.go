@@ -270,6 +270,9 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project) (*object.Tag, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, fmt.Errorf("fetching tag objects: %w", err)
@@ -280,7 +283,6 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		latestTag    *object.Tag
 	)
 
-	p.mu.Lock()
 	err = tags.ForEach(func(tag *object.Tag) error {
 		if !semver.Regex.MatchString(tag.Name) {
 			return nil
@@ -311,7 +313,6 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
-	p.mu.Unlock()
 
 	return latestTag, nil
 }
