@@ -38,7 +38,7 @@ type Parser struct {
 	prereleaseIdentifier string
 	prereleaseMode       bool
 	projects             []monorepo.Project
-	mu                   sync.RWMutex
+	mu                   sync.Mutex
 }
 
 type OptionFunc func(*Parser)
@@ -271,7 +271,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Sem
 // among all tags.
 func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project) (*object.Tag, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	tags, err := repository.TagObjects()
 	if err != nil {
@@ -314,6 +313,7 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
+	p.mu.Unlock()
 	return latestTag, nil
 }
 
