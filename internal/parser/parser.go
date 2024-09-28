@@ -158,10 +158,12 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 			return output, fmt.Errorf("building semver from git tag: %w", err)
 		}
 
+		p.mu.Lock()
 		latestSemverTagCommit, err := latestSemverTag.Commit()
 		if err != nil {
 			return output, fmt.Errorf("fetching latest semver tag commit: %w", err)
 		}
+		p.mu.Unlock()
 
 		// Show all commit that are at least one second older than the latest one pointed by SemVer tag
 		since := latestSemverTagCommit.Committer.When.Add(time.Second)
