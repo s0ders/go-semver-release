@@ -27,7 +27,7 @@ func TestMonorepo_Unmarshall(t *testing.T) {
 	assert.Equal(want, branches)
 }
 
-func TestBranch_UnmarshallErrors(t *testing.T) {
+func TestMonorepo_UnmarshallErrors(t *testing.T) {
 	assert := assertion.New(t)
 
 	type test struct {
@@ -38,6 +38,7 @@ func TestBranch_UnmarshallErrors(t *testing.T) {
 	tests := []test{
 		{have: []map[string]string{{"path": "./foo/"}}, want: ErrNoName},
 		{have: []map[string]string{{"name": "foo"}}, want: ErrNoPath},
+		{have: []map[string]string{}, want: ErrNoProjects},
 		{have: []map[string]string{{"name": "foo", "path": "./foo/"}}, want: nil},
 	}
 
