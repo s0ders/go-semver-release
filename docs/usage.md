@@ -161,6 +161,16 @@ monorepo:
 Each project will then be versioned separately meaning that each project will have its SemVer tag in the form 
 `<project>-<semver>` for instance `foo-1.2.3` or `bar-v0.0.1`
 
+**How does it work?**
+
+The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key 
+(e.g. `foo-1.0.0`). Then, for each project, the program will parse the commits older than the latest found tag and for 
+each commit, will check if one of the changes made in that commit belongs to the path of that project, if so, the latest
+SemVer is incremented according to the type of that commit.
+
+This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have 
+their SemVer bumped according to the commit type.
+
 ### Build metadata
 
 The Semantic Version convention states that your SemVer number can include build metadata in form
@@ -240,7 +250,11 @@ branch parsed:
     "new-release": true,
     "version": "1.2.3",
     "branch": "master",
+    "project": "foo",
     "message": "new release found"
 }
 ```
 
+> [!IMPORTANT]
+> The `project` key will only be present in an output if executed in monorepo mode. See the "Multiple projects in a 
+> single repository or "monorepo"" section for more information.
