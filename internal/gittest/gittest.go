@@ -184,16 +184,21 @@ func (r *TestRepository) AddCommitWithSpecificFile(commitType, filePath string) 
 
 // AddTag adds a new tag to the underlying Git repository with a given name and pointing to a given hash.
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
+	commit, err := r.CommitObject(hash)
+	if err != nil {
+		return fmt.Errorf("getting commit: %w", err)
+	}
+
 	tagOpts := &git.CreateTagOptions{
 		Message: tagName,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  r.When(),
+			When:  commit.Committer.When,
 		},
 	}
 
-	_, err := r.CreateTag(tagName, hash, tagOpts)
+	_, err = r.CreateTag(tagName, hash, tagOpts)
 
 	return err
 }
