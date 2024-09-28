@@ -506,7 +506,7 @@ func TestMonorepoParser_CommitContainsProjectFiles_False(t *testing.T) {
 	assert.False(contains, "commit does not contain project files")
 }
 
-func TestMonorepoParser_ComputeProjectsNewSemver(t *testing.T) {
+func TestMonorepoParser_Run(t *testing.T) {
 	assert := assertion.New(t)
 
 	testRepository, err := gittest.NewRepository()
@@ -539,10 +539,90 @@ func TestMonorepoParser_ComputeProjectsNewSemver(t *testing.T) {
 	parser := New(logger, tagger, rules, WithProjects(projects))
 	parser.SetBranch("master")
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, projects[0])
+	output, err := parser.Run(context.Background(), testRepository.Repository)
 	checkErr(t, "computing projects new semver", err)
 
-	assert.NotEmpty(output, "projects new semver output should not be empty")
+	assert.Len(output, 2, "parser run output should contain two elements")
+
+	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
+
+	assert.Contains(gotSemver, "1.0.1")
+	assert.Contains(gotSemver, "0.1.2")
+}
+
+func TestMonorepoParser_Run_WithPreexistingTags(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Add previous "foo" tags
+	fooCommit, err := testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt") // foo-1.0.0
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("foo-1.0.0", fooCommit)
+	checkErr(t, "adding foo tag", err)
+
+	// Add previous "bar" tags
+	barCommit, err := testRepository.AddCommitWithSpecificFile("chore!", "./bar/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("bar-1.0.0", barCommit) // bar-1.0.0
+	checkErr(t, "adding bar tag", err)
+
+	// Adding "foo" project commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt") // foo-2.0.0
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt") // foo-2.0.1
+	checkErr(t, "adding commit", err)
+
+	// Adding "bar" project commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/foo.txt") // bar-1.1.0
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt") // bar-1.1.1
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt") // bar-1.1.2
+	checkErr(t, "adding commit", err)
+
+	// Adding unrelated commits
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./unknown/a.txt")
+	checkErr(t, "adding commit", err)
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./temp/abc/b.txt")
+	checkErr(t, "adding commit", err)
+
+	parser := New(logger, tagger, rules, WithProjects(projects))
+	parser.SetBranch("master")
+
+	output, err := parser.Run(context.Background(), testRepository.Repository)
+	checkErr(t, "computing projects new semver", err)
+
+	assert.Len(output, 2, "parser run output should contain two elements")
+
+	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
+
+	assert.Contains(gotSemver, "2.0.1")
+	assert.Contains(gotSemver, "1.1.2")
+}
+
+func TestParser_Run_InvalidBranch(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	parser := New(logger, tagger, rules)
+	parser.SetBranch("branch_that_does_not_exist")
+
+	_, err = parser.Run(context.Background(), testRepository.Repository)
+	assert.ErrorContains(err, "does not exist", "parser run should have failed since branch does not exist")
 }
 
 func checkErr(t *testing.T, msg string, err error) {
