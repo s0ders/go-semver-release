@@ -27,12 +27,12 @@ func (g GitHubOutput) String() string {
 
 	str := "\n"
 
+	str += fmt.Sprintf("%s=%s\n", versionKey, g.TagPrefix+g.Semver.String())
+	str += fmt.Sprintf("%s=%t\n", releaseKey, g.NewRelease)
+
 	if g.ProjectName != "" {
 		str += fmt.Sprintf("%s=%s\n", projectKey, g.ProjectName)
 	}
-
-	str += fmt.Sprintf("%s=%s\n", versionKey, g.TagPrefix+g.Semver.String())
-	str += fmt.Sprintf("%s=%t\n", releaseKey, g.NewRelease)
 
 	return str
 }

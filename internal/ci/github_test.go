@@ -40,6 +40,35 @@ func TestCI_GenerateGitHub_HappyScenario(t *testing.T) {
 	assert.Equal(want, got, "output should match")
 }
 
+func TestCI_GenerateGitHub_HappyScenarioWithProject(t *testing.T) {
+	assert := assertion.New(t)
+
+	err := setup()
+	checkErr(t, "setting up test", err)
+
+	defer func() {
+		err = teardown()
+		checkErr(t, "tearing down test", err)
+	}()
+
+	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+
+	err = GenerateGitHubOutput(version, "main", WithNewRelease(true), WithTagPrefix("v"), WithProject("foo"))
+	if err != nil {
+		t.Fatalf("creating github output: %s", err)
+	}
+
+	outputPath := os.Getenv("GITHUB_OUTPUT")
+
+	writtenOutput, err := os.ReadFile(outputPath)
+	checkErr(t, "reading output file", err)
+
+	want := "\nMAIN_SEMVER=v1.2.3\nMAIN_NEW_RELEASE=true\nMAIN_PROJECT=foo\n"
+	got := string(writtenOutput)
+
+	assert.Equal(want, got, "output should match")
+}
+
 func TestCI_GenerateGitHub_NoEnvVar(t *testing.T) {
 	assert := assertion.New(t)
 
