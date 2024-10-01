@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
@@ -63,12 +61,12 @@ func (v *Version) String() string {
 	return str
 }
 
-// FromGitTag returns a semver struct corresponding to the Git annotated tag used as an input.
-func FromGitTag(tag *object.Tag) (*Version, error) {
-	submatch := Regex.FindStringSubmatch(tag.Name)
+// NewFromString returns a semver struct corresponding to the Git annotated tag used as an input.
+func NewFromString(str string) (*Version, error) {
+	submatch := Regex.FindStringSubmatch(str)
 
 	if len(submatch) < 4 {
-		return nil, fmt.Errorf("tag cannot be converted to a valid semver")
+		return nil, fmt.Errorf("string cannot be converted to a valid semver")
 	}
 
 	major, err := strconv.Atoi(submatch[1])
@@ -92,8 +90,8 @@ func FromGitTag(tag *object.Tag) (*Version, error) {
 	return semver, nil
 }
 
-// Compare returns an integer comparing two semantic versions. The result will be 0 if a == b, -1 if a < b, and +1
-// if a > b.
+// Compare returns an integer representing the precedence of two semantic versions. The result will be 0 if a == b,
+// -1 if a < b, and +1 if a > b.
 func Compare(a, b *Version) int {
 	switch {
 	case a.Major > b.Major:
