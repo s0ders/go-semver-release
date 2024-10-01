@@ -1,3 +1,5 @@
+//go:build testing
+
 // Package gittest provides basic types and functions for testing operations related to Git repositories.
 package gittest
 
