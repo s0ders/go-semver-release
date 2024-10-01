@@ -12,28 +12,28 @@ func TestSemver_Precedence(t *testing.T) {
 	assert := assertion.New(t)
 
 	type test struct {
-		s1, s2 *Semver
+		s1, s2 *Version
 		want   int
 	}
 
 	matrix := []test{
-		{s1: &Semver{Major: 1, Minor: 0, Patch: 2}, s2: &Semver{Major: 1, Minor: 0, Patch: 1}, want: 1},
-		{&Semver{Major: 1, Minor: 0, Patch: 2}, &Semver{Major: 1, Minor: 0, Patch: 3}, -1},
-		{&Semver{Major: 1, Minor: 0, Patch: 2}, &Semver{Major: 1, Minor: 1, Patch: 0}, -1},
-		{&Semver{Major: 0, Minor: 0, Patch: 1}, &Semver{Major: 1, Minor: 1, Patch: 0}, -1},
-		{&Semver{Major: 2, Minor: 0, Patch: 0}, &Semver{Major: 1, Minor: 99, Patch: 99}, 1},
-		{&Semver{Major: 99, Minor: 0, Patch: 0}, &Semver{Major: 2, Minor: 99, Patch: 99}, 1},
-		{s1: &Semver{Major: 1, Minor: 0, Patch: 0}, s2: &Semver{Major: 1, Minor: 0, Patch: 0}},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "foo"}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 1, Patch: 0, BuildMetadata: "foo"}, want: 1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 1, Patch: 0}, want: 1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0}, want: -1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "foo"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, BuildMetadata: "bar"}, want: 0},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "alpha"}, want: 1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "alpha"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "beta"}, want: -1},
-		{s1: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Semver{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 0},
+		{s1: &Version{Major: 1, Minor: 0, Patch: 2}, s2: &Version{Major: 1, Minor: 0, Patch: 1}, want: 1},
+		{&Version{Major: 1, Minor: 0, Patch: 2}, &Version{Major: 1, Minor: 0, Patch: 3}, -1},
+		{&Version{Major: 1, Minor: 0, Patch: 2}, &Version{Major: 1, Minor: 1, Patch: 0}, -1},
+		{&Version{Major: 0, Minor: 0, Patch: 1}, &Version{Major: 1, Minor: 1, Patch: 0}, -1},
+		{&Version{Major: 2, Minor: 0, Patch: 0}, &Version{Major: 1, Minor: 99, Patch: 99}, 1},
+		{&Version{Major: 99, Minor: 0, Patch: 0}, &Version{Major: 2, Minor: 99, Patch: 99}, 1},
+		{s1: &Version{Major: 1, Minor: 0, Patch: 0}, s2: &Version{Major: 1, Minor: 0, Patch: 0}},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0}, s2: &Version{Major: 0, Minor: 1, Patch: 0}, want: 1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Metadata: "foo"}, s2: &Version{Major: 0, Minor: 1, Patch: 0}, want: 1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0}, s2: &Version{Major: 0, Minor: 1, Patch: 0, Metadata: "foo"}, want: 1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Version{Major: 0, Minor: 1, Patch: 0}, want: 1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Version{Major: 0, Minor: 2, Patch: 0}, want: -1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0}, s2: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Metadata: "foo"}, s2: &Version{Major: 0, Minor: 2, Patch: 0, Metadata: "bar"}, want: 0},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "alpha"}, want: 1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "alpha"}, s2: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "beta"}, want: -1},
+		{s1: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, s2: &Version{Major: 0, Minor: 2, Patch: 0, Prerelease: "rc"}, want: 0},
 	}
 
 	for _, tc := range matrix {
@@ -46,16 +46,16 @@ func TestSemver_IsZero(t *testing.T) {
 	assert := assertion.New(t)
 
 	type test struct {
-		semver Semver
+		semver Version
 		want   bool
 	}
 
 	matrix := []test{
-		{Semver{Major: 0, Minor: 0, Patch: 0}, true},
-		{Semver{Major: 0, Minor: 0, Patch: 1}, false},
-		{Semver{Major: 0, Minor: 1, Patch: 0}, false},
-		{Semver{Major: 1, Minor: 0, Patch: 0}, false},
-		{Semver{Major: 1, Minor: 1, Patch: 1}, false},
+		{Version{Major: 0, Minor: 0, Patch: 0}, true},
+		{Version{Major: 0, Minor: 0, Patch: 1}, false},
+		{Version{Major: 0, Minor: 1, Patch: 0}, false},
+		{Version{Major: 1, Minor: 0, Patch: 0}, false},
+		{Version{Major: 1, Minor: 1, Patch: 1}, false},
 	}
 
 	for _, tc := range matrix {
@@ -68,15 +68,15 @@ func TestSemver_String(t *testing.T) {
 	assert := assertion.New(t)
 
 	type test struct {
-		have Semver
+		have Version
 		want string
 	}
 
 	tests := []test{
-		{Semver{Major: 1, Minor: 0, Patch: 0}, "1.0.0"},
-		{Semver{Major: 1, Minor: 0, Patch: 1, Prerelease: "rc"}, "1.0.1-rc"},
-		{Semver{Major: 1, Minor: 0, Patch: 1, BuildMetadata: "metadata"}, "1.0.1+metadata"},
-		{Semver{Major: 1, Minor: 0, Patch: 1, Prerelease: "alpha", BuildMetadata: "metadata"}, "1.0.1-alpha+metadata"},
+		{Version{Major: 1, Minor: 0, Patch: 0}, "1.0.0"},
+		{Version{Major: 1, Minor: 0, Patch: 1, Prerelease: "rc"}, "1.0.1-rc"},
+		{Version{Major: 1, Minor: 0, Patch: 1, Metadata: "metadata"}, "1.0.1+metadata"},
+		{Version{Major: 1, Minor: 0, Patch: 1, Prerelease: "alpha", Metadata: "metadata"}, "1.0.1-alpha+metadata"},
 	}
 
 	for _, tc := range tests {
@@ -97,7 +97,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 		Name:    "v1.2.3",
 		Message: "1.2.3",
 		Tagger: object.Signature{
-			Name:  "Go Semver Release",
+			Name:  "Go Version Release",
 			Email: "ci@ci.ci",
 			When:  time.Now(),
 		},
@@ -107,7 +107,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 		Name:    "1.2.3",
 		Message: "1.2.3",
 		Tagger: object.Signature{
-			Name:  "Go Semver Release",
+			Name:  "Go Version Release",
 			Email: "ci@ci.ci",
 			When:  time.Now(),
 		},
@@ -117,7 +117,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 		Name:    "v.1.2.3",
 		Message: "1.2.3",
 		Tagger: object.Signature{
-			Name:  "Go Semver Release",
+			Name:  "Go Version Release",
 			Email: "ci@ci.ci",
 			When:  time.Now(),
 		},
@@ -127,7 +127,7 @@ func TestSemver_FromGitTag(t *testing.T) {
 		Name:    "v1.2.3-rc+metadata",
 		Message: "1.2.3",
 		Tagger: object.Signature{
-			Name:  "Go Semver Release",
+			Name:  "Go Version Release",
 			Email: "ci@ci.ci",
 			When:  time.Now(),
 		},
@@ -155,7 +155,7 @@ func TestSemver_FromGitTagInvalid(t *testing.T) {
 		Name:    "foo",
 		Message: "foo",
 		Tagger: object.Signature{
-			Name:  "Go Semver Release",
+			Name:  "Go Version Release",
 			Email: "ci@ci.ci",
 			When:  time.Now(),
 		},
@@ -168,7 +168,7 @@ func TestSemver_FromGitTagInvalid(t *testing.T) {
 func TestSemver_Bump(t *testing.T) {
 	assert := assertion.New(t)
 
-	s := &Semver{Major: 0, Minor: 0, Patch: 0}
+	s := &Version{Major: 0, Minor: 0, Patch: 0}
 
 	s.BumpPatch()
 	assert.Equal(s.String(), "0.0.1", "the strings should be equal")

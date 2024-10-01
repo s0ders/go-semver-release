@@ -199,7 +199,7 @@ func configureBranches() ([]branch.Branch, error) {
 
 	err := viperInstance.UnmarshalKey("branches", &branchesMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling branches: %w", err)
+		return nil, fmt.Errorf("unmarshalling branches key: %w", err)
 	}
 
 	branches, err = branch.Unmarshall(branchesMarshalled)
@@ -222,7 +222,7 @@ func configureProjects() ([]monorepo.Project, error) {
 
 	err := viperInstance.UnmarshalKey("projects", &projectsMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling projects: %w", err)
+		return nil, fmt.Errorf("unmarshalling projects key: %w", err)
 	}
 
 	projects, err = monorepo.Unmarshall(projectsMarshalled)

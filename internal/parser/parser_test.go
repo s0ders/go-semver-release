@@ -192,6 +192,33 @@ func TestParser_ComputeNewSemver_UntaggedRepository_PatchRelease(t *testing.T) {
 	assert.Equal(want, output.Semver.String(), "version should be equal")
 }
 
+func TestParser_ComputeNewSemver_UnknownReleaseType(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	_, err = testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	invalidRules := rule.Rules{
+		Map: map[string]string{
+			"feat": "unknown",
+			"fix":  "patch",
+		},
+	}
+
+	parser := New(logger, tagger, invalidRules)
+	parser.SetBranch("master")
+
+	_, err = parser.ComputeNewSemver(testRepository.Repository, emptyProject)
+	assert.ErrorContains(err, "unknown release type")
+}
+
 func TestParser_ComputeNewSemver_UntaggedRepository_MinorRelease(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -311,11 +338,11 @@ func TestParser_ComputeNewSemver_BuildMetadata(t *testing.T) {
 	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
-	want := semver.Semver{
-		Major:         0,
-		Minor:         1,
-		Patch:         0,
-		BuildMetadata: "metadata",
+	want := semver.Version{
+		Major:    0,
+		Minor:    1,
+		Patch:    0,
+		Metadata: "metadata",
 	}
 
 	assert.Equal(want.String(), output.Semver.String(), "version should be equal")
@@ -345,7 +372,7 @@ func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
 	output, err := parser.ComputeNewSemver(testRepository.Repository, emptyProject)
 	checkErr(t, "computing new semver", err)
 
-	want := semver.Semver{
+	want := semver.Version{
 		Major:      0,
 		Minor:      1,
 		Patch:      0,
@@ -375,7 +402,7 @@ func TestParser_Run_NoMonorepo(t *testing.T) {
 	output, err := parser.Run(context.Background(), testRepository.Repository)
 	checkErr(t, "computing new semver", err)
 
-	want := semver.Semver{
+	want := semver.Version{
 		Major: 0,
 		Minor: 1,
 		Patch: 0,

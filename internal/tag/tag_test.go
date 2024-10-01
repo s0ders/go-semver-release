@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	taggerName  = "Go Semver Release"
+	taggerName  = "Go Version Release"
 	taggerEmail = "go-semver@release.ci"
 )
 
@@ -60,7 +60,7 @@ func TestTag_AddTagToRepository(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 	prefix := "v"
 
 	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(prefix))
@@ -89,7 +89,7 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
@@ -110,7 +110,7 @@ func TestTag_NewTagFromSemver(t *testing.T) {
 
 	hash := plumbing.Hash(b)
 
-	version := &semver.Semver{Patch: 1}
+	version := &semver.Version{Patch: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
@@ -140,7 +140,7 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, &semver.Semver{}, plumbing.Hash{})
+	err = tagger.TagRepository(repository, &semver.Version{}, plumbing.Hash{})
 	assert.Error(err, "should have failed trying to fetch uninitialized repository head")
 }
 
@@ -164,7 +164,7 @@ func TestTag_SignKey(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail, WithSignKey(entity))
 
@@ -184,7 +184,7 @@ func TestTag_Format(t *testing.T) {
 	assert := assertion.New(t)
 
 	tagPrefix := "v"
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(tagPrefix))
 
@@ -207,7 +207,7 @@ func TestTag_AddTagToRepositoryWithProject(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 	prefix := "v"
 	projectName := "foo"
 

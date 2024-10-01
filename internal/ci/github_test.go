@@ -22,7 +22,7 @@ func TestCI_GenerateGitHub_HappyScenario(t *testing.T) {
 		checkErr(t, "tearing down test", err)
 	}()
 
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput(version, "main", WithNewRelease(true), WithTagPrefix("v"))
 	if err != nil {
@@ -51,7 +51,7 @@ func TestCI_GenerateGitHub_HappyScenarioWithProject(t *testing.T) {
 		checkErr(t, "tearing down test", err)
 	}()
 
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput(version, "main", WithNewRelease(true), WithTagPrefix("v"), WithProject("foo"))
 	if err != nil {
@@ -72,7 +72,7 @@ func TestCI_GenerateGitHub_HappyScenarioWithProject(t *testing.T) {
 func TestCI_GenerateGitHub_NoEnvVar(t *testing.T) {
 	assert := assertion.New(t)
 
-	err := GenerateGitHubOutput(&semver.Semver{}, "main")
+	err := GenerateGitHubOutput(&semver.Version{}, "main")
 	assert.NoError(err, "should not have tried to generate an output")
 }
 
@@ -92,7 +92,7 @@ func TestCI_GenerateGitHub_ReadOnlyOutput(t *testing.T) {
 	err = os.Chmod(filePath, 0444)
 	checkErr(t, "changing output file permissions", err)
 
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput(version, "main")
 	assert.Error(err, "should have failed since output file is readonly")

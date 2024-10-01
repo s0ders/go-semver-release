@@ -71,7 +71,7 @@ func New(logger zerolog.Logger, tagger *tag.Tagger, rules rule.Rules, options ..
 
 type ComputeNewSemverOutput struct {
 	Project    monorepo.Project
-	Semver     *semver.Semver
+	Semver     *semver.Version
 	CommitHash plumbing.Hash
 	NewRelease bool
 }
@@ -141,7 +141,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	}
 
 	var (
-		latestSemver *semver.Semver
+		latestSemver *semver.Version
 		history      []*object.Commit
 		logOptions   git.LogOptions
 	)
@@ -149,7 +149,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	if latestSemverTag == nil {
 		p.logger.Debug().Msg("no previous tag, creating one")
 
-		latestSemver = &semver.Semver{Major: 0, Minor: 0, Patch: 0}
+		latestSemver = &semver.Version{Major: 0, Minor: 0, Patch: 0}
 	} else {
 		p.logger.Debug().Str("tag", latestSemverTag.Name).Msg("latest semver tag found")
 
@@ -193,7 +193,11 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 		return output, fmt.Errorf("parsing commit history: %w", err)
 	}
 
-	latestSemver.BuildMetadata = p.buildMetadata
+	if p.prereleaseMode {
+		latestSemver.Prerelease = p.prereleaseIdentifier
+	}
+
+	latestSemver.Metadata = p.buildMetadata
 
 	output.Semver = latestSemver
 	output.CommitHash = commitHash
@@ -204,14 +208,10 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 
 // ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rule
 // provided.
-func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Semver, project monorepo.Project) (bool, plumbing.Hash, error) {
+func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Version, project monorepo.Project) (bool, plumbing.Hash, error) {
 	newRelease := false
 	latestReleaseCommitHash := plumbing.Hash{}
 	rulesMap := p.rules.Map
-
-	if p.prereleaseMode {
-		latestSemver.Prerelease = p.prereleaseIdentifier
-	}
 
 	for _, commit := range commits {
 		if !conventionalCommitRegex.MatchString(commit.Message) {
@@ -280,7 +280,7 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	}
 
 	var (
-		latestSemver *semver.Semver
+		latestSemver *semver.Version
 		latestTag    *object.Tag
 	)
 

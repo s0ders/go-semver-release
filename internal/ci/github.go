@@ -11,7 +11,7 @@ import (
 )
 
 type GitHubOutput struct {
-	Semver      *semver.Semver
+	Semver      *semver.Version
 	Branch      string
 	TagPrefix   string
 	ProjectName string
@@ -57,7 +57,7 @@ func WithProject(project string) OptionFunc {
 	}
 }
 
-func GenerateGitHubOutput(semver *semver.Semver, branch string, options ...OptionFunc) (err error) {
+func GenerateGitHubOutput(semver *semver.Version, branch string, options ...OptionFunc) (err error) {
 	path, exists := os.LookupEnv("GITHUB_OUTPUT")
 
 	if !exists {

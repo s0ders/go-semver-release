@@ -28,6 +28,29 @@ type cmdOutput struct {
 	NewRelease bool   `json:"new-release"`
 }
 
+func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
+	assert := assertion.New(t)
+
+	rules, err := configureRules()
+	checkErr(t, err, "configuring rules")
+
+	assert.Equal(rule.Default, rules)
+}
+
+func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
+	assert := assertion.New(t)
+
+	_, err := configureBranches()
+	assert.ErrorContains(err, "missing branches key in configuration")
+}
+
+func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
+	assert := assertion.New(t)
+
+	_, err := configureProjects()
+	assert.ErrorContains(err, "missing projects key in configuration")
+}
+
 func TestReleaseCmd_SemVerConfigFile(t *testing.T) {
 	assert := assertion.New(t)
 

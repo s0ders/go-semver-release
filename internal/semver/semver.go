@@ -14,51 +14,57 @@ var (
 	Regex = regexp.MustCompile(`(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
 )
 
-type Semver struct {
-	Major         int
-	Minor         int
-	Patch         int
-	Prerelease    string
-	BuildMetadata string
+type Version struct {
+	Major      int
+	Minor      int
+	Patch      int
+	Prerelease string
+	Metadata   string
 }
 
-func (s *Semver) BumpPatch() {
-	s.Patch++
+func (v *Version) BumpMajor() {
+	v.Major++
+	v.Minor = 0
+	v.Patch = 0
+	v.Prerelease = ""
+	v.Metadata = ""
 }
 
-func (s *Semver) BumpMinor() {
-	s.Patch = 0
-	s.Minor++
+func (v *Version) BumpMinor() {
+	v.Minor++
+	v.Patch = 0
+	v.Prerelease = ""
+	v.Metadata = ""
 }
 
-func (s *Semver) BumpMajor() {
-	s.Patch = 0
-	s.Minor = 0
-	s.Major++
+func (v *Version) BumpPatch() {
+	v.Patch++
+	v.Prerelease = ""
+	v.Metadata = ""
 }
 
 // IsZero checks if all component of a semantic version number are equal to zero.
-func (s *Semver) IsZero() bool {
-	isZero := s.Major == s.Minor && s.Minor == s.Patch && s.Patch == 0
+func (v *Version) IsZero() bool {
+	isZero := v.Major == v.Minor && v.Minor == v.Patch && v.Patch == 0
 	return isZero
 }
 
-func (s *Semver) String() string {
-	str := fmt.Sprintf("%d.%d.%d", s.Major, s.Minor, s.Patch)
+func (v *Version) String() string {
+	str := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 
-	if s.Prerelease != "" {
-		str += "-" + s.Prerelease
+	if v.Prerelease != "" {
+		str += "-" + v.Prerelease
 	}
 
-	if s.BuildMetadata != "" {
-		str += "+" + s.BuildMetadata
+	if v.Metadata != "" {
+		str += "+" + v.Metadata
 	}
 
 	return str
 }
 
 // FromGitTag returns a semver struct corresponding to the Git annotated tag used as an input.
-func FromGitTag(tag *object.Tag) (*Semver, error) {
+func FromGitTag(tag *object.Tag) (*Version, error) {
 	submatch := Regex.FindStringSubmatch(tag.Name)
 
 	if len(submatch) < 4 {
@@ -81,14 +87,14 @@ func FromGitTag(tag *object.Tag) (*Semver, error) {
 	prerelease := submatch[4]
 	buildMetadata := submatch[5]
 
-	semver := &Semver{Major: major, Minor: minor, Patch: patch, Prerelease: prerelease, BuildMetadata: buildMetadata}
+	semver := &Version{Major: major, Minor: minor, Patch: patch, Prerelease: prerelease, Metadata: buildMetadata}
 
 	return semver, nil
 }
 
 // Compare returns an integer comparing two semantic versions. The result will be 0 if a == b, -1 if a < b, and +1
 // if a > b.
-func Compare(a, b *Semver) int {
+func Compare(a, b *Version) int {
 	switch {
 	case a.Major > b.Major:
 		return 1

@@ -58,7 +58,7 @@ func (t *Tagger) SetProjectName(name string) {
 }
 
 // TagFromSemver creates a new Git annotated tag from a semantic version number.
-func (t *Tagger) TagFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
+func (t *Tagger) TagFromSemver(semver *semver.Version, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
@@ -85,7 +85,7 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 
 // TagRepository AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
-func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver, commitHash plumbing.Hash) error {
+func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Version, commitHash plumbing.Hash) error {
 	if semver == nil {
 		return fmt.Errorf("semver is nil")
 	}
@@ -115,6 +115,6 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver
 	return nil
 }
 
-func (t *Tagger) Format(semver *semver.Semver) string {
+func (t *Tagger) Format(semver *semver.Version) string {
 	return t.TagPrefix + semver.String()
 }
