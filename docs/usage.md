@@ -196,6 +196,11 @@ key.
 > specifically generated for the purpose of signing tags. Please do not use your personal key, that way you can easily 
 > revoke the key if any action in your workflow came to be compromised.
 
+> [!WARNING]
+> As stated above, the GPG private key need to be written on disk before being read. Store it outside the repository 
+> being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since
+> it has not been commited) and will not be used.
+
 Example:
 ```bash
 $ go-semver-release release <PATH> --gpg-key-path ./path/to/key.asc
