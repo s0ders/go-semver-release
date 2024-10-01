@@ -153,7 +153,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	} else {
 		p.logger.Debug().Str("tag", latestSemverTag.Name).Msg("latest semver tag found")
 
-		latestSemver, err = semver.FromGitTag(latestSemverTag)
+		latestSemver, err = semver.NewFromString(latestSemverTag.Name)
 		if err != nil {
 			return output, fmt.Errorf("building semver from git tag: %w", err)
 		}
@@ -300,7 +300,7 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 			}
 		}
 
-		currentSemver, err := semver.FromGitTag(tag)
+		currentSemver, err := semver.NewFromString(tag.Name)
 		if err != nil {
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}

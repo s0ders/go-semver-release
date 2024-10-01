@@ -61,7 +61,7 @@ func (v *Version) String() string {
 	return str
 }
 
-// NewFromString returns a semver struct corresponding to the Git annotated tag used as an input.
+// NewFromString returns a semver struct corresponding to the string used as an input.
 func NewFromString(str string) (*Version, error) {
 	submatch := Regex.FindStringSubmatch(str)
 

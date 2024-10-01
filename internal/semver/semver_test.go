@@ -6,7 +6,7 @@ import (
 	assertion "github.com/stretchr/testify/assert"
 )
 
-func TestSemver_Precedence(t *testing.T) {
+func TestSemver_Compare(t *testing.T) {
 	assert := assertion.New(t)
 
 	type test struct {
@@ -110,6 +110,7 @@ func TestSemver_NewFromString_BadScenario(t *testing.T) {
 	assert := assertion.New(t)
 
 	invalidStrings := []string{
+		"",
 		"foo",
 		"-1.-1.-1",
 		"1.0.0+$@",
