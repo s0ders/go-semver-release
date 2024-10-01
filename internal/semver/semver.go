@@ -1,4 +1,4 @@
-// Package semver provides basic primitives to work with semantic version numbers.
+// Package semver provides basic primitives to work with semantic versions.
 package semver
 
 import (
