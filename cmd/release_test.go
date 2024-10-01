@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"io"
 	"os"
 	"path/filepath"
@@ -783,27 +785,28 @@ func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
 	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
 
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = os.RemoveAll(testRepository.Path)
-		checkErr(t, err, "removing sample repository")
-	}()
-
-	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"release", testRepository.Path})
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting flags")
-
-	err = rootCmd.Execute()
+	_, err := configureRules()
 	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
+}
+
+func TestReleaseCmd_InvalidBranch(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetBranches([]map[string]string{{}})
+
+	_, err := configureBranches()
+	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
+}
+
+func TestReleaseCmd_InvalidProjects(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetProjects([]map[string]string{{"path": "./foo/"}})
+
+	_, err := configureProjects()
+	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
 }
 
 func TestReleaseCmd_CustomRules(t *testing.T) {
