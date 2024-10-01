@@ -14,3 +14,5 @@ ldflags:
   - "-X github.com/s0ders/go-semver-release/v5/cmd.version={{ .Env.VERSION }}"
   - "-X github.com/s0ders/go-semver-release/v5/cmd.buildNumber={{ .Env.BUILD_NUMBER }}"
   - "-X github.com/s0ders/go-semver-release/v5/cmd.commitHash={{ .Env.COMMIT_HASH }}"
+  - "-w"
+  - "-s"
