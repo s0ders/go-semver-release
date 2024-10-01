@@ -15,10 +15,11 @@ them with the right [SemVer](https://semver.org/spec/v2.0.0.html) number.
 
 <ul>
     <li><a href="#Motivation">Motivation</a></li>
+    <li><a href="#Features">Features</a></li>
     <li><a href="#Install">Install</a></li>
     <li><a href="#Usage">Usage</a></li>
     <li><a href="#ci-workflow-examples">CI workflow examples</a></li>
-    <li><a href="#how-is-this-different-from-tool-x">How is this different from tool X ?</a></li>
+    <li><a href="#how-is-this-tool-different-from-x">How is this different from tool X ?</a></li>
 </ul>
 
 ## Motivation
@@ -39,6 +40,14 @@ support plugins to help in formatting your commit messages (e.g.,
 > `go-semver-release` can only read **annotated** Git tags. If at some point you need to manually add a SemVer tag your
 > repository, make sure it is annotated, otherwise the program will not be able to detect it.
 
+## Features
+- Automatic semantic versioning of your Git repository via annotated Git tags
+- Local or remote mode of execution (local removes the need for secret token)
+- Support for multiple release branch, prerelease and build metadata
+- Support monorepo (i.e. multiple projects inside a single repository, all versioned separately)
+- Custom tag prefix (e.g. `v1.0.0`)
+- Tag signature using GPG
+
 ## Install
 
 If [Go](https://go.dev) is installed on your machine, you can install from source:
@@ -48,7 +57,7 @@ $ go install github.com/s0ders/go-semver-release/v5@latest
 $ go-semver-release --help
 ```
 
-For cross-platform compatibility, you can use the generated [Docker image](https://hub.docker.com/r/s0ders/go-semver-release/tags):
+A [Docker image](https://hub.docker.com/r/s0ders/go-semver-release/tags) is available as well:
 
 ```bash
 $ docker pull s0ders/go-semver-release:latest
@@ -71,7 +80,7 @@ Go Semver Release focuses on versioning only, no package publishing, release log
 
 If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at 
 the right place. This allows the program to work with minimal dependencies and to avoid requiring the use of secret 
-tokens on user-end.
+tokens on user-end (if you choose to run in local mode for instance).
 
 As stated above, Go Semver Release is agnostic of which CI tool you use or which branch you use it on. You define the
 configuration using flags, environment variables or configurations file however you please on your CI for maximized
