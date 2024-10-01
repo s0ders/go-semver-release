@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 
@@ -10,13 +11,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v4/internal/branch"
-	"github.com/s0ders/go-semver-release/v4/internal/ci"
-	"github.com/s0ders/go-semver-release/v4/internal/gpg"
-	"github.com/s0ders/go-semver-release/v4/internal/parser"
-	"github.com/s0ders/go-semver-release/v4/internal/remote"
-	"github.com/s0ders/go-semver-release/v4/internal/rule"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
+	"github.com/s0ders/go-semver-release/v5/internal/ci"
+	"github.com/s0ders/go-semver-release/v5/internal/gpg"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v5/internal/parser"
+	"github.com/s0ders/go-semver-release/v5/internal/remote"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 var (
@@ -41,6 +43,7 @@ var releaseCmd = &cobra.Command{
 			repository *git.Repository
 			origin     *remote.Remote
 			entity     *openpgp.Entity
+			projects   []monorepo.Project
 		)
 
 		logger := zerolog.New(cmd.OutOrStdout())
@@ -86,62 +89,75 @@ var releaseCmd = &cobra.Command{
 			return fmt.Errorf("loading branches configuration: %w", err)
 		}
 
+		if monorepository {
+			projects, err = configureProjects()
+			if err != nil {
+				return fmt.Errorf("loading projects configuration: %w", err)
+			}
+		}
+
 		tagger := tag.NewTagger(gitName, gitEmail, tag.WithTagPrefix(tagPrefix), tag.WithSignKey(entity))
+		semverParser := parser.New(logger, tagger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithProjects(projects))
 
 		// Launch a parser per branch to analyze
 		for _, branch := range branches {
-			// TODO: optimize parser creation, create one and update branch
-			parser := parser.New(logger, tagger, rules,
-				parser.WithReleaseBranch(branch.Name),
-				parser.WithPrereleaseMode(branch.Prerelease),
-				parser.WithPrereleaseIdentifier(branch.Name),
-				parser.WithBuildMetadata(buildMetadata),
-			)
+			semverParser.SetBranch(branch.Name)
+			semverParser.SetPrerelease(branch.Prerelease)
+			semverParser.SetPrereleaseIdentifier(branch.Name)
 
-			computeSemverOutput, err := parser.ComputeNewSemver(repository)
+			// For projects, would have a slice of semver
+			outputs, err := semverParser.Run(context.Background(), repository)
 			if err != nil {
 				return fmt.Errorf("computing new semver: %w", err)
 			}
 
-			semver := computeSemverOutput.Semver
-			release := computeSemverOutput.NewRelease
-			commitHash := computeSemverOutput.CommitHash
+			for _, output := range outputs {
+				semver := output.Semver
+				release := output.NewRelease
+				commitHash := output.CommitHash
+				project := output.Project.Name
 
-			err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix))
-			if err != nil {
-				return fmt.Errorf("generating github output: %w", err)
-			}
-
-			logEvent := logger.Info()
-			logEvent.Bool("new-release", release)
-			logEvent.Str("version", semver.String())
-			logEvent.Str("branch", branch.Name)
-
-			switch {
-			case !release:
-				logEvent.Msg("no new release")
-				return nil
-			case release && dryRun:
-				logEvent.Msg("dry-run enabled, next release found")
-				return nil
-			default:
-				logEvent.Msg("new release found")
-
-				err = tagger.TagRepository(repository, semver, commitHash)
+				err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix), ci.WithProject(project))
 				if err != nil {
-					return fmt.Errorf("tagging repository: %w", err)
+					return fmt.Errorf("generating github output: %w", err)
 				}
 
-				logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
+				logEvent := logger.Info()
+				logEvent.Bool("new-release", release)
+				logEvent.Str("version", semver.String())
+				logEvent.Str("branch", branch.Name)
 
-				if remoteMode {
-					err = origin.PushTag(tagger.Format(semver))
+				if project != "" {
+					logEvent.Str("project", project)
+
+					tagger.SetProjectName(project)
+				}
+
+				switch {
+				case !release:
+					logEvent.Msg("no new release")
+					return nil
+				case release && dryRun:
+					logEvent.Msg("dry-run enabled, next release found")
+					return nil
+				default:
+					logEvent.Msg("new release found")
+
+					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
-						return fmt.Errorf("pushing tag to remote: %w", err)
+						return fmt.Errorf("tagging repository: %w", err)
+					}
+
+					logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
+
+					if remoteMode {
+						err = origin.PushTag(tagger.Format(semver))
+						if err != nil {
+							return fmt.Errorf("pushing tag to remote: %w", err)
+						}
 					}
 				}
 			}
-
 		}
 
 		return nil
@@ -183,7 +199,7 @@ func configureBranches() ([]branch.Branch, error) {
 
 	err := viperInstance.UnmarshalKey("branches", &branchesMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling branches: %w", err)
+		return nil, fmt.Errorf("unmarshalling branches key: %w", err)
 	}
 
 	branches, err = branch.Unmarshall(branchesMarshalled)
@@ -192,4 +208,27 @@ func configureBranches() ([]branch.Branch, error) {
 	}
 
 	return branches, nil
+}
+
+func configureProjects() ([]monorepo.Project, error) {
+	if !viperInstance.IsSet("projects") {
+		return nil, fmt.Errorf("missing projects key in configuration")
+	}
+
+	var (
+		projectsMarshalled []map[string]string
+		projects           []monorepo.Project
+	)
+
+	err := viperInstance.UnmarshalKey("projects", &projectsMarshalled)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling projects key: %w", err)
+	}
+
+	projects, err = monorepo.Unmarshall(projectsMarshalled)
+	if err != nil {
+		return nil, fmt.Errorf("parsing projects: %w", err)
+	}
+
+	return projects, nil
 }

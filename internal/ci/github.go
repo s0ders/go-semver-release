@@ -2,18 +2,20 @@
 package ci
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
 )
 
 type GitHubOutput struct {
-	Semver     *semver.Semver
-	Branch     string
-	TagPrefix  string
-	NewRelease bool
+	Semver      *semver.Version
+	Branch      string
+	TagPrefix   string
+	ProjectName string
+	NewRelease  bool
 }
 
 func (g GitHubOutput) String() string {
@@ -21,10 +23,16 @@ func (g GitHubOutput) String() string {
 
 	versionKey := branch + "_SEMVER"
 	releaseKey := branch + "_NEW_RELEASE"
+	projectKey := branch + "_PROJECT"
 
 	str := "\n"
+
 	str += fmt.Sprintf("%s=%s\n", versionKey, g.TagPrefix+g.Semver.String())
 	str += fmt.Sprintf("%s=%t\n", releaseKey, g.NewRelease)
+
+	if g.ProjectName != "" {
+		str += fmt.Sprintf("%s=%s\n", projectKey, g.ProjectName)
+	}
 
 	return str
 }
@@ -43,7 +51,13 @@ func WithTagPrefix(tagPrefix string) OptionFunc {
 	}
 }
 
-func GenerateGitHubOutput(semver *semver.Semver, branch string, options ...OptionFunc) (err error) {
+func WithProject(project string) OptionFunc {
+	return func(o *GitHubOutput) {
+		o.ProjectName = project
+	}
+}
+
+func GenerateGitHubOutput(semver *semver.Version, branch string, options ...OptionFunc) (err error) {
 	path, exists := os.LookupEnv("GITHUB_OUTPUT")
 
 	if !exists {
@@ -62,10 +76,7 @@ func GenerateGitHubOutput(semver *semver.Semver, branch string, options ...Optio
 	}
 
 	defer func() {
-		err = f.Close()
-		if err != nil {
-			return
-		}
+		err = errors.Join(err, f.Close())
 	}()
 
 	_, err = f.WriteString(output.String())
@@ -73,5 +84,5 @@ func GenerateGitHubOutput(semver *semver.Semver, branch string, options ...Optio
 		return fmt.Errorf("writing to ci file: %w", err)
 	}
 
-	return nil
+	return
 }

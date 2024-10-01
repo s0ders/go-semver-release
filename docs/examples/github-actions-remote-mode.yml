@@ -30,7 +30,7 @@ jobs:
           go-version: 1.22.4
 
       - name: Install Go Semver Release
-        run: go install github.com/s0ders/go-semver-release/v4@latest
+        run: go install github.com/s0ders/go-semver-release/v5@latest
 
       # Tests are good, versioning the repository (if any new release is found)
       - name: Go Semver Release

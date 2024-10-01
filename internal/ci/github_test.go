@@ -8,7 +8,7 @@ import (
 
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
 )
 
 func TestCI_GenerateGitHub_HappyScenario(t *testing.T) {
@@ -22,7 +22,7 @@ func TestCI_GenerateGitHub_HappyScenario(t *testing.T) {
 		checkErr(t, "tearing down test", err)
 	}()
 
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput(version, "main", WithNewRelease(true), WithTagPrefix("v"))
 	if err != nil {
@@ -40,10 +40,39 @@ func TestCI_GenerateGitHub_HappyScenario(t *testing.T) {
 	assert.Equal(want, got, "output should match")
 }
 
+func TestCI_GenerateGitHub_HappyScenarioWithProject(t *testing.T) {
+	assert := assertion.New(t)
+
+	err := setup()
+	checkErr(t, "setting up test", err)
+
+	defer func() {
+		err = teardown()
+		checkErr(t, "tearing down test", err)
+	}()
+
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
+
+	err = GenerateGitHubOutput(version, "main", WithNewRelease(true), WithTagPrefix("v"), WithProject("foo"))
+	if err != nil {
+		t.Fatalf("creating github output: %s", err)
+	}
+
+	outputPath := os.Getenv("GITHUB_OUTPUT")
+
+	writtenOutput, err := os.ReadFile(outputPath)
+	checkErr(t, "reading output file", err)
+
+	want := "\nMAIN_SEMVER=v1.2.3\nMAIN_NEW_RELEASE=true\nMAIN_PROJECT=foo\n"
+	got := string(writtenOutput)
+
+	assert.Equal(want, got, "output should match")
+}
+
 func TestCI_GenerateGitHub_NoEnvVar(t *testing.T) {
 	assert := assertion.New(t)
 
-	err := GenerateGitHubOutput(&semver.Semver{}, "main")
+	err := GenerateGitHubOutput(&semver.Version{}, "main")
 	assert.NoError(err, "should not have tried to generate an output")
 }
 
@@ -63,7 +92,7 @@ func TestCI_GenerateGitHub_ReadOnlyOutput(t *testing.T) {
 	err = os.Chmod(filePath, 0444)
 	checkErr(t, "changing output file permissions", err)
 
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	err = GenerateGitHubOutput(version, "main")
 	assert.Error(err, "should have failed since output file is readonly")
@@ -112,6 +141,7 @@ func teardown() error {
 }
 
 func checkErr(t *testing.T, msg string, err error) {
+	t.Helper()
 	if err != nil {
 		t.Fatalf("%s: %s", msg, err.Error())
 	}

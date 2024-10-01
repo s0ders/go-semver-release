@@ -26,6 +26,7 @@ var (
 	armoredKeyPath string
 	verbose        bool
 	remoteMode     bool
+	monorepository bool
 )
 
 var viperInstance = viper.New()
@@ -40,6 +41,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
 	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().BoolVar(&monorepository, "monorepo", false, "Operating in monorepo mode versioning multiple projects separately")
 
 	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
 }

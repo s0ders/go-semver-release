@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
 )
 
 var ErrTagAlreadyExists = errors.New("tag already exists")
@@ -32,6 +32,7 @@ func WithSignKey(key *openpgp.Entity) OptionFunc {
 
 type Tagger struct {
 	TagPrefix    string
+	ProjectName  string
 	GitSignature object.Signature
 	SignKey      *openpgp.Entity
 }
@@ -52,8 +53,12 @@ func NewTagger(name, email string, options ...OptionFunc) *Tagger {
 	return tagger
 }
 
+func (t *Tagger) SetProjectName(name string) {
+	t.ProjectName = name
+}
+
 // TagFromSemver creates a new Git annotated tag from a semantic version number.
-func (t *Tagger) TagFromSemver(semver *semver.Semver, hash plumbing.Hash) *object.Tag {
+func (t *Tagger) TagFromSemver(semver *semver.Version, hash plumbing.Hash) *object.Tag {
 	tag := &object.Tag{
 		Hash:   hash,
 		Name:   semver.String(),
@@ -80,13 +85,19 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 
 // TagRepository AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
 // parameter.
-func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver, commitHash plumbing.Hash) error {
+func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Version, commitHash plumbing.Hash) error {
 	if semver == nil {
 		return fmt.Errorf("semver is nil")
 	}
 
+	tagMessage := t.TagPrefix + semver.String()
+
+	if t.ProjectName != "" {
+		tagMessage = t.ProjectName + "-" + tagMessage
+	}
+
 	tagOpts := &git.CreateTagOptions{
-		Message: t.TagPrefix + semver.String(),
+		Message: tagMessage,
 		SignKey: t.SignKey,
 		Tagger:  &t.GitSignature,
 	}
@@ -104,6 +115,6 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Semver
 	return nil
 }
 
-func (t *Tagger) Format(semver *semver.Semver) string {
+func (t *Tagger) Format(semver *semver.Version) string {
 	return t.TagPrefix + semver.String()
 }

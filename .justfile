@@ -8,11 +8,11 @@ appVersion := "v0.0.0+local"
 buildNumber := "local"
 commitHash := "local"
 
-importPath := "github.com/s0ders/go-semver-release/v4/"
+importPath := "github.com/s0ders/go-semver-release/v5/"
 ldFlags := "-X " + importPath + "cmd.version=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.commitHash=" + commitHash + " -w -s"
 
 tests:
-	go test -failfast -race -v -covermode=atomic ./...
+	go test -tags testing -failfast -race -v -covermode=atomic ./...
 
 test-coverage: clean-coverage
     go test -coverprofile cover.out ./...
@@ -22,7 +22,7 @@ clean-coverage:
     rm -f cover.out cover.html
 
 test name:
-    go test '-run=^{{name}}$' -race ./...
+    go test -tags testing '-run=^{{name}}$' -race ./...
 
 build: clean
 	go build -ldflags="{{ldFlags}}" -o {{outPath}}{{ext}} .

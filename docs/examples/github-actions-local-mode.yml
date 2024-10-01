@@ -30,7 +30,7 @@ jobs:
           go-version: 1.22.4
 
       - name: Install Go Semver Release
-        run: go install github.com/s0ders/go-semver-release/v4@latest
+        run: go install github.com/s0ders/go-semver-release/v5@latest
 
       # If build and unit tests are green, check if there is a new release.
       # Running in dry-run mode since the repository remote won't be tag anyway because we are in local mode.

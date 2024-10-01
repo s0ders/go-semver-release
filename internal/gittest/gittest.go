@@ -1,3 +1,5 @@
+//go:build testing
+
 // Package gittest provides basic types and functions for testing operations related to Git repositories.
 package gittest
 
@@ -108,16 +110,69 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 
 	commitMessage := fmt.Sprintf("%s: this a test commit", commitType)
 
+	when := r.When()
+
 	commitOpts := &git.CommitOptions{
 		Committer: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  r.When(),
+			When:  when,
 		},
 		Author: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  r.When(),
+			When:  when,
+		},
+	}
+
+	commitHash, err = worktree.Commit(commitMessage, commitOpts)
+	if err != nil {
+		return commitHash, fmt.Errorf("creating commit: %w", err)
+	}
+
+	return commitHash, nil
+}
+
+func (r *TestRepository) AddCommitWithSpecificFile(commitType, filePath string) (plumbing.Hash, error) {
+	var commitHash plumbing.Hash
+
+	worktree, err := r.Worktree()
+	if err != nil {
+		return commitHash, fmt.Errorf("fetching worktree: %w", err)
+	}
+
+	commitFilePath := filepath.Clean(filepath.Join(r.Path, filePath))
+	dirs := filepath.Dir(commitFilePath)
+
+	err = os.MkdirAll(dirs, os.ModePerm)
+	if err != nil {
+		return commitHash, fmt.Errorf("creating parent directory: %w", err)
+	}
+
+	err = os.WriteFile(commitFilePath, []byte(strconv.Itoa(rand.IntN(10000))), 0o644)
+	if err != nil {
+		return commitHash, fmt.Errorf("writing commit file: %w", err)
+	}
+
+	_, err = worktree.Add(filepath.Clean(filePath))
+	if err != nil {
+		return commitHash, fmt.Errorf("adding commit file to worktree: %w", err)
+	}
+
+	commitMessage := fmt.Sprintf("%s: this a test commit", commitType)
+
+	when := r.When()
+
+	commitOpts := &git.CommitOptions{
+		Committer: &object.Signature{
+			Name:  "Go Semver Release",
+			Email: "go-semver@release.ci",
+			When:  when,
+		},
+		Author: &object.Signature{
+			Name:  "Go Semver Release",
+			Email: "go-semver@release.ci",
+			When:  when,
 		},
 	}
 
@@ -131,16 +186,21 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 
 // AddTag adds a new tag to the underlying Git repository with a given name and pointing to a given hash.
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
+	commit, err := r.CommitObject(hash)
+	if err != nil {
+		return fmt.Errorf("getting commit: %w", err)
+	}
+
 	tagOpts := &git.CreateTagOptions{
 		Message: tagName,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
 			Email: "go-semver@release.ci",
-			When:  r.When(),
+			When:  commit.Committer.When,
 		},
 	}
 
-	_, err := r.CreateTag(tagName, hash, tagOpts)
+	_, err = r.CreateTag(tagName, hash, tagOpts)
 
 	return err
 }

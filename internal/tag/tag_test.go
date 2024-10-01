@@ -11,12 +11,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v4/internal/gittest"
-	"github.com/s0ders/go-semver-release/v4/internal/semver"
+	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/semver"
 )
 
 var (
-	taggerName  = "Go Semver Release"
+	taggerName  = "Go Version Release"
 	taggerEmail = "go-semver@release.ci"
 )
 
@@ -60,7 +60,7 @@ func TestTag_AddTagToRepository(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 	prefix := "v"
 
 	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(prefix))
@@ -89,7 +89,7 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
@@ -100,7 +100,7 @@ func TestTag_AddExistingTagToRepository(t *testing.T) {
 	assert.Error(err, "should not have been able to add tag to repository")
 }
 
-func TestTag_NewTagFromServer(t *testing.T) {
+func TestTag_NewTagFromSemver(t *testing.T) {
 	assert := assertion.New(t)
 
 	var b [20]byte
@@ -110,7 +110,7 @@ func TestTag_NewTagFromServer(t *testing.T) {
 
 	hash := plumbing.Hash(b)
 
-	version := &semver.Semver{Patch: 1}
+	version := &semver.Version{Patch: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
@@ -140,7 +140,7 @@ func TestTag_AddToRepositoryWithNoHead(t *testing.T) {
 
 	tagger := NewTagger(taggerName, taggerEmail)
 
-	err = tagger.TagRepository(repository, &semver.Semver{}, plumbing.Hash{})
+	err = tagger.TagRepository(repository, &semver.Version{}, plumbing.Hash{})
 	assert.Error(err, "should have failed trying to fetch uninitialized repository head")
 }
 
@@ -164,7 +164,7 @@ func TestTag_SignKey(t *testing.T) {
 	head, err := testRepository.Head()
 	checkErr(t, "fetching head", err)
 
-	version := &semver.Semver{Major: 1}
+	version := &semver.Version{Major: 1}
 
 	tagger := NewTagger(taggerName, taggerEmail, WithSignKey(entity))
 
@@ -184,7 +184,7 @@ func TestTag_Format(t *testing.T) {
 	assert := assertion.New(t)
 
 	tagPrefix := "v"
-	version := &semver.Semver{Major: 1, Minor: 2, Patch: 3}
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
 
 	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(tagPrefix))
 
@@ -194,7 +194,39 @@ func TestTag_Format(t *testing.T) {
 	assert.Equal(want, got)
 }
 
+func TestTag_AddTagToRepositoryWithProject(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	head, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	version := &semver.Version{Major: 1}
+	prefix := "v"
+	projectName := "foo"
+
+	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(prefix))
+	tagger.SetProjectName(projectName)
+
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
+	checkErr(t, "tagging repository", err)
+
+	wantTag := projectName + "-" + prefix + version.String()
+
+	tagExists, err := Exists(testRepository.Repository, wantTag)
+	checkErr(t, "checking if tag exists", err)
+
+	assert.Equal(tagExists, true, "tag should have been found")
+}
+
 func checkErr(t *testing.T, msg string, err error) {
+	t.Helper()
 	if err != nil {
 		t.Fatalf("%s: %s", msg, err)
 	}

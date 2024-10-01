@@ -144,6 +144,33 @@ Example:
 $ go-semver-release release <PATH> --tag-prefix v
 ```
 
+### Multiple projects in a single repository or "monorepo"
+
+The program can also version separately multiple projects stored in a single repository also called "monorepo" or "mono 
+repository". To do so, the configuration file must include a `monorepo` section stating the name and path of the various
+projects inside that repository.
+
+```yaml
+monorepo:
+  - name: foo
+    path: ./foo/
+  - name: bar
+    path: ./xyz/bar/
+```
+
+Each project will then be versioned separately meaning that each project will have its SemVer tag in the form 
+`<project>-<semver>` for instance `foo-1.2.3` or `bar-v0.0.1`
+
+**How does it work?**
+
+The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key 
+(e.g. `foo-1.0.0`). Then, for each project, the program will parse the commits older than the latest found tag and for 
+each commit, will check if one of the changes made in that commit belongs to the path of that project, if so, the latest
+SemVer is incremented according to the type of that commit.
+
+This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have 
+their SemVer bumped according to the commit type.
+
 ### Build metadata
 
 The Semantic Version convention states that your SemVer number can include build metadata in form
@@ -168,6 +195,11 @@ key.
 > this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key 
 > specifically generated for the purpose of signing tags. Please do not use your personal key, that way you can easily 
 > revoke the key if any action in your workflow came to be compromised.
+
+> [!WARNING]
+> As stated above, the GPG private key need to be written on disk before being read. Store it outside the repository 
+> being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since
+> it has not been committed) and will not be used.
 
 Example:
 ```bash
@@ -223,7 +255,11 @@ branch parsed:
     "new-release": true,
     "version": "1.2.3",
     "branch": "master",
+    "project": "foo",
     "message": "new release found"
 }
 ```
 
+> [!IMPORTANT]
+> The `project` key will only be present in an output if executed in monorepo mode. See the "Multiple projects in a 
+> single repository or "monorepo"" section for more information.

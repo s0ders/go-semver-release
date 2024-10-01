@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,19 +17,43 @@ import (
 	"github.com/spf13/pflag"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v4/internal/gittest"
-	"github.com/s0ders/go-semver-release/v4/internal/rule"
-	"github.com/s0ders/go-semver-release/v4/internal/tag"
+	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
+	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 type cmdOutput struct {
 	Message    string `json:"message"`
 	Branch     string `json:"branch"`
 	Version    string `json:"version"`
+	Project    string `json:"project"`
 	NewRelease bool   `json:"new-release"`
 }
 
-func TestLocalCmd_SemVerConfigFile(t *testing.T) {
+func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
+	assert := assertion.New(t)
+
+	rules, err := configureRules()
+	checkErr(t, err, "configuring rules")
+
+	assert.Equal(rule.Default, rules)
+}
+
+func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
+	assert := assertion.New(t)
+
+	_, err := configureBranches()
+	assert.ErrorContains(err, "missing branches key in configuration")
+}
+
+func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
+	assert := assertion.New(t)
+
+	_, err := configureProjects()
+	assert.ErrorContains(err, "missing projects key in configuration")
+}
+
+func TestReleaseCmd_SemVerConfigFile(t *testing.T) {
 	assert := assertion.New(t)
 
 	taggerName := "My CI Robot"
@@ -183,7 +209,7 @@ rules:
 	assert.Equal(true, exists, "alpha tag not found")
 }
 
-func TestLocalCmd_Release(t *testing.T) {
+func TestReleaseCmd_Release(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -234,7 +260,7 @@ func TestLocalCmd_Release(t *testing.T) {
 	assert.Equal(true, exists, "tag not found")
 }
 
-func TestLocalCmd_RemoteRelease(t *testing.T) {
+func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -314,7 +340,7 @@ func TestLocalCmd_RemoteRelease(t *testing.T) {
 	assert.Equal(true, exists, "tag not found")
 }
 
-func TestLocalCmd_MultiBranchRelease(t *testing.T) {
+func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{
@@ -435,7 +461,7 @@ func TestLocalCmd_MultiBranchRelease(t *testing.T) {
 	checkErr(t, err, "scanning error")
 }
 
-func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
+func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -482,7 +508,7 @@ func TestLocalCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	assert.Equal(true, exists)
 }
 
-func TestLocalCmd_Prerelease(t *testing.T) {
+func TestReleaseCmd_Prerelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master", "prerelease": "true"}})
@@ -524,7 +550,7 @@ func TestLocalCmd_Prerelease(t *testing.T) {
 	assert.Equal(true, exists)
 }
 
-func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
+func TestReleaseCmd_ReleaseWithDryRun(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -568,7 +594,7 @@ func TestLocalCmd_ReleaseWithDryRun(t *testing.T) {
 	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
 }
 
-func TestLocalCmd_NoRelease(t *testing.T) {
+func TestReleaseCmd_NoRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -596,7 +622,7 @@ func TestLocalCmd_NoRelease(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 }
 
-func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
+func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -651,7 +677,7 @@ func TestLocalCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert.Error(err, "should have failed trying to write GitHub output to read-only file")
 }
 
-func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
+func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
 	assert := assertion.New(t)
 
 	actual := new(bytes.Buffer)
@@ -666,7 +692,7 @@ func TestLocalCmd_InvalidRepositoryPath(t *testing.T) {
 	assert.Error(err, "should have failed trying to open inexisting Git repository")
 }
 
-func TestLocalCmd_InvalidArmoredKeyPath(t *testing.T) {
+func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 	assert := assertion.New(t)
 
 	actual := new(bytes.Buffer)
@@ -681,7 +707,7 @@ func TestLocalCmd_InvalidArmoredKeyPath(t *testing.T) {
 	assert.Error(err, "should have failed trying to open inexisting armored GPG key")
 }
 
-func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
+func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 	assert := assertion.New(t)
 
 	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
@@ -722,7 +748,7 @@ func TestLocalCmd_InvalidArmoredKeyContent(t *testing.T) {
 	assert.Error(err, "should have failed trying to read armored key ring from empty file")
 }
 
-func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
+func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -756,33 +782,34 @@ func TestLocalCmd_RepositoryWithNoHead(t *testing.T) {
 	assert.Error(err, "should have failed trying to compute new semver of repository with no HEAD")
 }
 
-func TestLocalCmd_InvalidCustomRules(t *testing.T) {
+func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
 	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
 
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = os.RemoveAll(testRepository.Path)
-		checkErr(t, err, "removing sample repository")
-	}()
-
-	actual := new(bytes.Buffer)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"release", testRepository.Path})
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting flags")
-
-	err = rootCmd.Execute()
+	_, err := configureRules()
 	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
 }
 
-func TestLocalCmd_CustomRules(t *testing.T) {
+func TestReleaseCmd_InvalidBranch(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetBranches([]map[string]string{{}})
+
+	_, err := configureBranches()
+	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
+}
+
+func TestReleaseCmd_InvalidProjects(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetProjects([]map[string]string{{"path": "./foo/"}})
+
+	_, err := configureProjects()
+	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
+}
+
+func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -823,6 +850,87 @@ func TestLocalCmd_CustomRules(t *testing.T) {
 	assert.NoError(err, "failed to check if tag exists")
 
 	assert.Equal(true, exists, "tag should exist")
+}
+
+func TestReleaseCmd_Monorepo(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetMonorepo()
+	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetProjects([]map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
+	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
+
+	buf := new(bytes.Buffer)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = testRepository.Remove()
+		checkErr(t, err, "removing repository")
+	}()
+
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"release", testRepository.Path})
+
+	// "foo" commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat", "./foo/foo.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo2.txt")
+	checkErr(t, err, "adding commit")
+
+	// "bar" commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
+	checkErr(t, err, "adding commit")
+
+	// Executing command
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	i := 0
+	expectedOutputs := []cmdOutput{
+		{
+			Message:    "new release found",
+			Version:    "0.1.1",
+			NewRelease: true,
+			Branch:     "master",
+			Project:    "foo",
+		},
+		{
+			Message:    "new release found",
+			Version:    "1.0.2",
+			NewRelease: true,
+			Branch:     "master",
+			Project:    "bar",
+		},
+	}
+
+	scanner := bufio.NewScanner(buf)
+
+	for scanner.Scan() {
+		rawOutput := scanner.Bytes()
+
+		actualOutput := cmdOutput{}
+
+		err = json.Unmarshal(rawOutput, &actualOutput)
+		checkErr(t, err, "unmarshalling output")
+
+		assert.Equal(expectedOutputs[i], actualOutput)
+		i++
+	}
+	err = scanner.Err()
+	checkErr(t, err, "scanning error")
 }
 
 type CommandFlagOptions func()
@@ -889,6 +997,7 @@ func resetPersistentFlags(cmd *cobra.Command) (err error) {
 }
 
 func checkErr(t *testing.T, err error, message string) {
+	t.Helper()
 	if err != nil {
 		t.Fatalf("%s: %s", message, err)
 	}
@@ -900,4 +1009,12 @@ func configSetBranches(branches []map[string]string) {
 
 func configSetRules(rules map[string][]string) {
 	viperInstance.Set("rules", rules)
+}
+
+func configSetMonorepo() {
+	viperInstance.Set("monorepo", true)
+}
+
+func configSetProjects(projects []map[string]string) {
+	viperInstance.Set("projects", projects)
 }
