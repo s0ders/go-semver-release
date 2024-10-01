@@ -8,7 +8,7 @@ goarch: arm64
 
 main: ./main.go
 
-binary: go-semver-release-{{ .Os }}-{{ .Arch }}
+binary: go-semver-release-{{ .Os }}-{{ .Arch }}.exe
 
 ldflags:
   - "-X github.com/s0ders/go-semver-release/v5/cmd.version={{ .Env.VERSION }}"
