@@ -199,7 +199,7 @@ key.
 > [!WARNING]
 > As stated above, the GPG private key need to be written on disk before being read. Store it outside the repository 
 > being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since
-> it has not been commited) and will not be used.
+> it has not been committed) and will not be used.
 
 Example:
 ```bash
