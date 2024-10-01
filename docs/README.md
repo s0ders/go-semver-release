@@ -25,20 +25,21 @@ them with the right [SemVer](https://semver.org/spec/v2.0.0.html) number.
 ## Motivation
 
 This project was built to create a lightweight and simple tool to automate the semantic versioning on your Git
-repository in a language and CI agnostic way by following strictly the Semantic Versioning convention.
+repository in a language and CI agnostic way by strictly following the Semantic Versioning and Conventional Commit 
+convention.
 
 Following the UNIX philosophy of "make each program do one thing well", it only handles publishing SemVer tags to your
 Git repository, no package publishing or any other features.
 
 All you need to have is an initialized Git repository, a release branch (e.g., `main`) and a formatted commit history on
 that branch following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification. Many IDEs 
-support plugins to help in formatting your commit messages (e.g., 
+support plugins that help formatting messages (e.g., 
 [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), 
 [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit)).
 
 > [!IMPORTANT]
-> `go-semver-release` can only read **annotated** Git tags. If at some point you need to manually add a SemVer tag your
-> repository, make sure it is annotated, otherwise the program will not be able to detect it.
+> `go-semver-release` can only read **annotated** Git tags. If at some point you need to manually add a SemVer tag to 
+> your repository, make sure it is annotated, otherwise the program will not be able to detect it.
 
 ## Features
 - Automatic semantic versioning of your Git repository via annotated Git tags
