@@ -50,3 +50,4 @@ jobs:
         with:
           install-mode: 'goinstall'
           version: latest
+          args: '--build-tags testing'
