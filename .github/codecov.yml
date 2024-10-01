@@ -5,3 +5,5 @@ coverage:
         target: 80%
         threshold: 2%
     patch: off
+ignore:
+  - "internal/gittest/*.go"
