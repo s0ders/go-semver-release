@@ -17,17 +17,19 @@ The order of precedence for the configuration is as follows:
 
 ### Configuration file
 
-Type: `string`
-
-CLI argument: `--config`
+CLI flag: `--config`
 
 The tool expects a configuration file for configuration options such as branches or release rules, the default path, which can be overidden, is `<REPOSITORY_ROOT>/.semver.yaml`
 
+Example:
+
+```bash
+$ go-semver-release release <PATH> --config <CONFIG_PATH>
+```
+
 ### Release rules
 
-CLI argument: none, can only be set via configuration file
-
-Configuration file key: `rules`
+CLI flag: `--rules`
 
 Release rules define which commit type will trigger a release, and which type of release (i.e., `minor` or `patch`).
 
@@ -49,21 +51,9 @@ rules:
 
 The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
-### Tag prefix
-
-A tag prefix is used to custom the tag format of a SemVer applied to a Git repository. A classic, and the default, value is `v`. For instance, if the release version found is `1.2.3`, the Git tag will be `v1.2.3`.
-
-{% hint style="info" %}
-Tag prefix can be changed during the lifetime of a repository (e.g., going from no prefix to `v`), this will not affect the SemVer tag history, the program will still be able to recognize previous SemVer tags as long as they are annotated tags.
-{% endhint %}
-
-Example:
-
-```bash
-$ go-semver-release release <PATH> --tag-prefix v
-```
-
 ### Branches
+
+CLI flag: `--branches`
 
 Branches set in configuration are the one Go Semver Release will read commit history from in order to compute the next SemVer release. In the configuration file, `branches` is a list of branch, which can have two attributes `name`, mandatory, and `prerelease` optional.
 
@@ -72,27 +62,25 @@ A prerelease branch will have its tag suffixed by its own name. For instance, fo
 Example:
 
 ```yaml
-# ~/.semver.yaml
 branches:
   - name: "master"
   - name: "rc"
     prerelease: true
   - name: "alpha"
     prerelease: true
-# ...
 ```
 
 ### Remote and access token
+
+CLI flags: `--remote`, `--remote-name`
 
 By default, Go Semver Release operate in local mode and expect the repository to exist on the local file system. This has the advantage of avoiding the use of access token. However, it can be easier to simply let Go Semver Release clone a repository, parse it and push the newly found SemVer tag, if any.
 
 To enable the remote mode, you to set the following in your configuration file:
 
 ```yaml
-# ~/.semver.yaml
 remote: true
 remote-name: "origin"
-# ...
 ```
 
 You also need an access token so that Go Semver Release can clone your repository and push tags to it. All modern Git remote providers offer this feature (e.g., [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [GitLab](https://docs.gitlab.com/ee/user/project/settings/project\_access\_tokens.html), [Bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/)).
@@ -100,6 +88,8 @@ You also need an access token so that Go Semver Release can clone your repositor
 Please do not set your access token directly in your configuration file. A much safer alternative it to set the access token as a secret on your repository and, in your CI workflow, pass it to Go Semver Release either via the `--access-token` flag or via the `GO_SEMVER_RELEASE_ACCESS_TOKEN` environment variable.
 
 ### Monorepo
+
+CLI flag: `--monorepo`
 
 The program can also version separately multiple projects stored in a single repository also called "monorepo" or "mono repository". To do so, the configuration file must include a `monorepo` section stating the name and path of the various projects inside that repository.
 
@@ -119,11 +109,29 @@ The program will first fetch the latest, if any, SemVer tag for each project con
 
 This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have their SemVer bumped according to the commit type.
 
+### Tag prefix
+
+CLI flag: `--tag-prefix`
+
+A tag prefix is used to custom the tag format of a SemVer applied to a Git repository. A classic, and the default, value is `v`. For instance, if the release version found is `1.2.3`, the Git tag will be `v1.2.3`.
+
+{% hint style="info" %}
+Tag prefix can be changed during the lifetime of a repository (e.g., going from no prefix to `v`), this will not affect the SemVer tag history, the program will still be able to recognize previous SemVer tags as long as they are annotated tags.
+{% endhint %}
+
+Example:
+
+```bash
+$ go-semver-release release <PATH> --tag-prefix v
+```
+
 ### Build metadata
 
-The Semantic Version convention states that your SemVer number can include build metadata in form `1.2.3+<build_metadata>`. Usually, these metadata represent a unique build number or a build specific information so that a specific version can be linked to the build that created it.
+CLI flags: `--build-metadata`
 
-The `--build-metadata` allows to pass a string containing build metadata that will be appended to the semantic version number in the form stated above.
+The Semantic Version convention states that your SemVer number can include build metadata in the form `1.2.3+<build_metadata>`. Usually, these metadata represent a unique build number or build specific information so that a version can be linked to the build that created it.
+
+The option allows to pass a string containing metadata that will be appended to the semantic version number in the form stated above.
 
 Example:
 
@@ -133,7 +141,9 @@ $ go-semver-release release <PATH> --build-metadata $CI_JOB_ID
 
 ### GPG signed tags
 
-The `--gpg-key-path` allows passing an armored GPG signing key so that the produced tags, if any, are signed with that key.
+CLI flag: `--gpg-key-path`
+
+Path to an armored GPG signing key used to sign the produced tags.
 
 {% hint style="danger" %}
 Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key specifically generated for the purpose of signing tags. Do not use your personal key, that way you can easily revoke the key if any action in your workflow came to be compromised.
@@ -151,7 +161,9 @@ $ go-semver-release release <PATH> --gpg-key-path ./path/to/key.asc
 
 ### Dry-run
 
-The `--dry-run` flag controls if the repository is actually tagged after computing the next semantic version.&#x20;
+CLI flag: `--dry-run`
+
+Controls if the repository is actually tagged after computing the next semantic version.&#x20;
 
 Example:
 
@@ -160,6 +172,8 @@ $ go-semver-release release <PATH> --dry-run
 ```
 
 ### Git name and email
+
+CLI flags: `--git-name`, `--git-email`
 
 The program creates new tag whenever a new release is found. These tags are annotated and, as such, require a Git signature by an author. By default, the tag will be created by an author with the name "Go Semver Release" and email "go-semver@release.ci".
 
@@ -171,7 +185,9 @@ $ go-semver-release release <PATH> --git-name <NAME> --git-email <EMAIL>
 
 ### Verbose
 
-The `--verbose` defines the level of verbosity that will be printed out by the command. By default, the command is not verbose and will only print an output informing if a new release was found along with its value.
+CLI flag: `--verbose`
+
+Defines the level of verbosity that will be printed out by the command. By default, the command is not verbose and will only print an output informing if a new release was found along with its value.
 
 If enabled, the command will print whenever it finds a commit that triggers a bump in the semantic version with information about each commit (e.g., hash, message) and other detailed information about the steps the program is performing.
 

@@ -29,11 +29,11 @@ This program can only read annotated Git tags. If at some point you need to manu
 
 ### Usage
 
-Documentation about the CLI usage can be found [here](./#usage).
+Documentation about the CLI usage can be found [here](broken-reference).
 
 ### CI workflow examples
 
-This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](./#ci-workflow-examples).
+This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](recipes/workflow-examples.md).
 
 ### How is this different from tool X ?
 
