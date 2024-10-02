@@ -6,12 +6,14 @@
 
 Go program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging them with the right [SemVer](https://semver.org/spec/v2.0.0.html) number.
 
-* [Motivation](./#Motivation)
-* [Features](./#Features)
-* [Install](./#Install)
-* [Usage](./#Usage)
-* [CI workflow examples](./#ci-workflow-examples)
-* [How is this different from tool X ?](./#how-is-this-tool-different-from-x)
+### Features
+
+* Automatic semantic versioning of your Git repository via annotated Git tags
+* Local or remote mode of execution (local removes the need for secret token)
+* Support for multiple release branch, prerelease and build metadata
+* Support monorepo (i.e. multiple projects inside a single repository, all versioned separately)
+* Custom tag prefix (e.g. `v1.0.0`)
+* Tag signature using GPG
 
 ### Motivation
 
@@ -23,30 +25,7 @@ All you need to have is an initialized Git repository, a release branch (e.g., `
 
 > \[!IMPORTANT] `go-semver-release` can only read **annotated** Git tags. If at some point you need to manually add a SemVer tag to your repository, make sure it is annotated, otherwise the program will not be able to detect it.
 
-### Features
-
-* Automatic semantic versioning of your Git repository via annotated Git tags
-* Local or remote mode of execution (local removes the need for secret token)
-* Support for multiple release branch, prerelease and build metadata
-* Support monorepo (i.e. multiple projects inside a single repository, all versioned separately)
-* Custom tag prefix (e.g. `v1.0.0`)
-* Tag signature using GPG
-
-### Install
-
-If [Go](https://go.dev) is installed on your machine, you can install from source:
-
-```bash
-$ go install github.com/s0ders/go-semver-release/v5@latest
-$ go-semver-release --help
-```
-
-A [Docker image](https://hub.docker.com/r/s0ders/go-semver-release/tags) is available as well:
-
-```bash
-$ docker pull s0ders/go-semver-release:latest
-$ docker run --rm s0ders/go-semver-release --help
-```
+###
 
 ### Usage
 
@@ -56,10 +35,8 @@ Documentation about the CLI usage can be found [here](usage.md).
 
 This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](workflows.md).
 
-### How is this tool different from X ?
+### How is this different from tool X ?
 
 Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). Go Semver Release focuses on versioning only, no package publishing, release log generation or other features.
 
-If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work with minimal dependencies and to avoid requiring the use of secret tokens on user-end (if you choose to run in local mode for instance).
-
-As stated above, Go Semver Release is agnostic of which CI tool you use or which branch you use it on. You define the configuration using flags, environment variables or configurations file however you please on your CI for maximized modularity.
+If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work with minimal dependencies, limit surface of attack and work faster.
