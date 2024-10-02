@@ -18,3 +18,22 @@ If executed in non-verbose mode, no matter the scenario (e.g., no new release, n
 The `project` key will only be present in an output if executed in monorepo mode. See the "Multiple projects in a single repository or "monorepo"" section for more information.
 {% endhint %}
 
+Example of a monorepo execution output:
+
+```json
+{
+    "new-release": false,
+    "version": "0.0.3",
+    "branch": "master",
+    "project": "foo",
+    "message": "no new release found"
+},
+{
+    "new-release": true,
+    "version": "1.0.0-rc",
+    "branch": "rc",
+    "project": "bar",
+    "message": "new release found"
+},
+```
+

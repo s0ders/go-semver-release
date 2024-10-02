@@ -10,7 +10,6 @@ All you need to get started is:
 
 ```yaml
 # <REPOSITORY_ROOT>/.semver.yaml
-# All parameters below are optionals and have sensible defaults except for "branches" that must explicitly be set.
 remote: true
 remote-name: "origin"
 git-name: "My Custom Robot Name"
@@ -34,5 +33,3 @@ Once the configuration file is saved inside the Git repository to version, the t
 ```bash
 $ go-semver-release release <REPOSITORY_PATH_OR_URL> --config <PATH_TO_CONFIG_FILE> [--dry-run, --verbose]
 ```
-
-##

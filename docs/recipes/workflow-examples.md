@@ -1,10 +1,10 @@
-# Usage in CI/CD
+# Workflow examples
 
 ## Versioning workflow
 
 Since Go Semver Release is CI agnostic, this page aims to give a few examples of CI workflows that you can implement to benefit the most out of this program.
 
-A typical CI workflow using Go Semver Release would look like this:
+A typical workflow versioning your repository using Go Semver Release would look like this:
 
 ```mermaid
 sequenceDiagram
@@ -19,11 +19,11 @@ sequenceDiagram
     Versioning->>Release: New release
 ```
 
-## Pipeline examples
+### Workflow example
 
-> \[!IMPORTANT]
->
-> Usually, the first step in a CI/CD job is to "checkout" or clone the repository being worked on by the CI/CD workflow. Please make sure that in the step or job using Go Semver Release, the repository is cloned along with its annotated tags, otherwise previous SemVer tags will not be detected.
+{% hint style="warning" %}
+Usually, the first step in a CI/CD job is to clone (or "checkout") the repository on which the workflow will operate. When doing so, the checkout step usually has a depth property allowing you to fetch tags. Make sure that all annotated tags are fetched otherwise the program will not be able to detect previous semantic version tags.
+{% endhint %}
 
 Below are simple pipeline examples for various CI providers:
 

@@ -23,17 +23,17 @@ Following the UNIX philosophy of "make each program do one thing well", it only 
 
 All you need to have is an initialized Git repository, a release branch (e.g., `main`) and a formatted commit history on that branch following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification. Many IDEs support plugins that help formatting messages (e.g., [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit)).
 
-> \[!IMPORTANT] `go-semver-release` can only read **annotated** Git tags. If at some point you need to manually add a SemVer tag to your repository, make sure it is annotated, otherwise the program will not be able to detect it.
-
-###
+{% hint style="info" %}
+This program can only read annotated Git tags. If at some point you need to manually add a SemVer tag to your repository, make sure it is annotated, otherwise the program will not be able to detect it.
+{% endhint %}
 
 ### Usage
 
-Documentation about the CLI usage can be found [here](usage.md).
+Documentation about the CLI usage can be found [here](./#usage).
 
 ### CI workflow examples
 
-This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](workflows.md).
+This tool is voluntarily agnostic of which CI tool is used with it. Examples of workflows with various CI tools can be found [here](./#ci-workflow-examples).
 
 ### How is this different from tool X ?
 
