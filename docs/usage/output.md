@@ -15,5 +15,12 @@ If executed in non-verbose mode, the output, will always have the following keys
 ```
 
 {% hint style="info" %}
-The `project` key will only be present in an output if executed in monorepo mode. See the "Multiple projects in a single repository or "monorepo"" section for more information.
+The `project` key will only be present in an output if executed in monorepo mode. See [this section](configuration.md#monorepo) for more information.
 {% endhint %}
+
+Here is an example of an output where two branches were parsed, please note that there are two separate JSON which means that for this output to be parsed, it needs to be read line by line:
+
+```json
+{"new-release":true,"version":"1.2.2","branch":"main","message":"new release found"}
+{"new-release":true,"version":"2.1.1-rc","branch":"rc","message":"new release found"}
+```
