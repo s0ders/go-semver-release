@@ -34,22 +34,35 @@ CLI flag: `--rules`
 Release rules define which commit type will trigger a release, and which type of release (i.e., `minor` or `patch`).
 
 {% hint style="info" %}
-Release type can only be `minor` or `patch`, `major` is reserved for breaking change only.
+Release type can only be `minor` or `patch`, `major` is reserved for breaking change only which are indicated either using an exclamation mark after the commit type (e.g. `feat!`) or by stating `BREAKING CHANGE` in the commit message footer.
 {% endhint %}
 
 The following release rules are applied by default, they can be overridden by adding or removing commit types in the `minor` and `patch` list.
 
-```yaml
-rules:
-  minor:
+| Release type | Commit type             |
+| ------------ | ----------------------- |
+| `minor`      | `feat`                  |
+| `patch`      | `fix`, `perf`, `revert` |
+
+
+
+The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
+
+Examples:
+
+```bash
+$ go-semver-release release <PATH> --rules='{"minor": ["feat"], "patch": ["fix", "perf"]}'
+```
+
+<pre class="language-yaml"><code class="lang-yaml"><strong>rules:
+</strong>  minor:
     - feat
   patch:
     - fix
     - perf
+    - refactor
     - revert
-```
-
-The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
+</code></pre>
 
 ### Branches
 
@@ -59,7 +72,11 @@ Branches set in configuration are the one Go Semver Release will read commit his
 
 A prerelease branch will have its tag suffixed by its own name. For instance, for a branch named `rc` a set to `prerelease`, a new release will look like `1.2.3-rc`.
 
-Example:
+Examples:
+
+```bash
+$ go-semver-release release <PATH> --branches='[{"name": "master"}, {"name": "rc", "prerelease": true}]'
+```
 
 ```yaml
 branches:
@@ -83,9 +100,9 @@ remote: true
 remote-name: "origin"
 ```
 
-You also need an access token so that Go Semver Release can clone your repository and push tags to it. All modern Git remote providers offer this feature (e.g., [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [GitLab](https://docs.gitlab.com/ee/user/project/settings/project\_access\_tokens.html), [Bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/)).
+An access token is required so that Go Semver Release can clone the Git repository and push tags to it. All modern Git remote providers offer this feature (e.g., [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [GitLab](https://docs.gitlab.com/ee/user/project/settings/project\_access\_tokens.html), [Bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/)).
 
-Please do not set your access token directly in your configuration file. A much safer alternative it to set the access token as a secret on your repository and, in your CI workflow, pass it to Go Semver Release either via the `--access-token` flag or via the `GO_SEMVER_RELEASE_ACCESS_TOKEN` environment variable.
+Please do not set the access token directly in the configuration file. A much safer alternative it to set the access token as a secret on the remote repository and, in your CI workflow, pass it to Go Semver Release either via the `--access-token` flag or via the `GO_SEMVER_RELEASE_ACCESS_TOKEN` environment variable.
 
 ### Monorepo
 
@@ -123,6 +140,10 @@ Example:
 
 ```bash
 $ go-semver-release release <PATH> --tag-prefix v
+```
+
+```yaml
+tag-prefix: "v"
 ```
 
 ### Build metadata
@@ -195,4 +216,8 @@ Example:
 
 ```bash
 $ go-semver-release release <PATH> --verbose
+```
+
+```yaml
+verbose: true
 ```

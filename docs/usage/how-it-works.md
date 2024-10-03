@@ -3,6 +3,7 @@
 When executed, the program will go through the following steps:
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TB
   A["Load configuration"] --> B{"Is there a GPG key ?"}
   B -- Yes --> C["Load the GPG key"]
@@ -22,9 +23,17 @@ flowchart TB
   N --> O["Loop on sorted commits"]
   O --> P{"Does commit message matches Conventional Commits ?"}
   P -- Yes --> Q["Bump SemVer according to the configured release rules"]
+  Q --> R{"Is it the last commit ?"}
+  R -- No --> O
+  R -- Yes --> T{"Is it the last project ?"}
+  T -- No --> I
+  T -- Yes --> U{"Is it the last branch ?"}
+  U -- No --> G
+  U -- Yes --> V{"Is there a GPG key ?"}
+  V -- Yes --> W["Tag the repository with a signed tag"]
+  V -- No --> X["Tag the repository"]
+  W & X --> Y{"Is the repository remote ?"}
+  Y -- No --> Z["<b>Done</b>"]
+  Y -- Yes --> AA["Push the tag to remote"]
+  AA --> AB["<b>Done</b>"]
 ```
-
-
-
-1. Tag the repository and sign it if a GPG key was passed
-2. Push the tag to remote if executed in remote mode
