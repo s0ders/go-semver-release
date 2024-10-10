@@ -3,6 +3,8 @@ package branch
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 )
 
 var (
@@ -32,9 +34,14 @@ func Unmarshall(input []map[string]string) ([]Branch, error) {
 
 		branch := Branch{Name: pattern}
 
-		_, ok = b["prerelease"]
+		prerelease, ok := b["prerelease"]
 		if ok {
-			branch.Prerelease = true
+			prereleaseBool, err := strconv.ParseBool(prerelease)
+			if err != nil {
+				return nil, fmt.Errorf("parsing prerelease key to bool: %w", err)
+			}
+
+			branch.Prerelease = prereleaseBool
 		}
 
 		branches[i] = branch

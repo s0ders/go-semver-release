@@ -30,6 +30,8 @@ type cmdOutput struct {
 	NewRelease bool   `json:"new-release"`
 }
 
+// TODO: fix flaky tests, order matters since viper does not support an "unset"/"reset" function
+// TODO: add a test with GPG key happy scenario
 func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -49,8 +51,10 @@ func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
 func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
 	assert := assertion.New(t)
 
-	_, err := configureProjects()
-	assert.ErrorContains(err, "missing projects key in configuration")
+	projects, err := configureProjects()
+	checkErr(t, err, "configuring projects")
+
+	assert.Nil(projects, "no monorepo configuration, should have gotten nil")
 }
 
 func TestReleaseCmd_SemVerConfigFile(t *testing.T) {
@@ -209,7 +213,7 @@ rules:
 	assert.Equal(true, exists, "alpha tag not found")
 }
 
-func TestReleaseCmd_Release(t *testing.T) {
+func TestReleaseCmd_LocalRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -508,7 +512,7 @@ func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	assert.Equal(true, exists)
 }
 
-func TestReleaseCmd_Prerelease(t *testing.T) {
+func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master", "prerelease": "true"}})
@@ -550,7 +554,7 @@ func TestReleaseCmd_Prerelease(t *testing.T) {
 	assert.Equal(true, exists)
 }
 
-func TestReleaseCmd_ReleaseWithDryRun(t *testing.T) {
+func TestReleaseCmd_DryRunRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -594,7 +598,7 @@ func TestReleaseCmd_ReleaseWithDryRun(t *testing.T) {
 	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
 }
 
-func TestReleaseCmd_NoRelease(t *testing.T) {
+func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 	assert := assertion.New(t)
 
 	configSetBranches([]map[string]string{{"name": "master"}})
@@ -674,6 +678,7 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
+	// TODO: ErrorIs or somthing
 	assert.Error(err, "should have failed trying to write GitHub output to read-only file")
 }
 
@@ -800,10 +805,10 @@ func TestReleaseCmd_InvalidBranch(t *testing.T) {
 	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
 }
 
-func TestReleaseCmd_InvalidProjects(t *testing.T) {
+func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetProjects([]map[string]string{{"path": "./foo/"}})
+	configSetMonorepo([]map[string]string{{"path": "./foo/"}})
 
 	_, err := configureProjects()
 	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
@@ -855,9 +860,8 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 func TestReleaseCmd_Monorepo(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetMonorepo()
 	configSetBranches([]map[string]string{{"name": "master"}})
-	configSetProjects([]map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
+	configSetMonorepo([]map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
 	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
 
 	buf := new(bytes.Buffer)
@@ -933,6 +937,7 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	checkErr(t, err, "scanning error")
 }
 
+// Setup structs and functions
 type CommandFlagOptions func()
 
 func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
@@ -944,6 +949,8 @@ func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
 }
 
 func setup(t *testing.T, buf io.Writer, commits []string, commandFlagOptions ...CommandFlagOptions) (*git.Repository, string) {
+	t.Helper()
+
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
@@ -1004,17 +1011,37 @@ func checkErr(t *testing.T, err error, message string) {
 }
 
 func configSetBranches(branches []map[string]string) {
-	viperInstance.Set("branches", branches)
+	b, err := json.Marshal(branches)
+	if err != nil {
+		panic(err)
+	}
+
+	err = rootCmd.PersistentFlags().Set(BranchesFlag, string(b))
+	if err != nil {
+		panic(err)
+	}
 }
 
 func configSetRules(rules map[string][]string) {
-	viperInstance.Set("rules", rules)
+	b, err := json.Marshal(rules)
+	if err != nil {
+		panic(err)
+	}
+
+	err = rootCmd.PersistentFlags().Set(RulesFlag, string(b))
+	if err != nil {
+		panic(err)
+	}
 }
 
-func configSetMonorepo() {
-	viperInstance.Set("monorepo", true)
-}
+func configSetMonorepo(monorepository []map[string]string) {
+	b, err := json.Marshal(monorepository)
+	if err != nil {
+		panic(err)
+	}
 
-func configSetProjects(projects []map[string]string) {
-	viperInstance.Set("projects", projects)
+	err = rootCmd.PersistentFlags().Set(MonorepoFlag, string(b))
+	if err != nil {
+		panic(err)
+	}
 }

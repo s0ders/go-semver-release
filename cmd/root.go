@@ -3,17 +3,23 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
 )
 
 const (
 	defaultConfigFile = ".semver"
 	configFileFormat  = "yaml"
-	envPrefix         = "GO_SEMVER_RELEASE"
+
+	MonorepoFlag = "monorepo"
+	RulesFlag    = "rules"
+	BranchesFlag = "branches"
 )
 
 var (
@@ -26,7 +32,9 @@ var (
 	armoredKeyPath string
 	verbose        bool
 	remoteMode     bool
-	monorepository bool
+	branches       branch.Flag
+	monorepository monorepo.Flag
+	rules          rule.Flag
 )
 
 var viperInstance = viper.New()
@@ -39,9 +47,11 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&accessToken, "access-token", "", "Access token used to push tag to Git remote")
 	rootCmd.PersistentFlags().StringVar(&remoteName, "remote-name", "origin", "Name of the Git repository remote")
 	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
-	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
-	rootCmd.PersistentFlags().BoolVar(&monorepository, "monorepo", false, "Operating in monorepo mode versioning multiple projects separately")
+	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
+	rootCmd.PersistentFlags().Var(&branches, BranchesFlag, "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
+	rootCmd.PersistentFlags().Var(&monorepository, MonorepoFlag, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
+	rootCmd.PersistentFlags().Var(&rules, RulesFlag, "An hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 
 	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
 }
@@ -74,10 +84,6 @@ func initializeConfig(cmd *cobra.Command) error {
 			return err
 		}
 	}
-
-	viperInstance.SetEnvPrefix(envPrefix)
-	viperInstance.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viperInstance.AutomaticEnv()
 
 	if err := bindFlags(cmd, viperInstance); err != nil {
 		return err

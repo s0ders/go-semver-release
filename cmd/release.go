@@ -42,8 +42,6 @@ var releaseCmd = &cobra.Command{
 		var (
 			repository *git.Repository
 			origin     *remote.Remote
-			entity     *openpgp.Entity
-			projects   []monorepo.Project
 		)
 
 		logger := zerolog.New(cmd.OutOrStdout())
@@ -52,18 +50,6 @@ var releaseCmd = &cobra.Command{
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		} else {
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		}
-
-		if armoredKeyPath != "" {
-			armoredKeyFile, err := os.ReadFile(armoredKeyPath)
-			if err != nil {
-				return fmt.Errorf("reading armored key: %w", err)
-			}
-
-			entity, err = gpg.FromArmored(bytes.NewReader(armoredKeyFile))
-			if err != nil {
-				return fmt.Errorf("loading armored key: %w", err)
-			}
 		}
 
 		if remoteMode {
@@ -79,6 +65,11 @@ var releaseCmd = &cobra.Command{
 			}
 		}
 
+		entity, err := configureGPGKey()
+		if err != nil {
+			return fmt.Errorf("configuring GPG key: %w", err)
+		}
+
 		rules, err := configureRules()
 		if err != nil {
 			return fmt.Errorf("loading rules configuration: %w", err)
@@ -89,23 +80,19 @@ var releaseCmd = &cobra.Command{
 			return fmt.Errorf("loading branches configuration: %w", err)
 		}
 
-		if monorepository {
-			projects, err = configureProjects()
-			if err != nil {
-				return fmt.Errorf("loading projects configuration: %w", err)
-			}
+		projects, err := configureProjects()
+		if err != nil {
+			return fmt.Errorf("loading projects configuration: %w", err)
 		}
 
 		tagger := tag.NewTagger(gitName, gitEmail, tag.WithTagPrefix(tagPrefix), tag.WithSignKey(entity))
 		semverParser := parser.New(logger, tagger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithProjects(projects))
 
-		// Launch a parser per branch to analyze
 		for _, branch := range branches {
 			semverParser.SetBranch(branch.Name)
 			semverParser.SetPrerelease(branch.Prerelease)
 			semverParser.SetPrereleaseIdentifier(branch.Name)
 
-			// For projects, would have a slice of semver
 			outputs, err := semverParser.Run(context.Background(), repository)
 			if err != nil {
 				return fmt.Errorf("computing new semver: %w", err)
@@ -165,54 +152,54 @@ var releaseCmd = &cobra.Command{
 }
 
 func configureRules() (rule.Rules, error) {
-	if !viperInstance.IsSet("rules") {
+	if !viperInstance.IsSet(RulesFlag) {
 		return rule.Default, nil
 	}
 
 	var (
-		rulesMarshalled map[string][]string
-		rules           rule.Rules
+		rulesMarshalled   map[string][]string
+		unmarshalledRules rule.Rules
 	)
 
-	err := viperInstance.UnmarshalKey("rules", &rulesMarshalled)
+	err := viperInstance.UnmarshalKey(RulesFlag, &rulesMarshalled)
 	if err != nil {
-		return rules, fmt.Errorf("unmarshalling rules key: %w", err)
+		return unmarshalledRules, fmt.Errorf("unmarshalling %s key: %w", RulesFlag, err)
 	}
 
-	rules, err = rule.Unmarshall(rulesMarshalled)
+	unmarshalledRules, err = rule.Unmarshall(rulesMarshalled)
 	if err != nil {
-		return rules, fmt.Errorf("parsing rules: %w", err)
+		return unmarshalledRules, fmt.Errorf("parsing rules: %w", err)
 	}
 
-	return rules, nil
+	return unmarshalledRules, nil
 }
 
 func configureBranches() ([]branch.Branch, error) {
-	if !viperInstance.IsSet("branches") {
-		return nil, fmt.Errorf("missing branches key in configuration")
+	if !viperInstance.IsSet(BranchesFlag) {
+		return nil, fmt.Errorf("missing %s key in configuration", BranchesFlag)
 	}
 
 	var (
-		branchesMarshalled []map[string]string
-		branches           []branch.Branch
+		branchesMarshalled   []map[string]string
+		unmarshalledBranches []branch.Branch
 	)
 
-	err := viperInstance.UnmarshalKey("branches", &branchesMarshalled)
+	err := viperInstance.UnmarshalKey(BranchesFlag, &branchesMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling branches key: %w", err)
+		return nil, fmt.Errorf("unmarshalling %s key: %w", BranchesFlag, err)
 	}
 
-	branches, err = branch.Unmarshall(branchesMarshalled)
+	unmarshalledBranches, err = branch.Unmarshall(branchesMarshalled)
 	if err != nil {
 		return nil, fmt.Errorf("parsing branches: %w", err)
 	}
 
-	return branches, nil
+	return unmarshalledBranches, nil
 }
 
 func configureProjects() ([]monorepo.Project, error) {
-	if !viperInstance.IsSet("projects") {
-		return nil, fmt.Errorf("missing projects key in configuration")
+	if !viperInstance.IsSet(MonorepoFlag) {
+		return nil, nil
 	}
 
 	var (
@@ -220,9 +207,9 @@ func configureProjects() ([]monorepo.Project, error) {
 		projects           []monorepo.Project
 	)
 
-	err := viperInstance.UnmarshalKey("projects", &projectsMarshalled)
+	err := viperInstance.UnmarshalKey(MonorepoFlag, &projectsMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling projects key: %w", err)
+		return nil, fmt.Errorf("unmarshalling %s key: %w", MonorepoFlag, err)
 	}
 
 	projects, err = monorepo.Unmarshall(projectsMarshalled)
@@ -231,4 +218,22 @@ func configureProjects() ([]monorepo.Project, error) {
 	}
 
 	return projects, nil
+}
+
+func configureGPGKey() (*openpgp.Entity, error) {
+	if armoredKeyPath == "" {
+		return nil, nil
+	}
+
+	armoredKeyFile, err := os.ReadFile(armoredKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading armored key: %w", err)
+	}
+
+	entity, err := gpg.FromArmored(bytes.NewReader(armoredKeyFile))
+	if err != nil {
+		return nil, fmt.Errorf("loading armored key: %w", err)
+	}
+
+	return entity, nil
 }
