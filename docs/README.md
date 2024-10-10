@@ -8,7 +8,7 @@
 
 Go Semver Release is a CLI program designed to automate versioning of Git repository by analyzing their formatted commit history and tagging them with the right [SemVer](https://semver.org/spec/v2.0.0.html) number.
 
-This documentation is best read at [https://go-semver-release.akira.sh](https://go-semver-release.akira.sh)&#x20;
+This documentation is also available at [https://go-semver-release.akira.sh](https://go-semver-release.akira.sh)&#x20;
 
 ## Features
 
