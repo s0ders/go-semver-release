@@ -2,7 +2,7 @@
 
 ## Go Semver Release
 
-<figure><img src=".gitbook/assets/gop.png" alt="" width="188"><figcaption></figcaption></figure>
+<figure><img src=".gitbook/assets/gop.png" alt="Go Semver Release Logo" width="188"><figcaption></figcaption></figure>
 
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go) ![GitHub Tag](https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff) ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release) [![Go Reference](https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg)](https://pkg.go.dev/github.com/s0ders/go-semver-release/v5) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI) [![Go Report Card](https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v2)](https://goreportcard.com/report/github.com/s0ders/go-semver-release/v5) ![Codecov](https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage) ![GitHub License](https://img.shields.io/github/license/s0ders/go-semver-release?label=License)
 
@@ -14,7 +14,7 @@ Go Semver Release is a CLI program designed to automate versioning of Git reposi
 * 🌐 Local or remote mode of execution (local removes the need for secret token)
 * 🌴 Support for multiple release branch, prerelease and build metadata
 * 🗂️ Support monorepo (i.e. multiple projects inside a single repository, all versioned separately)
-* 🇻  Custom tag prefix
+* ⚙️ Custom tag prefix
 * 📝 Tag signature using GPG
 
 ### Motivation
