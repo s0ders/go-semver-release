@@ -1,5 +1,7 @@
 # Output
 
+## Command output
+
 The `release` command output is JSON formatted so that it can easily be parsed.
 
 If executed in non-verbose mode, the output, will always have the following keys (values are given for example), and the program will produce one of these output per branch and per project, if executed in monorepo mode:
@@ -24,3 +26,6 @@ Here is an example of an output where two branches were parsed, please note that
 {"new-release":true,"version":"1.2.2","branch":"main","message":"new release found"}
 {"new-release":true,"version":"2.1.1-rc","branch":"rc","message":"new release found"}
 ```
+
+## GitHub Action output
+

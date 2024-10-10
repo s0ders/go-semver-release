@@ -1,6 +1,10 @@
 # Configuration
 
-To see the list of all available flags and their default values from a terminal, run the following:
+### How to read this page
+
+Configuration option can be set either via flag or configuration file. The same option share the same name for its flag and configuration key counterpart. Each paragraph about an option will have an example for how to use it via flag or a YAML configuration file.
+
+Default values are not specified here since they are available when running the following command:
 
 ```bash
 $ go-semver-release release --help
@@ -8,12 +12,11 @@ $ go-semver-release release --help
 
 ### Configuration precedence
 
-The order of precedence for the configuration is as follows:
+The order of precedence for the configuration is:
 
 * Explicitly set flag values have the highest precedence
-* Then environment variable prefixed with `GO_SEMVER_RELEASE`  (e.g., `GO_SEMVER_RELEASE_TAG_PREFIX`)
 * Then values set in the configuration file
-* Finally, flag default values have the lowest precedence
+* Finally, flag default values have the lowest precedence, each flag default value is given in the help message of the command
 
 ### Configuration file
 
@@ -142,10 +145,6 @@ Example:
 $ go-semver-release release <PATH> --tag-prefix v
 ```
 
-```yaml
-tag-prefix: "v"
-```
-
 ### Build metadata
 
 CLI flags: `--build-metadata`
@@ -216,8 +215,4 @@ Example:
 
 ```bash
 $ go-semver-release release <PATH> --verbose
-```
-
-```yaml
-verbose: true
 ```
