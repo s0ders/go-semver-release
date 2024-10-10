@@ -22,7 +22,7 @@ The order of precedence for the configuration is:
 
 CLI flag: `--config`
 
-The tool expects a configuration file for configuration options such as branches or release rules, the default path, which can be overidden, is `<REPOSITORY_ROOT>/.semver.yaml`
+The tool expects a configuration file for configuration options such as branches or release rules, the default path, which can be overridden, is `<REPOSITORY_ROOT>/.semver.yaml`
 
 Example:
 
