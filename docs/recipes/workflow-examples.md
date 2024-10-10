@@ -22,9 +22,8 @@ sequenceDiagram
 
 ### Workflow example
 
-{% hint style="warning" %}
-Usually, the first step in a CI/CD job is to clone (or "checkout") the repository on which the workflow will operate. When doing so, the checkout step usually has a `depth` property allowing you to fetch tags. Make sure that all annotated tags are fetched otherwise the program will not be able to detect previous semantic version tags.
-{% endhint %}
+> [!WARNING]
+> Usually, the first step in a CI/CD job is to clone (or "checkout") the repository on which the workflow will operate. When doing so, the checkout step usually has a `depth` property allowing you to fetch tags. Make sure that all annotated tags are fetched otherwise the program will not be able to detect previous semantic version tags.
 
 Below are simple pipeline examples for various CI providers:
 

@@ -36,9 +36,8 @@ CLI flag: `--rules`
 
 Release rules define which commit type will trigger a release, and which type of release (i.e., `minor` or `patch`).
 
-{% hint style="info" %}
-Release type can only be `minor` or `patch`, `major` is reserved for breaking change only which are indicated either using an exclamation mark after the commit type (e.g. `feat!`) or by stating `BREAKING CHANGE` in the commit message footer.
-{% endhint %}
+> [!NOTE]
+> Release type can only be `minor` or `patch`, `major` is reserved for breaking change only which are indicated either using an exclamation mark after the commit type (e.g. `feat!`) or by stating `BREAKING CHANGE` in the commit message footer.
 
 The following release rules are applied by default, they can be overridden by adding or removing commit types in the `minor` and `patch` list.
 
@@ -135,9 +134,8 @@ CLI flag: `--tag-prefix`
 
 A tag prefix is used to custom the tag format of a SemVer applied to a Git repository. A classic, and the default, value is `v`. For instance, if the release version found is `1.2.3`, the Git tag will be `v1.2.3`.
 
-{% hint style="info" %}
-Tag prefix can be changed during the lifetime of a repository (e.g., going from no prefix to `v`), this will not affect the SemVer tag history, the program will still be able to recognize previous SemVer tags as long as they are annotated tags.
-{% endhint %}
+> [!NOTE]
+> Tag prefix can be changed during the lifetime of a repository (e.g., going from no prefix to `v`), this will not affect the SemVer tag history, the program will still be able to recognize previous SemVer tags as long as they are annotated tags.
 
 Example:
 
@@ -165,13 +163,11 @@ CLI flag: `--gpg-key-path`
 
 Path to an armored GPG signing key used to sign the produced tags.
 
-{% hint style="danger" %}
-Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key specifically generated for the purpose of signing tags. Do not use your personal key, that way you can easily revoke the key if any action in your workflow came to be compromised.
-{% endhint %}
+> [!CAUTION]
+> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key specifically generated for the purpose of signing tags. Do not use your personal key, that way you can easily revoke the key if any action in your workflow came to be compromised.
 
-{% hint style="warning" %}
-As stated above, the GPG private key need to be written on disk before being read. Store it outside the repository being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since it has not been committed) and will not be found by the program.
-{% endhint %}
+> [!WARNING]
+> As stated above, the GPG private key need to be written on disk before being read. Store it outside the repository being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since it has not been committed) and will not be found by the program.
 
 Example:
 

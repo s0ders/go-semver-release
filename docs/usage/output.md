@@ -16,9 +16,8 @@ If executed in non-verbose mode, the output, will always have the following keys
 }
 ```
 
-{% hint style="info" %}
-The `project` key will only be present in an output if executed in monorepo mode. See [this section](configuration.md#monorepo) for more information.
-{% endhint %}
+> [!NOTE]
+> The `project` key will only be present in an output if executed in monorepo mode. See [this section](configuration.md#monorepo) for more information.
 
 Here is an example of an output where two branches were parsed, please note that there are two separate JSON which means that for this output to be parsed, it needs to be read line by line:
 
@@ -29,3 +28,4 @@ Here is an example of an output where two branches were parsed, please note that
 
 ## GitHub Action output
 
+🚧 This section is a work in progress 🚧
