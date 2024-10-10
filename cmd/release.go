@@ -70,12 +70,12 @@ var releaseCmd = &cobra.Command{
 			origin = remote.New(remoteName, accessToken)
 			repository, err = origin.Clone(args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("cloning Git repository: %w", err)
 			}
 		} else {
 			repository, err = git.PlainOpen(args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("opening local Git repository: %w", err)
 			}
 		}
 
