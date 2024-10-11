@@ -4,20 +4,23 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/s0ders/go-semver-release/v5/internal/branch"
-	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	assertion "github.com/stretchr/testify/assert"
 
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
 	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v5/internal/rule"
 	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
@@ -931,6 +934,95 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	}
 	err = scanner.Err()
 	checkErr(t, err, "scanning error")
+}
+
+func TestReleaseCmd_GPGSigning(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetBranches([]map[string]string{{"name": "master"}})
+
+	buf := new(bytes.Buffer)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = testRepository.Remove()
+		checkErr(t, err, "removing repository")
+	}()
+
+	err = resetPersistentFlags(rootCmd)
+	checkErr(t, err, "resetting root command flags")
+
+	err = resetFlags(releaseCmd)
+	checkErr(t, err, "resetting release command flags")
+
+	// Generate GPG key
+	dir, err := os.MkdirTemp("", "gpg-*")
+	if err != nil {
+		t.Fatalf("failed to create temp directory: %s", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(dir)
+		if err != nil {
+			t.Fatalf("failed to remove temp directory: %s", err)
+		}
+	}()
+
+	keyFilePath := filepath.Join(dir, "key.asc")
+	armoredKeyFile, err := os.Create(keyFilePath)
+	if err != nil {
+		t.Fatalf("failed to create armored key file: %s", err)
+	}
+
+	defer func() {
+		err = armoredKeyFile.Close()
+		if err != nil {
+			t.Fatalf("failed to close armored key file: %s", err)
+		}
+	}()
+
+	opts := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, RSABits: 1024}
+	expectedEntity, err := openpgp.NewEntity("John Doe", "", "john.doe@example.com", opts)
+	if err != nil {
+		t.Fatalf("entity creation failed: %s", err)
+	}
+
+	armorWriter, err := armor.Encode(armoredKeyFile, openpgp.PrivateKeyType, map[string]string{})
+	if err != nil {
+		t.Fatalf("armor encoding failed: %s", err)
+	}
+
+	if err = expectedEntity.SerializePrivate(armorWriter, nil); err != nil {
+		t.Fatalf("serialization failed: %s", err)
+	}
+
+	err = armorWriter.Close()
+	if err != nil {
+		t.Fatalf("failed to close armor writer: %s", err)
+	}
+
+	// Execute command
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"release", testRepository.Path, "--gpg-key-path", keyFilePath})
+
+	_, err = testRepository.AddCommit("feat")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, err, "adding commit")
+
+	// Executing command
+	err = rootCmd.Execute()
+	checkErr(t, err, "executing command")
+
+	newTag, err := testRepository.Repository.Tag("v0.1.1")
+	checkErr(t, err, "getting new tag")
+
+	obj, err := testRepository.Repository.TagObject(newTag.Hash())
+
+	assert.NotEmpty(obj.PGPSignature, "PGP signature should not be empty")
 }
 
 type CommandFlagOptions func()
