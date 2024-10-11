@@ -87,8 +87,8 @@ jobs:
       - name: Go Semver Release
         id: go-semver
         run: |
-          if [ ! -f "${GPG_KEY_PATH}" ]; then
-            echo "Error: GPG key file not found at ${GPG_KEY_PATH}"
+          if [ ! -f "${GO_SEMVER_GPG_KEY_PATH}" ]; then
+            echo "Error: GPG key file not found at ${GO_SEMVER_GPG_KEY_PATH}"
             exit 1
           fi
           
