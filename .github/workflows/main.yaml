@@ -74,6 +74,7 @@ jobs:
       - name: Go Semver Release
         id: go-semver
         run: |
+          # Write GPG key
           mkdir -p ~/secrets
           echo "${{ secrets.GPG_PRIVATE_KEY }}" > ~/secrets/private.asc
           key_path=$(cd "$(dirname ~/secrets/private.asc)" && pwd)/$(basename ~/secrets/private.asc)
@@ -98,6 +99,7 @@ jobs:
       contents: read
     needs:
       - versioning
+    if: ${{needs.versioning.outputs.release == 'true'}}
     env:
       VERSION: ${{needs.versioning.outputs.semver}}
     steps:
@@ -130,6 +132,7 @@ jobs:
     needs:
       - versioning
       - docker-release
+    if: ${{needs.versioning.outputs.release == 'true'}}
     strategy:
       matrix:
         os:
