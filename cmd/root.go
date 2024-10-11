@@ -42,8 +42,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().BoolVar(&monorepository, "monorepo", false, "Operating in monorepo mode versioning multiple projects separately")
-
-	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
 }
 
 var rootCmd = &cobra.Command{
