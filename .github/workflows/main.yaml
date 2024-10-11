@@ -80,7 +80,8 @@ jobs:
           key_path=$(cd "$(dirname ~/secrets/private.asc)" && pwd)/$(basename ~/secrets/private.asc)
           
           # Install latest stable release
-          ./build/download_latest_release.sh
+          chmod +x ./build/download_latest_release.sh
+          bash ./build/download_latest_release.sh
           
           # Print latest stable release version
           ./go-semver-release-linux-amd64 version
