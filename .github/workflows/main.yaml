@@ -71,23 +71,25 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up GPG key
+        run: |
+          mkdir -p ~/secrets
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" > ~/secrets/private.asc
+          GPG_KEY_PATH="${HOME}/secrets/private.asc"
+          echo "GO_SEMVER_GPG_KEY_PATH=${GO_SEMVER_GPG_KEY_PATH}" >> $GITHUB_ENV
+
+      - name: Download latest stable release
+        run: |
+          chmod +x ./build/download_latest_release.sh
+          bash ./build/download_latest_release.sh
+
       - name: Go Semver Release
         id: go-semver
         run: |
-          # Write GPG key
-          mkdir -p ~/secrets
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" > ~/secrets/private.asc
-          key_path=$(cd "$(dirname ~/secrets/private.asc)" && pwd)/$(basename ~/secrets/private.asc)
-          
-           # Install latest stable release
-          chmod +x ./build/download_latest_release.sh
-          bash ./build/download_latest_release.sh
-          
-          # Execute it
           ./go-semver-release-linux-amd64 release https://github.com/s0ders/go-semver-release.git \
           --config .semver.yaml \
           --access-token ${{ secrets.GO_SEMVER_RELEASE_ACCESS_TOKEN }} \
-          --gpg-key-path "$key_path" \
+          --gpg-key-path "${GO_SEMVER_GPG_KEY_PATH}" \
           --verbose 
 
   docker-release:
