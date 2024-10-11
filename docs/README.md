@@ -6,6 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v2)](https://goreportcard.com/report/github.com/s0ders/go-semver-release/v5)
 ![Codecov](https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage)
 ![GitHub License](https://img.shields.io/github/license/s0ders/go-semver-release?label=License)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8877/badge)](https://www.bestpractices.dev/projects/8877)
 
 
 # Go Semver Release
