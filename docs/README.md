@@ -19,7 +19,7 @@ This documentation is also available at [https://go-semver-release.akira.sh](htt
 * ⚙️ Custom tag prefix
 * 📝 Tag signature using GPG
 
-### Motivation
+## Motivation
 
 This project was built to create a lightweight and simple tool to automate the semantic versioning on your Git repository in a language and CI agnostic way by strictly following the Semantic Versioning and Conventional Commit convention.
 
