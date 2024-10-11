@@ -74,16 +74,16 @@ jobs:
       - name: Go Semver Release
         id: go-semver
         run: |
-        # Write GPG key
+          # Write GPG key
           mkdir -p ~/secrets
           echo "${{ secrets.GPG_PRIVATE_KEY }}" > ~/secrets/private.asc
           key_path=$(cd "$(dirname ~/secrets/private.asc)" && pwd)/$(basename ~/secrets/private.asc)
           
-         # Install latest stable release
+           # Install latest stable release
           chmod +x ./build/download_latest_release.sh
           bash ./build/download_latest_release.sh
           
-        # Execute it
+          # Execute it
           ./go-semver-release-linux-amd64 release https://github.com/s0ders/go-semver-release.git \
           --config .semver.yaml \
           --access-token ${{ secrets.GO_SEMVER_RELEASE_ACCESS_TOKEN }} \
