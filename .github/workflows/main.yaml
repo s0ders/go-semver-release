@@ -75,8 +75,8 @@ jobs:
         run: |
           mkdir -p ~/secrets
           echo "${{ secrets.GPG_PRIVATE_KEY }}" > ~/secrets/private.asc
-          chmod 600 "${GPG_KEY_PATH}"
-          GPG_KEY_PATH="${HOME}/secrets/private.asc"
+          GO_SEMVER_GPG_KEY_PATH="${HOME}/secrets/private.asc"
+          chmod 600 "${GO_SEMVER_GPG_KEY_PATH}"
           echo "GO_SEMVER_GPG_KEY_PATH=${GO_SEMVER_GPG_KEY_PATH}" >> $GITHUB_ENV
 
       - name: Download latest stable release
