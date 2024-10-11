@@ -75,6 +75,7 @@ jobs:
         run: |
           mkdir -p ~/secrets
           echo "${{ secrets.GPG_PRIVATE_KEY }}" > ~/secrets/private.asc
+          chmod 600 "${GPG_KEY_PATH}"
           GPG_KEY_PATH="${HOME}/secrets/private.asc"
           echo "GO_SEMVER_GPG_KEY_PATH=${GO_SEMVER_GPG_KEY_PATH}" >> $GITHUB_ENV
 
@@ -86,6 +87,11 @@ jobs:
       - name: Go Semver Release
         id: go-semver
         run: |
+          if [ ! -f "${GPG_KEY_PATH}" ]; then
+            echo "Error: GPG key file not found at ${GPG_KEY_PATH}"
+            exit 1
+          fi
+          
           ./go-semver-release-linux-amd64 release https://github.com/s0ders/go-semver-release.git \
           --config .semver.yaml \
           --access-token ${{ secrets.GO_SEMVER_RELEASE_ACCESS_TOKEN }} \
