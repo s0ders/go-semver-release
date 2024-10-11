@@ -81,7 +81,10 @@ jobs:
           # Install latest stable release
           ./build/download_latest_release.sh
           
-          # Execute it
+          # Print latest stable release version
+          ./go-semver-release-linux-amd64 version
+          
+          # Version
           ./go-semver-release-linux-amd64 release https://github.com/s0ders/go-semver-release.git \
           --config .semver.yaml \
           --access-token ${{ secrets.GO_SEMVER_RELEASE_ACCESS_TOKEN }} \
