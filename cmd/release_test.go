@@ -745,7 +745,7 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
 	err = rootCmd.Execute()
-	assert.ErrorContains(err, "writing to ci file", "should have failed trying to write GitHub output to read-only file")
+	assert.ErrorContains(err, "opening ci file", "should have failed trying to write GitHub output to read-only file")
 }
 
 func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
