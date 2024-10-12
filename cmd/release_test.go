@@ -62,7 +62,7 @@ func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := NewAppContext()
 
-	configSetRules(ctx, map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
+	setTestRules(ctx, map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
 
 	_, err := configureRules(ctx)
 	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
@@ -72,7 +72,7 @@ func TestReleaseCmd_InvalidBranch(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := NewAppContext()
 
-	configSetBranches(ctx, []map[string]any{{}})
+	setTestBranches(ctx, []map[string]any{{}})
 
 	_, err := configureBranches(ctx)
 	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
@@ -82,10 +82,57 @@ func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := NewAppContext()
 
-	configSetMonorepo(ctx, []map[string]string{{"path": "./foo/"}})
+	setTestMonorepo(ctx, []map[string]string{{"path": "./foo/"}})
 
 	_, err := configureProjects(ctx)
 	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
+}
+
+func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
+	assert := assertion.New(t)
+	ctx := NewAppContext()
+
+	setTestGPGKeyPath(ctx, "./fake.asc")
+
+	_, err := configureGPGKey(ctx)
+
+	assert.ErrorContains(err, "reading armored key", "should have failed trying to open non existing armored GPG key")
+}
+
+func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
+	assert := assertion.New(t)
+	ctx := NewAppContext()
+
+	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
+	if err != nil {
+		t.Fatalf("failed to create temporary directory: %s", err)
+	}
+
+	defer func() {
+		err = os.RemoveAll(gpgKeyDir)
+		if err != nil {
+			t.Fatalf("failed to remove temporary directory: %s", err)
+		}
+	}()
+
+	keyFilePath := filepath.Join(gpgKeyDir, "key.asc")
+
+	keyFile, err := os.Create(keyFilePath)
+	if err != nil {
+		t.Fatalf("failed to create output file: %s", err)
+	}
+
+	defer func() {
+		err = keyFile.Close()
+		if err != nil {
+			t.Fatalf("failed to create temporary directory: %s", err)
+		}
+	}()
+
+	setTestGPGKeyPath(ctx, keyFilePath)
+
+	_, err = configureGPGKey(ctx)
+	assert.ErrorContains(err, "loading armored key", "should have failed trying to read armored key ring from empty file")
 }
 
 func TestReleaseCmd_SemVerConfigFile(t *testing.T) {
@@ -249,7 +296,7 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 
 	ctx := NewAppContext()
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -302,7 +349,7 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 
 	ctx := NewAppContext()
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -378,7 +425,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	ctx := NewAppContext()
-	configSetBranches(ctx, []map[string]any{
+	setTestBranches(ctx, []map[string]any{
 		{"name": "master"},
 		{"name": "rc", "prerelease": true},
 	})
@@ -497,8 +544,8 @@ func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	metadata := "foobarbaz"
-	configSetBuildMetadata(ctx, metadata)
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestBuildMetadata(ctx, metadata)
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -539,7 +586,7 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	assert := assertion.New(t)
 
 	ctx := NewAppContext()
-	configSetBranches(ctx, []map[string]any{{"name": "master", "prerelease": true}})
+	setTestBranches(ctx, []map[string]any{{"name": "master", "prerelease": true}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -583,8 +630,8 @@ func TestReleaseCmd_DryRunRelease(t *testing.T) {
 	ctx := NewAppContext()
 	actual := new(bytes.Buffer)
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
-	configSetDryRun(ctx, true)
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestDryRun(ctx, true)
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -624,7 +671,7 @@ func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 	ctx := NewAppContext()
 	actual := new(bytes.Buffer)
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
 
 	_, path := setup(t, ctx, actual, []string{})
 
@@ -652,7 +699,7 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	ctx := NewAppContext()
 	actual := new(bytes.Buffer)
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
 	checkErr(t, err, "creating output directory")
@@ -698,8 +745,7 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
 
 	err = rootCmd.Execute()
-	// TODO: ErrorIs or somthing
-	assert.Error(err, "should have failed trying to write GitHub output to read-only file")
+	assert.ErrorContains(err, "writing to ci file", "should have failed trying to write GitHub output to read-only file")
 }
 
 func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
@@ -713,63 +759,7 @@ func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
 	rootCmd.SetArgs([]string{"release", "./does/not/exist"})
 
 	err := rootCmd.Execute()
-	// TODO: use ErrorIs
-	assert.Error(err, "should have failed trying to open inexisting Git repository")
-}
-
-func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
-	assert := assertion.New(t)
-	actual := new(bytes.Buffer)
-	ctx := NewAppContext()
-
-	rootCmd := NewRootCommand(ctx)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"release", ".", "--gpg-key-path", "./fake.asc"})
-
-	err := rootCmd.Execute()
-	// TODO: use ErrorIs
-	assert.Error(err, "should have failed trying to open inexisting armored GPG key")
-}
-
-func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
-	assert := assertion.New(t)
-	actual := new(bytes.Buffer)
-	ctx := NewAppContext()
-
-	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
-	if err != nil {
-		t.Fatalf("failed to create temporary directory: %s", err)
-	}
-
-	defer func() {
-		err = os.RemoveAll(gpgKeyDir)
-		if err != nil {
-			t.Fatalf("failed to remove temporary directory: %s", err)
-		}
-	}()
-
-	keyFilePath := filepath.Join(gpgKeyDir, "key.asc")
-
-	keyFile, err := os.Create(keyFilePath)
-	if err != nil {
-		t.Fatalf("failed to create output file: %s", err)
-	}
-
-	defer func() {
-		err = keyFile.Close()
-		if err != nil {
-			t.Fatalf("failed to create temporary directory: %s", err)
-		}
-	}()
-
-	rootCmd := NewRootCommand(ctx)
-	rootCmd.SetOut(actual)
-	rootCmd.SetErr(actual)
-	rootCmd.SetArgs([]string{"release", ".", "--gpg-key-path", keyFilePath})
-
-	err = rootCmd.Execute()
-	assert.Error(err, "should have failed trying to read armored key ring from empty file")
+	assert.ErrorContains(err, "opening local Git repository", "should have failed trying to open inexisting Git repository")
 }
 
 func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
@@ -777,7 +767,7 @@ func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 	ctx := NewAppContext()
 	actual := new(bytes.Buffer)
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
 
 	tempDirPath, err := os.MkdirTemp("", "tag-*")
 	if err != nil {
@@ -809,8 +799,8 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := NewAppContext()
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
-	configSetRules(ctx, map[string][]string{"minor": {"feat", "fix"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestRules(ctx, map[string][]string{"minor": {"feat", "fix"}})
 
 	commits := []string{
 		"fix",  // 0.1.0 (with custom rule)
@@ -854,9 +844,9 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	ctx := NewAppContext()
 	buf := new(bytes.Buffer)
 
-	configSetBranches(ctx, []map[string]any{{"name": "master"}})
-	configSetMonorepo(ctx, []map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
-	configSetRules(ctx, map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
+	setTestBranches(ctx, []map[string]any{{"name": "master"}})
+	setTestMonorepo(ctx, []map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
+	setTestRules(ctx, map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
 
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
@@ -924,8 +914,7 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	checkErr(t, err, "scanning error")
 }
 
-// Setup structs and functions
-
+// Test utilities
 func setup(t *testing.T, ctx *AppContext, buf io.Writer, commits []string) (*git.Repository, string) {
 	t.Helper()
 
@@ -950,24 +939,28 @@ func setup(t *testing.T, ctx *AppContext, buf io.Writer, commits []string) (*git
 	return testRepository.Repository, testRepository.Path
 }
 
-func configSetBranches(ctx *AppContext, branches []map[string]any) {
+func setTestBranches(ctx *AppContext, branches []map[string]any) {
 	ctx.Viper.Set(BranchesConfiguration, branches)
 }
 
-func configSetRules(ctx *AppContext, rules map[string][]string) {
+func setTestRules(ctx *AppContext, rules map[string][]string) {
 	ctx.Viper.Set(RulesConfiguration, rules)
 }
 
-func configSetMonorepo(ctx *AppContext, monorepository []map[string]string) {
+func setTestMonorepo(ctx *AppContext, monorepository []map[string]string) {
 	ctx.Viper.Set(MonorepoConfiguration, monorepository)
 }
 
-func configSetBuildMetadata(ctx *AppContext, str string) {
-	ctx.Viper.Set("build-metadata", str)
+func setTestBuildMetadata(ctx *AppContext, str string) {
+	ctx.Viper.Set(BuildMetadataConfiguration, str)
 }
 
-func configSetDryRun(ctx *AppContext, b bool) {
-	ctx.Viper.Set("dry-run", strconv.FormatBool(b))
+func setTestDryRun(ctx *AppContext, b bool) {
+	ctx.Viper.Set(DryRunConfiguration, strconv.FormatBool(b))
+}
+
+func setTestGPGKeyPath(ctx *AppContext, str string) {
+	ctx.Viper.Set(GPGPathConfiguration, str)
 }
 
 func checkErr(t *testing.T, err error, message string) {

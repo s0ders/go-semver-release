@@ -136,8 +136,8 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 		},
 	}
 
-	releaseCmd.Flags().StringVar(&buildMetadata, "build-metadata", "", "Build metadata (e.g. build number) that will be appended to the SemVer")
-	releaseCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "Only compute the next SemVer, do not push any tag")
+	releaseCmd.Flags().StringVar(&buildMetadata, BuildMetadataConfiguration, "", "Build metadata (e.g. build number) that will be appended to the SemVer")
+	releaseCmd.Flags().BoolVarP(&dryRun, DryRunConfiguration, "d", false, "Only compute the next SemVer, do not push any tag")
 
 	return releaseCmd
 }
@@ -212,13 +212,13 @@ func configureProjects(ctx *AppContext) ([]monorepo.Project, error) {
 }
 
 func configureGPGKey(ctx *AppContext) (*openpgp.Entity, error) {
-	if armoredKeyPath == "" {
+	if !ctx.Viper.IsSet(GPGPathConfiguration) {
 		return nil, nil
 	}
 
 	ctx.Logger.Debug().Str("path", armoredKeyPath).Msg("using the following armored key for signing")
 
-	armoredKeyFile, err := os.ReadFile(armoredKeyPath)
+	armoredKeyFile, err := os.ReadFile(ctx.Viper.GetString(GPGPathConfiguration))
 	if err != nil {
 		return nil, fmt.Errorf("reading armored key: %w", err)
 	}

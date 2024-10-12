@@ -19,9 +19,12 @@ const (
 	defaultConfigFile = ".semver"
 	configFileFormat  = "yaml"
 
-	MonorepoConfiguration = "monorepo"
-	RulesConfiguration    = "rules"
-	BranchesConfiguration = "branches"
+	MonorepoConfiguration      = "monorepo"
+	RulesConfiguration         = "rules"
+	BranchesConfiguration      = "branches"
+	DryRunConfiguration        = "dry-run"
+	BuildMetadataConfiguration = "build-metadata"
+	GPGPathConfiguration       = "gpg-key-path"
 )
 
 // TODO: move into AppContext ?
@@ -75,7 +78,7 @@ func NewRootCommand(ctx *AppContext) *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&tagPrefix, "tag-prefix", "v", "Prefix added to the version tag name")
 	rootCmd.PersistentFlags().StringVar(&accessToken, "access-token", "", "Access token used to push tag to Git remote")
 	rootCmd.PersistentFlags().StringVar(&remoteName, "remote-name", "origin", "Name of the Git repository remote")
-	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
+	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced tags")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
 	rootCmd.PersistentFlags().Var(&branches, BranchesConfiguration, "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
