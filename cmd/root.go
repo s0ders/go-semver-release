@@ -85,8 +85,6 @@ func NewRootCommand(ctx *AppContext) *cobra.Command {
 	rootCmd.PersistentFlags().Var(&monorepository, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
 	rootCmd.PersistentFlags().Var(&rules, RulesConfiguration, "An hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 
-	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
-
 	releaseCmd := NewReleaseCmd(ctx)
 	versionCmd := NewVersionCmd()
 

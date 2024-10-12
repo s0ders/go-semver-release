@@ -49,3 +49,8 @@ docker-build:
 
 action-lint:
 	@actionlint
+
+install-tooling:
+    go install github.com/rhysd/actionlint/cmd/actionlint@latest
+    go install golang.org/x/vuln/cmd/govulncheck@latest
+    go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
