@@ -7,12 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	assertion "github.com/stretchr/testify/assert"
 
 	"github.com/s0ders/go-semver-release/v5/internal/branch"
@@ -30,11 +29,12 @@ type cmdOutput struct {
 	NewRelease bool   `json:"new-release"`
 }
 
-// TODO: fix flaky tests, order matters since viper does not support an "unset"/"reset" function
+// TODO: test passing branches/rules/monorepo as flags
 func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 	assert := assertion.New(t)
 
-	rules, err := configureRules()
+	ctx := NewAppContext()
+	rules, err := configureRules(ctx)
 	checkErr(t, err, "configuring rules")
 
 	assert.Equal(rule.Default, rules)
@@ -43,17 +43,49 @@ func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
 	assert := assertion.New(t)
 
-	_, err := configureBranches()
+	ctx := NewAppContext()
+	_, err := configureBranches(ctx)
 	assert.ErrorContains(err, "missing branches key in configuration")
 }
 
 func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
 	assert := assertion.New(t)
 
-	projects, err := configureProjects()
+	ctx := NewAppContext()
+	projects, err := configureProjects(ctx)
 	checkErr(t, err, "configuring projects")
 
 	assert.Nil(projects, "no monorepo configuration, should have gotten nil")
+}
+
+func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
+	assert := assertion.New(t)
+	ctx := NewAppContext()
+
+	configSetRules(ctx, map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
+
+	_, err := configureRules(ctx)
+	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
+}
+
+func TestReleaseCmd_InvalidBranch(t *testing.T) {
+	assert := assertion.New(t)
+	ctx := NewAppContext()
+
+	configSetBranches(ctx, []map[string]any{{}})
+
+	_, err := configureBranches(ctx)
+	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
+}
+
+func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
+	assert := assertion.New(t)
+	ctx := NewAppContext()
+
+	configSetMonorepo(ctx, []map[string]string{{"path": "./foo/"}})
+
+	_, err := configureProjects(ctx)
+	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
 }
 
 func TestReleaseCmd_SemVerConfigFile(t *testing.T) {
@@ -139,6 +171,9 @@ rules:
 		checkErr(t, err, "creating sample commit")
 	}
 
+	ctx := NewAppContext()
+	rootCmd := NewRootCommand(ctx)
+
 	// Executing command
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
@@ -146,9 +181,6 @@ rules:
 	checkErr(t, err, "setting root command config flag")
 
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting local command flags")
 
 	err = rootCmd.Execute()
 	checkErr(t, err, "executing command")
@@ -215,7 +247,9 @@ rules:
 func TestReleaseCmd_LocalRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]any{{"name": "master"}})
+	ctx := NewAppContext()
+
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -235,7 +269,7 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, commits)
+	repository, path := setup(t, ctx, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -266,7 +300,9 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]any{{"name": "master"}})
+	ctx := NewAppContext()
+
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -299,12 +335,7 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 		checkErr(t, err, "creating sample commit")
 	}
 
-	err = resetPersistentFlags(rootCmd)
-	checkErr(t, err, "resetting root command flags")
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting release command flags")
-
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 
@@ -346,7 +377,8 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]any{
+	ctx := NewAppContext()
+	configSetBranches(ctx, []map[string]any{
 		{"name": "master"},
 		{"name": "rc", "prerelease": true},
 	})
@@ -361,12 +393,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 		checkErr(t, err, "removing repository")
 	}()
 
-	err = resetPersistentFlags(rootCmd)
-	checkErr(t, err, "resetting root command flags")
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting release command flags")
-
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
@@ -466,11 +493,12 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 
 func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	assert := assertion.New(t)
-
-	configSetBranches([]map[string]any{{"name": "master"}})
+	ctx := NewAppContext()
+	buf := new(bytes.Buffer)
 
 	metadata := "foobarbaz"
-	buf := new(bytes.Buffer)
+	configSetBuildMetadata(ctx, metadata)
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -479,11 +507,7 @@ func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 		"fix",   // 1.1.1
 	}
 
-	flags := map[string]string{
-		"build-metadata": metadata,
-	}
-
-	repository, path := setup(t, buf, commits, WithReleaseFlags(flags))
+	repository, path := setup(t, ctx, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -514,7 +538,8 @@ func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]any{{"name": "master", "prerelease": true}})
+	ctx := NewAppContext()
+	configSetBranches(ctx, []map[string]any{{"name": "master", "prerelease": true}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -525,7 +550,7 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, commits)
+	repository, path := setup(t, ctx, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -555,21 +580,18 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 
 func TestReleaseCmd_DryRunRelease(t *testing.T) {
 	assert := assertion.New(t)
+	ctx := NewAppContext()
+	actual := new(bytes.Buffer)
 
-	configSetBranches([]map[string]any{{"name": "master"}})
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	configSetDryRun(ctx, true)
 
 	commits := []string{
 		"fix",   // 0.0.1
 		"feat!", // 1.0.0 (breaking change)
 	}
 
-	releaseFlags := map[string]string{
-		"dry-run": "true",
-	}
-
-	actual := new(bytes.Buffer)
-
-	repository, path := setup(t, actual, commits, WithReleaseFlags(releaseFlags))
+	repository, path := setup(t, ctx, actual, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -599,12 +621,12 @@ func TestReleaseCmd_DryRunRelease(t *testing.T) {
 
 func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 	assert := assertion.New(t)
-
-	configSetBranches([]map[string]any{{"name": "master"}})
-
+	ctx := NewAppContext()
 	actual := new(bytes.Buffer)
 
-	_, path := setup(t, actual, []string{})
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+
+	_, path := setup(t, ctx, actual, []string{})
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -627,8 +649,10 @@ func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 
 func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert := assertion.New(t)
+	ctx := NewAppContext()
+	actual := new(bytes.Buffer)
 
-	configSetBranches([]map[string]any{{"name": "master"}})
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
 	checkErr(t, err, "creating output directory")
@@ -668,13 +692,10 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 		assert.NoError(err, "removing sample repository")
 	}()
 
-	actual := new(bytes.Buffer)
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
-
-	err = resetFlags(releaseCmd)
-	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
 	// TODO: ErrorIs or somthing
@@ -683,36 +704,38 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 
 func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
 	assert := assertion.New(t)
-
 	actual := new(bytes.Buffer)
+	ctx := NewAppContext()
+
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
 	rootCmd.SetArgs([]string{"release", "./does/not/exist"})
 
-	err := resetFlags(releaseCmd)
-	assert.NoError(err, "failed to reset releaseCmd flags")
-
-	err = rootCmd.Execute()
+	err := rootCmd.Execute()
+	// TODO: use ErrorIs
 	assert.Error(err, "should have failed trying to open inexisting Git repository")
 }
 
 func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 	assert := assertion.New(t)
-
 	actual := new(bytes.Buffer)
+	ctx := NewAppContext()
+
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
 	rootCmd.SetArgs([]string{"release", ".", "--gpg-key-path", "./fake.asc"})
 
-	err := resetFlags(releaseCmd)
-	assert.NoError(err, "failed to reset releaseCmd flags")
-
-	err = rootCmd.Execute()
+	err := rootCmd.Execute()
+	// TODO: use ErrorIs
 	assert.Error(err, "should have failed trying to open inexisting armored GPG key")
 }
 
 func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 	assert := assertion.New(t)
+	actual := new(bytes.Buffer)
+	ctx := NewAppContext()
 
 	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
 	if err != nil {
@@ -740,13 +763,10 @@ func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 		}
 	}()
 
-	actual := new(bytes.Buffer)
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
 	rootCmd.SetArgs([]string{"release", ".", "--gpg-key-path", keyFilePath})
-
-	err = resetFlags(releaseCmd)
-	assert.NoError(err, "failed to reset releaseCmd flags")
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to read armored key ring from empty file")
@@ -754,8 +774,10 @@ func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 
 func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 	assert := assertion.New(t)
+	ctx := NewAppContext()
+	actual := new(bytes.Buffer)
 
-	configSetBranches([]map[string]any{{"name": "master"}})
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
 
 	tempDirPath, err := os.MkdirTemp("", "tag-*")
 	if err != nil {
@@ -774,41 +796,21 @@ func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 		t.Fatalf("initializing repository: %v", err)
 	}
 
-	actual := new(bytes.Buffer)
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
 	rootCmd.SetArgs([]string{"release", tempDirPath})
-
-	err = resetFlags(releaseCmd)
-	assert.NoError(err, "resetting command flags")
 
 	err = rootCmd.Execute()
 	assert.Error(err, "should have failed trying to compute new semver of repository with no HEAD")
 }
 
-func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
-	assert := assertion.New(t)
-
-	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"feat", "fix"}})
-
-	_, err := configureRules()
-	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
-}
-
-func TestReleaseCmd_InvalidBranch(t *testing.T) {
-	assert := assertion.New(t)
-
-	configSetBranches([]map[string]any{{}})
-
-	_, err := configureBranches()
-	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
-}
-
 func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert := assertion.New(t)
+	ctx := NewAppContext()
 
-	configSetBranches([]map[string]any{{"name": "master"}})
-	configSetRules(map[string][]string{"minor": {"feat", "fix"}})
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	configSetRules(ctx, map[string][]string{"minor": {"feat", "fix"}})
 
 	commits := []string{
 		"fix",  // 0.1.0 (with custom rule)
@@ -817,7 +819,7 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	repository, path := setup(t, buf, commits)
+	repository, path := setup(t, ctx, buf, commits)
 
 	defer func() {
 		err := os.RemoveAll(path)
@@ -847,23 +849,14 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert.Equal(true, exists, "tag should exist")
 }
 
-func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
-	assert := assertion.New(t)
-
-	configSetMonorepo([]map[string]string{{"path": "./foo/"}})
-
-	_, err := configureProjects()
-	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
-}
-
 func TestReleaseCmd_Monorepo(t *testing.T) {
 	assert := assertion.New(t)
-
-	configSetBranches([]map[string]any{{"name": "master"}})
-	configSetMonorepo([]map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
-	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
-
+	ctx := NewAppContext()
 	buf := new(bytes.Buffer)
+
+	configSetBranches(ctx, []map[string]any{{"name": "master"}})
+	configSetMonorepo(ctx, []map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
+	configSetRules(ctx, map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
 
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
@@ -873,12 +866,7 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 		checkErr(t, err, "removing repository")
 	}()
 
-	err = resetPersistentFlags(rootCmd)
-	checkErr(t, err, "resetting root command flags")
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting release command flags")
-
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
@@ -937,17 +925,8 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 }
 
 // Setup structs and functions
-type CommandFlagOptions func()
 
-func WithReleaseFlags(flags map[string]string) CommandFlagOptions {
-	return func() {
-		for k, v := range flags {
-			_ = releaseCmd.Flags().Set(k, v)
-		}
-	}
-}
-
-func setup(t *testing.T, buf io.Writer, commits []string, commandFlagOptions ...CommandFlagOptions) (*git.Repository, string) {
+func setup(t *testing.T, ctx *AppContext, buf io.Writer, commits []string) (*git.Repository, string) {
 	t.Helper()
 
 	testRepository, err := gittest.NewRepository()
@@ -960,16 +939,7 @@ func setup(t *testing.T, buf io.Writer, commits []string, commandFlagOptions ...
 		}
 	}
 
-	err = resetPersistentFlags(rootCmd)
-	checkErr(t, err, "resetting root command flags")
-
-	err = resetFlags(releaseCmd)
-	checkErr(t, err, "resetting release command flags")
-
-	for _, option := range commandFlagOptions {
-		option()
-	}
-
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 	rootCmd.SetArgs([]string{"release", testRepository.Path})
@@ -980,43 +950,30 @@ func setup(t *testing.T, buf io.Writer, commits []string, commandFlagOptions ...
 	return testRepository.Repository, testRepository.Path
 }
 
-func resetFlags(cmd *cobra.Command) (err error) {
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		err = f.Value.Set(f.DefValue)
-		if err != nil {
-			return
-		}
-	})
-
-	return err
+func configSetBranches(ctx *AppContext, branches []map[string]any) {
+	ctx.Viper.Set(BranchesConfiguration, branches)
 }
 
-func resetPersistentFlags(cmd *cobra.Command) (err error) {
-	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		err = f.Value.Set(f.DefValue)
-		if err != nil {
-			return
-		}
-	})
+func configSetRules(ctx *AppContext, rules map[string][]string) {
+	ctx.Viper.Set(RulesConfiguration, rules)
+}
 
-	return err
+func configSetMonorepo(ctx *AppContext, monorepository []map[string]string) {
+	ctx.Viper.Set(MonorepoConfiguration, monorepository)
+}
+
+func configSetBuildMetadata(ctx *AppContext, str string) {
+	ctx.Viper.Set("build-metadata", str)
+}
+
+func configSetDryRun(ctx *AppContext, b bool) {
+	ctx.Viper.Set("dry-run", strconv.FormatBool(b))
 }
 
 func checkErr(t *testing.T, err error, message string) {
 	t.Helper()
+
 	if err != nil {
 		t.Fatalf("%s: %s", message, err)
 	}
-}
-
-func configSetBranches(branches []map[string]any) {
-	viperInstance.Set(BranchesConfiguration, branches)
-}
-
-func configSetRules(rules map[string][]string) {
-	viperInstance.Set(RulesConfiguration, rules)
-}
-
-func configSetMonorepo(monorepository []map[string]string) {
-	viperInstance.Set(MonorepoConfiguration, monorepository)
 }

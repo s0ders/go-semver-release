@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -23,6 +24,7 @@ const (
 	BranchesConfiguration = "branches"
 )
 
+// TODO: move into AppContext ?
 var (
 	cfgFile        string
 	gitName        string
@@ -38,9 +40,35 @@ var (
 	rules          rule.Flag
 )
 
-var viperInstance = viper.New()
+type AppContext struct {
+	Viper  *viper.Viper
+	Logger zerolog.Logger
+}
 
-func init() {
+func NewAppContext() *AppContext {
+	return &AppContext{
+		Viper: viper.New(),
+	}
+}
+
+func NewRootCommand(ctx *AppContext) *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   "go-semver-release",
+		Short: "go-semver-release - CLI to automate semantic versioning of Git repositories",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			ctx.Logger = zerolog.New(cmd.OutOrStdout())
+
+			if verbose {
+				ctx.Logger = ctx.Logger.Level(zerolog.DebugLevel)
+			} else {
+				ctx.Logger = ctx.Logger.Level(zerolog.InfoLevel)
+			}
+
+			return initializeConfig(cmd, ctx)
+		},
+	}
+
+	// TODO: some flags should be at releaseCmd level
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Configuration file path (default is ./"+defaultConfigFile+""+configFileFormat+")")
 	rootCmd.PersistentFlags().StringVar(&gitName, "git-name", "Go Semver Release", "Name used in semantic version tags")
 	rootCmd.PersistentFlags().StringVar(&gitEmail, "git-email", "go-semver@release.ci", "Email used in semantic version tags")
@@ -55,30 +83,28 @@ func init() {
 	rootCmd.PersistentFlags().Var(&rules, RulesConfiguration, "An hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 
 	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
+
+	releaseCmd := NewReleaseCmd(ctx)
+	versionCmd := NewVersionCmd()
+
+	rootCmd.AddCommand(releaseCmd)
+	rootCmd.AddCommand(versionCmd)
+
+	return rootCmd
 }
 
-var rootCmd = &cobra.Command{
-	Use:   "go-semver-release",
-	Short: "go-semver-release - CLI to automate semantic versioning of Git repositories",
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		return initializeConfig(cmd)
-	},
-}
-
-func Execute() error {
-	return rootCmd.Execute()
-}
-
-func initializeConfig(cmd *cobra.Command) error {
+func initializeConfig(cmd *cobra.Command, ctx *AppContext) error {
 	if cfgFile != "" {
-		viperInstance.SetConfigFile(cfgFile)
+		ctx.Viper.SetConfigFile(cfgFile)
 	} else {
-		viperInstance.AddConfigPath(".")
-		viperInstance.SetConfigType(configFileFormat)
-		viperInstance.SetConfigName(defaultConfigFile)
+		ctx.Viper.AddConfigPath(".")
+		ctx.Viper.SetConfigType(configFileFormat)
+		ctx.Viper.SetConfigName(defaultConfigFile)
 	}
 
-	if err := viperInstance.ReadInConfig(); err != nil {
+	ctx.Logger.Debug().Str("path", cfgFile).Msg("using the following configuration file")
+
+	if err := ctx.Viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 
 		if !errors.As(err, &configFileNotFoundError) {
@@ -86,7 +112,7 @@ func initializeConfig(cmd *cobra.Command) error {
 		}
 	}
 
-	if err := bindFlags(cmd, viperInstance); err != nil {
+	if err := bindFlags(cmd, ctx.Viper); err != nil {
 		return err
 	}
 

@@ -7,7 +7,10 @@ import (
 )
 
 func main() {
-	err := cmd.Execute()
+	ctx := cmd.NewAppContext()
+	rootCmd := cmd.NewRootCommand(ctx)
+
+	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}

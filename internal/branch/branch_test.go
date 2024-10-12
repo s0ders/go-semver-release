@@ -9,7 +9,7 @@ import (
 func TestBranch_Unmarshall(t *testing.T) {
 	assert := assertion.New(t)
 
-	have := []map[string]string{{"name": "main"}, {"name": "alpha", "prerelease": "true"}}
+	have := []map[string]any{{"name": "main"}, {"name": "alpha", "prerelease": true}}
 	want := []Branch{
 		{Name: "main"},
 		{Name: "alpha", Prerelease: true},
@@ -27,14 +27,14 @@ func TestBranch_UnmarshallErrors(t *testing.T) {
 	assert := assertion.New(t)
 
 	type test struct {
-		have []map[string]string
+		have []map[string]any
 		want error
 	}
 
 	tests := []test{
-		{have: []map[string]string{}, want: ErrNoBranch},
-		{have: []map[string]string{{"prerelease": "true"}}, want: ErrNoName},
-		{have: []map[string]string{{"name": "alpha", "prerelease": "true"}}, want: nil},
+		{have: []map[string]any{}, want: ErrNoBranch},
+		{have: []map[string]any{{"prerelease": true}}, want: ErrNoName},
+		{have: []map[string]any{{"name": "alpha", "prerelease": true}}, want: nil},
 	}
 
 	for _, tc := range tests {
