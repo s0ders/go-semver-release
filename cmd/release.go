@@ -152,7 +152,7 @@ var releaseCmd = &cobra.Command{
 }
 
 func configureRules() (rule.Rules, error) {
-	if !viperInstance.IsSet(RulesFlag) {
+	if !viperInstance.IsSet(RulesConfiguration) {
 		return rule.Default, nil
 	}
 
@@ -161,9 +161,9 @@ func configureRules() (rule.Rules, error) {
 		unmarshalledRules rule.Rules
 	)
 
-	err := viperInstance.UnmarshalKey(RulesFlag, &rulesMarshalled)
+	err := viperInstance.UnmarshalKey(RulesConfiguration, &rulesMarshalled)
 	if err != nil {
-		return unmarshalledRules, fmt.Errorf("unmarshalling %s key: %w", RulesFlag, err)
+		return unmarshalledRules, fmt.Errorf("unmarshalling %s key: %w", RulesConfiguration, err)
 	}
 
 	unmarshalledRules, err = rule.Unmarshall(rulesMarshalled)
@@ -175,18 +175,18 @@ func configureRules() (rule.Rules, error) {
 }
 
 func configureBranches() ([]branch.Branch, error) {
-	if !viperInstance.IsSet(BranchesFlag) {
-		return nil, fmt.Errorf("missing %s key in configuration", BranchesFlag)
+	if !viperInstance.IsSet(BranchesConfiguration) {
+		return nil, fmt.Errorf("missing %s key in configuration", BranchesConfiguration)
 	}
 
 	var (
-		branchesMarshalled   []map[string]string
+		branchesMarshalled   []map[string]any
 		unmarshalledBranches []branch.Branch
 	)
 
-	err := viperInstance.UnmarshalKey(BranchesFlag, &branchesMarshalled)
+	err := viperInstance.UnmarshalKey(BranchesConfiguration, &branchesMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling %s key: %w", BranchesFlag, err)
+		return nil, fmt.Errorf("unmarshalling %s key: %w", BranchesConfiguration, err)
 	}
 
 	unmarshalledBranches, err = branch.Unmarshall(branchesMarshalled)
@@ -198,7 +198,7 @@ func configureBranches() ([]branch.Branch, error) {
 }
 
 func configureProjects() ([]monorepo.Project, error) {
-	if !viperInstance.IsSet(MonorepoFlag) {
+	if !viperInstance.IsSet(MonorepoConfiguration) {
 		return nil, nil
 	}
 
@@ -207,9 +207,9 @@ func configureProjects() ([]monorepo.Project, error) {
 		projects           []monorepo.Project
 	)
 
-	err := viperInstance.UnmarshalKey(MonorepoFlag, &projectsMarshalled)
+	err := viperInstance.UnmarshalKey(MonorepoConfiguration, &projectsMarshalled)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling %s key: %w", MonorepoFlag, err)
+		return nil, fmt.Errorf("unmarshalling %s key: %w", MonorepoConfiguration, err)
 	}
 
 	projects, err = monorepo.Unmarshall(projectsMarshalled)

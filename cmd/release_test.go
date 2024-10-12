@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/s0ders/go-semver-release/v5/internal/branch"
-	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +15,9 @@ import (
 	"github.com/spf13/pflag"
 	assertion "github.com/stretchr/testify/assert"
 
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
 	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v5/internal/rule"
 	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
@@ -31,7 +31,6 @@ type cmdOutput struct {
 }
 
 // TODO: fix flaky tests, order matters since viper does not support an "unset"/"reset" function
-// TODO: add a test with GPG key happy scenario
 func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -216,7 +215,7 @@ rules:
 func TestReleaseCmd_LocalRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -267,7 +266,7 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",      // 0.0.1
@@ -347,9 +346,9 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{
+	configSetBranches([]map[string]any{
 		{"name": "master"},
-		{"name": "rc", "prerelease": "true"},
+		{"name": "rc", "prerelease": true},
 	})
 
 	buf := new(bytes.Buffer)
@@ -468,7 +467,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	metadata := "foobarbaz"
 	buf := new(bytes.Buffer)
@@ -515,7 +514,7 @@ func TestReleaseCmd_ReleaseWithBuildMetadata(t *testing.T) {
 func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master", "prerelease": "true"}})
+	configSetBranches([]map[string]any{{"name": "master", "prerelease": true}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -557,7 +556,7 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 func TestReleaseCmd_DryRunRelease(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	commits := []string{
 		"fix",   // 0.0.1
@@ -601,7 +600,7 @@ func TestReleaseCmd_DryRunRelease(t *testing.T) {
 func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	actual := new(bytes.Buffer)
 
@@ -629,7 +628,7 @@ func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	outputDir, err := os.MkdirTemp("./", "output-*")
 	checkErr(t, err, "creating output directory")
@@ -756,7 +755,7 @@ func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 
 	tempDirPath, err := os.MkdirTemp("", "tag-*")
 	if err != nil {
@@ -799,25 +798,16 @@ func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 func TestReleaseCmd_InvalidBranch(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{}})
+	configSetBranches([]map[string]any{{}})
 
 	_, err := configureBranches()
 	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
 }
 
-func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
-	assert := assertion.New(t)
-
-	configSetMonorepo([]map[string]string{{"path": "./foo/"}})
-
-	_, err := configureProjects()
-	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
-}
-
 func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 	configSetRules(map[string][]string{"minor": {"feat", "fix"}})
 
 	commits := []string{
@@ -857,10 +847,19 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert.Equal(true, exists, "tag should exist")
 }
 
+func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
+	assert := assertion.New(t)
+
+	configSetMonorepo([]map[string]string{{"path": "./foo/"}})
+
+	_, err := configureProjects()
+	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
+}
+
 func TestReleaseCmd_Monorepo(t *testing.T) {
 	assert := assertion.New(t)
 
-	configSetBranches([]map[string]string{{"name": "master"}})
+	configSetBranches([]map[string]any{{"name": "master"}})
 	configSetMonorepo([]map[string]string{{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}})
 	configSetRules(map[string][]string{"minor": {"feat"}, "patch": {"fix"}})
 
@@ -1010,38 +1009,14 @@ func checkErr(t *testing.T, err error, message string) {
 	}
 }
 
-func configSetBranches(branches []map[string]string) {
-	b, err := json.Marshal(branches)
-	if err != nil {
-		panic(err)
-	}
-
-	err = rootCmd.PersistentFlags().Set(BranchesFlag, string(b))
-	if err != nil {
-		panic(err)
-	}
+func configSetBranches(branches []map[string]any) {
+	viperInstance.Set(BranchesConfiguration, branches)
 }
 
 func configSetRules(rules map[string][]string) {
-	b, err := json.Marshal(rules)
-	if err != nil {
-		panic(err)
-	}
-
-	err = rootCmd.PersistentFlags().Set(RulesFlag, string(b))
-	if err != nil {
-		panic(err)
-	}
+	viperInstance.Set(RulesConfiguration, rules)
 }
 
 func configSetMonorepo(monorepository []map[string]string) {
-	b, err := json.Marshal(monorepository)
-	if err != nil {
-		panic(err)
-	}
-
-	err = rootCmd.PersistentFlags().Set(MonorepoFlag, string(b))
-	if err != nil {
-		panic(err)
-	}
+	viperInstance.Set(MonorepoConfiguration, monorepository)
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-type Flag []map[string]string
+type Flag []map[string]any
 
 func (f *Flag) String() string {
 	if f == nil {
@@ -23,7 +23,7 @@ func (f *Flag) String() string {
 }
 
 func (f *Flag) Set(value string) error {
-	var temp []map[string]string
+	var temp []map[string]any
 
 	if err := json.Unmarshal([]byte(value), &temp); err != nil {
 		return fmt.Errorf("unmarshalling branch flag value: %w", err)

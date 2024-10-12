@@ -4,7 +4,6 @@ package branch
 import (
 	"errors"
 	"fmt"
-	"strconv"
 )
 
 var (
@@ -18,7 +17,7 @@ type Branch struct {
 }
 
 // Unmarshall takes a raw Viper configuration and returns a slice of Branch representing a branch configuration.
-func Unmarshall(input []map[string]string) ([]Branch, error) {
+func Unmarshall(input []map[string]any) ([]Branch, error) {
 	if len(input) == 0 {
 		return nil, ErrNoBranch
 	}
@@ -27,21 +26,26 @@ func Unmarshall(input []map[string]string) ([]Branch, error) {
 
 	for i, b := range input {
 
-		pattern, ok := b["name"]
+		name, ok := b["name"]
 		if !ok {
 			return nil, ErrNoName
 		}
 
-		branch := Branch{Name: pattern}
+		stringName, ok := name.(string)
+		if !ok {
+			return nil, fmt.Errorf("could not assert that the \"name\" property of the branch configuration is a string")
+		}
+
+		branch := Branch{Name: stringName}
 
 		prerelease, ok := b["prerelease"]
 		if ok {
-			prereleaseBool, err := strconv.ParseBool(prerelease)
-			if err != nil {
-				return nil, fmt.Errorf("parsing prerelease key to bool: %w", err)
+			boolPrerelease, ok := prerelease.(bool)
+			if !ok {
+				return nil, fmt.Errorf("could not assert that the \"prerelease\" property of the branch configuration is a bool")
 			}
 
-			branch.Prerelease = prereleaseBool
+			branch.Prerelease = boolPrerelease
 		}
 
 		branches[i] = branch

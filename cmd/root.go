@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -17,9 +18,9 @@ const (
 	defaultConfigFile = ".semver"
 	configFileFormat  = "yaml"
 
-	MonorepoFlag = "monorepo"
-	RulesFlag    = "rules"
-	BranchesFlag = "branches"
+	MonorepoConfiguration = "monorepo"
+	RulesConfiguration    = "rules"
+	BranchesConfiguration = "branches"
 )
 
 var (
@@ -49,9 +50,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&armoredKeyPath, "gpg-key-path", "", "Path to an armored GPG key used to sign produced tags")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().BoolVar(&remoteMode, "remote", false, "Version a remote repository, a token is required")
-	rootCmd.PersistentFlags().Var(&branches, BranchesFlag, "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
-	rootCmd.PersistentFlags().Var(&monorepository, MonorepoFlag, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
-	rootCmd.PersistentFlags().Var(&rules, RulesFlag, "An hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
+	rootCmd.PersistentFlags().Var(&branches, BranchesConfiguration, "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
+	rootCmd.PersistentFlags().Var(&monorepository, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
+	rootCmd.PersistentFlags().Var(&rules, RulesConfiguration, "An hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 
 	rootCmd.MarkFlagsRequiredTogether("remote", "remote-name", "access-token")
 }
@@ -96,13 +97,25 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
 	var err error
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if err != nil {
+			return
+		}
+
 		configName := f.Name
 
 		if !f.Changed && v.IsSet(configName) {
 			val := v.Get(configName)
-			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
-			if err != nil {
-				return
+
+			switch flagType := f.Value.(type) {
+			case *branch.Flag, *rule.Flag, *monorepo.Flag:
+				jsonStr, jsonErr := json.Marshal(val)
+				if jsonErr != nil {
+					err = fmt.Errorf("marshaling %q value: %w", configName, jsonErr)
+				}
+
+				err = flagType.Set(string(jsonStr))
+			default:
+				err = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
 			}
 		}
 	})
