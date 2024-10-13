@@ -9,8 +9,10 @@ import (
 
 type Flag []map[string]string
 
+const FlagType = "monorepoFlag"
+
 func (f *Flag) String() string {
-	if f == nil {
+	if f == nil || len(*f) == 0 {
 		return "[]"
 	}
 
@@ -33,18 +35,7 @@ func (f *Flag) Set(value string) error {
 }
 
 func (f *Flag) Type() string {
-	return "monorepoFlag"
-}
-
-func (f *Flag) Projects() ([]Project, error) {
-	m := []map[string]string(*f)
-
-	projects, err := Unmarshall(m)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling projects: %w", err)
-	}
-
-	return projects, nil
+	return FlagType
 }
 
 var _ pflag.Value = (*Flag)(nil)

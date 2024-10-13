@@ -9,8 +9,10 @@ import (
 
 type Flag []map[string]any
 
+const FlagType = "branchesFlag"
+
 func (f *Flag) String() string {
-	if f == nil {
+	if f == nil || len(*f) == 0 {
 		return "[]"
 	}
 
@@ -34,7 +36,7 @@ func (f *Flag) Set(value string) error {
 }
 
 func (f *Flag) Type() string {
-	return "branchesFlag"
+	return FlagType
 }
 
 var _ pflag.Value = (*Flag)(nil)

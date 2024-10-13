@@ -9,8 +9,10 @@ import (
 
 type Flag map[string][]string
 
+const FlagType = "ruleFlag"
+
 func (f *Flag) String() string {
-	if f == nil {
+	if f == nil || len(*f) == 0 {
 		return "{}"
 	}
 
@@ -33,18 +35,7 @@ func (f *Flag) Set(value string) error {
 }
 
 func (f *Flag) Type() string {
-	return "ruleFlag"
-}
-
-func (f *Flag) Rules() (Rules, error) {
-	m := map[string][]string(*f)
-
-	rules, err := Unmarshall(m)
-	if err != nil {
-		return Rules{}, fmt.Errorf("unmarshalling rules: %w", err)
-	}
-
-	return rules, nil
+	return FlagType
 }
 
 var _ pflag.Value = (*Flag)(nil)
