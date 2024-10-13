@@ -33,7 +33,7 @@ This project was built to create a lightweight and simple tool to automate the s
 
 Following the UNIX philosophy of "make each program do one thing well", it only handles publishing SemVer tags to your Git repository, no package publishing or any other features.
 
-All you need to have is an initialized Git repository, a release branch (e.g., `main`) and a formatted commit history on that branch following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification. Many IDEs support plugins that help formatting messages (e.g., [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit)).
+All you need to have is an initialized Git repository, a release branch (e.g. `main`) and a formatted commit history on that branch following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification. Many IDEs support plugins that help formatting messages (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit)).
 
 > [!NOTE]
 > This program can only read annotated Git tags. If at some point you need to manually add a SemVer tag to your repository, make sure it is annotated, otherwise the program will not be able to detect it.
@@ -42,7 +42,7 @@ All you need to have is an initialized Git repository, a release branch (e.g., `
 
 Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). Go Semver Release focuses on versioning only, no package publishing, release log generation or other features.
 
-If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work with minimal dependencies, limit surface of attack and work faster.
+If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work with minimal dependencies and work faster.
 
 ## Documentation
 
