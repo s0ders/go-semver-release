@@ -11,8 +11,8 @@ main: ./main.go
 binary: go-semver-release-{{ .Os }}-{{ .Arch }}
 
 ldflags:
-  - "-X github.com/s0ders/go-semver-release/v5/cmd.version={{ .Env.VERSION }}"
+  - "-X github.com/s0ders/go-semver-release/v5/cmd.cmdVersion={{ .Env.VERSION }}"
   - "-X github.com/s0ders/go-semver-release/v5/cmd.buildNumber={{ .Env.BUILD_NUMBER }}"
-  - "-X github.com/s0ders/go-semver-release/v5/cmd.commitHash={{ .Env.COMMIT_HASH }}"
+  - "-X github.com/s0ders/go-semver-release/v5/cmd.buildCommitHash={{ .Env.COMMIT_HASH }}"
   - "-w"
   - "-s"

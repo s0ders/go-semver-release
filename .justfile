@@ -9,7 +9,7 @@ buildNumber := "local"
 commitHash := "local"
 
 importPath := "github.com/s0ders/go-semver-release/v5/"
-ldFlags := "-X " + importPath + "cmd.version=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.commitHash=" + commitHash + " -w -s"
+ldFlags := "-X " + importPath + "cmd.cmdVersion=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.buildCommitHash=" + commitHash + " -w -s"
 
 tests:
 	go test -shuffle=on -tags testing -failfast -race -v -covermode=atomic ./...

@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	version     string
-	buildNumber string
-	commitHash  string
+	cmdVersion      string
+	buildNumber     string
+	buildCommitHash string
 )
 
 func NewVersionCmd() *cobra.Command {
@@ -19,7 +19,7 @@ func NewVersionCmd() *cobra.Command {
 		Long:  "Display CLI current version and the associated build number and commit hash",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			fmt.Fprintf(cmd.OutOrStdout(), "Version: %s\nBuild: %s\nCommit: %s\n", version, buildNumber, commitHash)
+			fmt.Fprintf(cmd.OutOrStdout(), "Version: %s\nBuild: %s\nCommit: %s\n", cmdVersion, buildNumber, buildCommitHash)
 
 			return nil
 		},
