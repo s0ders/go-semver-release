@@ -1,35 +1,17 @@
-## Go Semver Release
+# Go Semver Release
 
 <p align="center">
   <img src=".gitbook/assets/gop.png" alt="Go Semver Release Logo" width="230">
-    <br><br>
-  <a href="https://github.com/avelino/awesome-go">
-    <img alt="Mentioned in Awesome Go" src="https://awesome.re/mentioned-badge.svg">
-  </a>
-  <a href="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff">
-    <img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff">
-  </a>
-  <a href="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release">
-    <img alt="GitHub go.mod Go version" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release">
-  </a>
-  <a href="https://pkg.go.dev/github.com/s0ders/go-semver-release/v5">
-    <img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg">
-  </a>
-  <a href="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI">
-    <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI">
-  </a>
-  <a href="https://goreportcard.com/report/github.com/s0ders/go-semver-release/v5">
-    <img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v5">
-  </a>
-  <a href="https://app.codecov.io/github/s0ders/go-semver-release">
-    <img alt="Codecov" src="https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage">
-  </a>
-  <a href="https://github.com/s0ders/go-semver-release/blob/main/LICENSE.md">
-    <img alt="GitHub License" src="https://img.shields.io/github/license/s0ders/go-semver-release?label=License">
-  </a>
-    <a href="https://www.bestpractices.dev/projects/8877">
-        <img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/8877/badge">
-    </a>
+  <br><br>
+  <a href="https://github.com/avelino/awesome-go"><img alt="Mentioned in Awesome Go" src="https://awesome.re/mentioned-badge.svg"></a>
+  <a href="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff"><img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff"></a>
+  <a href="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"><img alt="GitHub go.mod Go version" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"></a>
+  <a href="https://pkg.go.dev/github.com/s0ders/go-semver-release/v5"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg"></a>
+  <a href="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"></a>
+  <a href="https://goreportcard.com/report/github.com/s0ders/go-semver-release/v5"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v5"></a>
+  <a href="https://app.codecov.io/github/s0ders/go-semver-release"><img alt="Codecov" src="https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage"></a>
+  <a href="https://github.com/s0ders/go-semver-release/blob/main/LICENSE.md"><img alt="GitHub License" src="https://img.shields.io/github/license/s0ders/go-semver-release?label=License"></a>
+  <a href="https://www.bestpractices.dev/projects/8877"><img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/8877/badge"></a>
 </p>
 
 Go Semver Release is a CLI program designed to automate versioning of Git repository by analyzing their [formatted commit history](https://www.conventionalcommits.org) and tagging them with the right [SemVer](https://semver.org/spec/v2.0.0.html) number.
