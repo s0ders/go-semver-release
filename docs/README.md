@@ -4,7 +4,7 @@
   <img src=".gitbook/assets/gop.png" alt="Go Semver Release Logo" width="230">
   <br><br>
   <a href="https://github.com/avelino/awesome-go"><img alt="Mentioned in Awesome Go" src="https://awesome.re/mentioned-badge.svg"></a>
-  <a href="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff"><img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff"></a>
+  <a href="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff"><img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version\&color=bb33ff"></a>
   <a href="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"><img alt="GitHub go.mod Go version" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"></a>
   <a href="https://pkg.go.dev/github.com/s0ders/go-semver-release/v5"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg"></a>
   <a href="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"></a>
