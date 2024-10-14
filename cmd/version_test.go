@@ -9,8 +9,10 @@ import (
 
 func TestCmd_Version(t *testing.T) {
 	assert := assert.New(t)
-
 	actual := new(bytes.Buffer)
+	ctx := NewAppContext()
+
+	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
 	rootCmd.SetErr(actual)
 	rootCmd.SetArgs([]string{"version"})

@@ -246,7 +246,6 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Ver
 		}
 
 		releaseType, ok := rulesMap[commitType]
-
 		if !ok {
 			continue
 		}
@@ -273,6 +272,7 @@ func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Ver
 // among all tags.
 func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project) (*object.Tag, error) {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	tags, err := repository.TagObjects()
 	if err != nil {
@@ -289,15 +289,8 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 			return nil
 		}
 
-		if project.Name != "" {
-			matchProjectTagFormat, err := regexp.MatchString(fmt.Sprintf(`^%s\-.*`, project.Name), tag.Name)
-			if err != nil {
-				return err
-			}
-
-			if !matchProjectTagFormat {
-				return nil
-			}
+		if project.Name != "" && !strings.HasPrefix(tag.Name, project.Name+"-") {
+			return nil
 		}
 
 		currentSemver, err := semver.NewFromString(tag.Name)
@@ -311,11 +304,11 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		}
 		return nil
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
-	p.mu.Unlock()
 	return latestTag, nil
 }
 
@@ -350,25 +343,16 @@ func (p *Parser) checkoutBranch(repository *git.Repository) error {
 // commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the
 // given project's path.
 func commitContainsProjectFiles(commit *object.Commit, projectPath string) (bool, error) {
-	regex, err := regexp.Compile(fmt.Sprintf("^%s", projectPath))
-	if err != nil {
-		return false, fmt.Errorf("compiling project's path regexp: %w", err)
-	}
-
 	commitTree, err := commit.Tree()
 	if err != nil {
 		return false, fmt.Errorf("getting commit tree: %w", err)
 	}
 
-	parentCommit := commit.Parents()
-	parentTree := &object.Tree{}
-	if parentCommit != nil {
-		parent, err := parentCommit.Next()
-		if err == nil {
-			parentTree, err = parent.Tree()
-			if err != nil {
-				return false, fmt.Errorf("getting parent tree: %w", err)
-			}
+	var parentTree *object.Tree
+	if parent, err := commit.Parent(0); err == nil {
+		parentTree, err = parent.Tree()
+		if err != nil {
+			return false, fmt.Errorf("getting parent tree: %w", err)
 		}
 	}
 
@@ -378,7 +362,8 @@ func commitContainsProjectFiles(commit *object.Commit, projectPath string) (bool
 	}
 
 	for _, change := range changes {
-		if regex.MatchString(filepath.Dir(change.To.Name)) {
+		dir := filepath.Dir(change.To.Name)
+		if strings.HasPrefix(dir, projectPath) {
 			return true, nil
 		}
 	}
