@@ -450,6 +450,7 @@ func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
 	expectedVersion := "1.1.1" + "+" + metadata
 	expectedTag := "v" + expectedVersion
@@ -488,6 +489,7 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	err := th.SetFlag(BranchesConfiguration, `[{"name": "master", "prerelease": true}]`)
 	checkErr(t, err, "setting flags")
 	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
 	expectedVersion := "1.1.1-master"
 	expectedTag := "v" + expectedVersion
@@ -527,6 +529,7 @@ func TestReleaseCmd_DryRunRelease(t *testing.T) {
 	})
 	checkErr(t, err, "setting flags")
 	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
 	expectedVersion := "1.0.0"
 	expectedTag := expectedVersion
