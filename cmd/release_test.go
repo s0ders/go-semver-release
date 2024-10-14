@@ -673,6 +673,7 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 		BranchesConfiguration: `[{"name": "master"}]`,
 		RulesConfiguration:    `{"minor": ["feat", "fix"]}`,
 	})
+	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
