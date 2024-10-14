@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 
 json_url="https://api.github.com/repos/s0ders/go-semver-release/releases/latest"
 asset_name="go-semver-release-linux-amd64"
