@@ -20,16 +20,11 @@ import (
 	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
-var (
-	buildMetadata string
-	dryRun        bool
-)
-
 func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 	releaseCmd := &cobra.Command{
 		Use:   "release <REPOSITORY_PATH_OR_URL>",
-		Short: "Version a local Git repository",
-		Long:  "Tag a Git repository with the new semantic version number if a new release is found",
+		Short: "Version a Git repository according the the given configuration",
+		Long:  "Tag a Git repository with the new semantic version number if a new release is found on the given release branches and projects if executed in a monorepo",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			var (
@@ -37,8 +32,8 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 				origin     *remote.Remote
 			)
 
-			if remoteMode {
-				origin = remote.New(remoteName, accessToken)
+			if ctx.RemoteModeFlag {
+				origin = remote.New(ctx.RemoteNameFlag, ctx.AccessTokenFlag)
 				repository, err = origin.Clone(args[0])
 				if err != nil {
 					return fmt.Errorf("cloning Git repository: %w", err)
@@ -70,8 +65,8 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 				return fmt.Errorf("loading projects configuration: %w", err)
 			}
 
-			tagger := tag.NewTagger(gitName, gitEmail, tag.WithTagPrefix(tagPrefix), tag.WithSignKey(entity))
-			semverParser := parser.New(ctx.Logger, tagger, rules, parser.WithBuildMetadata(buildMetadata), parser.WithProjects(projects))
+			tagger := tag.NewTagger(ctx.GitNameFlag, ctx.GitEmailFlag, tag.WithTagPrefix(ctx.TagPrefixFlag), tag.WithSignKey(entity))
+			semverParser := parser.New(ctx.Logger, tagger, rules, parser.WithBuildMetadata(ctx.BuildMetadataFlag), parser.WithProjects(projects))
 
 			for _, branch := range branches {
 				semverParser.SetBranch(branch.Name)
@@ -89,7 +84,7 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 					commitHash := output.CommitHash
 					project := output.Project.Name
 
-					err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(tagPrefix), ci.WithProject(project))
+					err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefixFlag), ci.WithProject(project))
 					if err != nil {
 						return fmt.Errorf("generating github output: %w", err)
 					}
@@ -109,7 +104,7 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 					case !release:
 						logEvent.Msg("no new release")
 						return nil
-					case release && dryRun:
+					case release && ctx.DryRunFlag:
 						logEvent.Msg("dry-run enabled, next release found")
 						return nil
 					default:
@@ -122,7 +117,7 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 
 						ctx.Logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
 
-						if remoteMode {
+						if ctx.RemoteModeFlag {
 							err = origin.PushTag(tagger.Format(semver))
 							if err != nil {
 								return fmt.Errorf("pushing tag to remote: %w", err)
@@ -136,89 +131,64 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 		},
 	}
 
-	releaseCmd.Flags().StringVar(&buildMetadata, BuildMetadataConfiguration, "", "Build metadata (e.g. build number) that will be appended to the SemVer")
-	releaseCmd.Flags().BoolVarP(&dryRun, DryRunConfiguration, "d", false, "Only compute the next SemVer, do not push any tag")
-
 	return releaseCmd
 }
 
 func configureRules(ctx *AppContext) (rule.Rules, error) {
-	if !ctx.Viper.IsSet(RulesConfiguration) {
+	flag := ctx.RulesFlag
+
+	if flag.String() == "{}" {
 		return rule.Default, nil
 	}
 
-	var (
-		rulesMarshalled   map[string][]string
-		unmarshalledRules rule.Rules
-	)
+	rulesJSON := map[string][]string(flag)
 
-	err := ctx.Viper.UnmarshalKey(RulesConfiguration, &rulesMarshalled)
+	unmarshalledRules, err := rule.Unmarshall(rulesJSON)
 	if err != nil {
-		return unmarshalledRules, fmt.Errorf("unmarshalling %s key: %w", RulesConfiguration, err)
-	}
-
-	unmarshalledRules, err = rule.Unmarshall(rulesMarshalled)
-	if err != nil {
-		return unmarshalledRules, fmt.Errorf("parsing rules: %w", err)
+		return unmarshalledRules, fmt.Errorf("parsing rules configuration: %w", err)
 	}
 
 	return unmarshalledRules, nil
 }
 
 func configureBranches(ctx *AppContext) ([]branch.Branch, error) {
-	if !ctx.Viper.IsSet(BranchesConfiguration) {
-		return nil, fmt.Errorf("missing %s key in configuration", BranchesConfiguration)
-	}
+	branchesJSON := []map[string]any(ctx.BranchesFlag)
 
-	var (
-		branchesMarshalled   []map[string]any
-		unmarshalledBranches []branch.Branch
-	)
-
-	err := ctx.Viper.UnmarshalKey(BranchesConfiguration, &branchesMarshalled)
+	unmarshalledBranches, err := branch.Unmarshall(branchesJSON)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling %s key: %w", BranchesConfiguration, err)
-	}
-
-	unmarshalledBranches, err = branch.Unmarshall(branchesMarshalled)
-	if err != nil {
-		return nil, fmt.Errorf("parsing branches: %w", err)
+		return nil, fmt.Errorf("parsing branches configuration: %w", err)
 	}
 
 	return unmarshalledBranches, nil
 }
 
 func configureProjects(ctx *AppContext) ([]monorepo.Project, error) {
-	if !ctx.Viper.IsSet(MonorepoConfiguration) {
+	flag := ctx.MonorepositoryFlag
+
+	if flag.String() == "[]" {
 		return nil, nil
 	}
 
-	var (
-		projectsMarshalled []map[string]string
-		projects           []monorepo.Project
-	)
+	monorepoJSON := []map[string]string(flag)
 
-	err := ctx.Viper.UnmarshalKey(MonorepoConfiguration, &projectsMarshalled)
+	projects, err := monorepo.Unmarshall(monorepoJSON)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling %s key: %w", MonorepoConfiguration, err)
-	}
-
-	projects, err = monorepo.Unmarshall(projectsMarshalled)
-	if err != nil {
-		return nil, fmt.Errorf("parsing projects: %w", err)
+		return nil, fmt.Errorf("parsing monorepository projects configuration: %w", err)
 	}
 
 	return projects, nil
 }
 
 func configureGPGKey(ctx *AppContext) (*openpgp.Entity, error) {
-	if !ctx.Viper.IsSet(GPGPathConfiguration) {
+	flag := ctx.GPGKeyPathFlag
+
+	if flag == "" {
 		return nil, nil
 	}
 
-	ctx.Logger.Debug().Str("path", armoredKeyPath).Msg("using the following armored key for signing")
+	ctx.Logger.Debug().Str("path", ctx.GPGKeyPathFlag).Msg("using the following armored key for signing")
 
-	armoredKeyFile, err := os.ReadFile(ctx.Viper.GetString(GPGPathConfiguration))
+	armoredKeyFile, err := os.ReadFile(ctx.GPGKeyPathFlag)
 	if err != nil {
 		return nil, fmt.Errorf("reading armored key: %w", err)
 	}
