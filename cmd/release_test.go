@@ -196,6 +196,7 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	checkErr(t, err, "setting flags")
 
 	output, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
 	expectedVersion := "1.2.0"
 	expectedTag := "v" + expectedVersion
@@ -249,6 +250,7 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
 	expectedVersion := "1.2.2"
 	expectedTag := "v" + expectedVersion
@@ -391,6 +393,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
 	i := 0
 	expectedOutputs := []cmdOutput{
