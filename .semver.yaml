@@ -1,7 +1,7 @@
 remote: true
 remote-name: origin
 git-name: Go Semver Release
-git-email: go-semver@release.ci
+git-email: 39492740+s0ders@users.noreply.github.com
 tag-prefix: v
 branches:
   - name: main
