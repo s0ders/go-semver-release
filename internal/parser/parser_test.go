@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
@@ -656,5 +657,30 @@ func checkErr(t *testing.T, msg string, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("%s: %s", msg, err.Error())
+	}
+}
+
+func BenchmarkParser_ComputeNewSemver(b *testing.B) {
+
+	parser := New(logger, tagger, rules)
+	testRepository, err := gittest.NewRepository()
+	if err != nil {
+		b.Fatalf("creating test repository: %s", err)
+	}
+
+	b.Cleanup(func() {
+		os.RemoveAll(testRepository.Path)
+	})
+
+	commitTypes := []string{"feat", "fix", "chore"}
+
+	for i := 1; i <= 10000; i++ {
+		commitType := commitTypes[rand.Intn(len(commitTypes))]
+		testRepository.AddCommit(commitType)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{})
 	}
 }
