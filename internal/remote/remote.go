@@ -12,9 +12,9 @@ import (
 )
 
 type Remote struct {
-	name       string
 	auth       *http.BasicAuth
 	repository *git.Repository
+	name       string
 }
 
 func New(name string, token string) *Remote {
@@ -28,17 +28,18 @@ func New(name string, token string) *Remote {
 }
 
 // Clone clones a given remote repository to a temporary directory.
-func (r *Remote) Clone(url string) (*git.Repository, error) {
+func (r *Remote) Clone(url string, singleBranch bool) (*git.Repository, error) {
 	tempDir, err := os.MkdirTemp("", "*")
 	if err != nil {
 		return nil, fmt.Errorf("creating temporary directory: %w", err)
 	}
 
 	r.repository, err = git.PlainClone(tempDir, false, &git.CloneOptions{
-		RemoteName: r.name,
-		Auth:       r.auth,
-		URL:        url,
-		Progress:   io.Discard,
+		RemoteName:   r.name,
+		Auth:         r.auth,
+		URL:          url,
+		Progress:     io.Discard,
+		SingleBranch: singleBranch,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cloning repository: %w", err)
