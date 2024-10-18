@@ -70,8 +70,9 @@ func New(logger zerolog.Logger, tagger *tag.Tagger, rules rule.Rules, options ..
 }
 
 type ComputeNewSemverOutput struct {
-	Project    monorepo.Project
 	Semver     *semver.Version
+	Project    monorepo.Project
+	Branch     string
 	CommitHash plumbing.Hash
 	NewRelease bool
 }
@@ -171,6 +172,8 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	}
 
 	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	repositoryLogs, err := repository.Log(&logOptions)
 	if err != nil {
 		return output, fmt.Errorf("fetching commit history: %w", err)
@@ -186,11 +189,20 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	sort.Slice(history, func(i, j int) bool {
 		return history[i].Committer.When.Before(history[j].Committer.When)
 	})
-	p.mu.Unlock()
 
-	newRelease, commitHash, err := p.ParseHistory(history, latestSemver, project)
-	if err != nil {
-		return output, fmt.Errorf("parsing commit history: %w", err)
+	var newRelease bool
+	var commitHash plumbing.Hash
+
+	for _, commit := range history {
+		newReleaseFound, hash, err := p.ProcessCommit(commit, latestSemver, project)
+		if err != nil {
+			return output, fmt.Errorf("parsing commit history: %w", err)
+		}
+
+		if newReleaseFound {
+			newRelease = true
+			commitHash = hash
+		}
 	}
 
 	if p.prereleaseMode {
@@ -200,72 +212,53 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	latestSemver.Metadata = p.buildMetadata
 
 	output.Semver = latestSemver
+	output.Branch = p.releaseBranch
 	output.CommitHash = commitHash
 	output.NewRelease = newRelease
 
 	return output, nil
 }
 
-// ParseHistory parses a slice of commits and modifies the given semantic version number according to the release rule
-// provided.
-func (p *Parser) ParseHistory(commits []*object.Commit, latestSemver *semver.Version, project monorepo.Project) (bool, plumbing.Hash, error) {
-	newRelease := false
-	latestReleaseCommitHash := plumbing.Hash{}
-	rulesMap := p.rules.Map
-
-	for _, commit := range commits {
-		if !conventionalCommitRegex.MatchString(commit.Message) {
-			continue
-		}
-
-		if project.Name != "" {
-			p.mu.Lock()
-			containsProjectFiles, err := commitContainsProjectFiles(commit, project.Path)
-			if err != nil {
-				return false, latestReleaseCommitHash, fmt.Errorf("checking if commit contains project files: %w", err)
-			}
-			p.mu.Unlock()
-
-			if !containsProjectFiles {
-				continue
-			}
-		}
-
-		match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
-		breakingChange := match[3] == "!" || strings.Contains(match[0], "BREAKING CHANGE")
-		commitType := match[1]
-		shortHash := commit.Hash.String()[0:7]
-		shortMessage := shortenMessage(commit.Message)
-
-		if breakingChange {
-			p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Msg("breaking change found")
-			latestSemver.BumpMajor()
-			latestReleaseCommitHash = commit.Hash
-			newRelease = true
-			continue
-		}
-
-		releaseType, ok := rulesMap[commitType]
-		if !ok {
-			continue
-		}
-
-		switch releaseType {
-		case "patch":
-			latestSemver.BumpPatch()
-		case "minor":
-			latestSemver.BumpMinor()
-		default:
-			return false, latestReleaseCommitHash, fmt.Errorf("unknown release type %q", releaseType)
-		}
-
-		latestReleaseCommitHash = commit.Hash
-		newRelease = true
-
-		p.logger.Debug().Str("commit-hash", shortHash).Str("commit-message", shortMessage).Str("release-type", releaseType).Msg("new release found")
+// ProcessCommit handles a single commit
+func (p *Parser) ProcessCommit(commit *object.Commit, latestSemver *semver.Version, project monorepo.Project) (bool, plumbing.Hash, error) {
+	if !conventionalCommitRegex.MatchString(commit.Message) {
+		return false, plumbing.ZeroHash, nil
 	}
 
-	return newRelease, latestReleaseCommitHash, nil
+	if project.Name != "" {
+		containsProjectFiles, err := commitContainsProjectFiles(commit, project.Path)
+		if err != nil {
+			return false, plumbing.ZeroHash, fmt.Errorf("checking if commit contains project files: %w", err)
+		}
+		if !containsProjectFiles {
+			return false, plumbing.ZeroHash, nil
+		}
+	}
+
+	match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
+	breakingChange := match[3] == "!" || strings.HasPrefix(commit.Message, "BREAKING CHANGE")
+	commitType := match[1]
+
+	if breakingChange {
+		latestSemver.BumpMajor()
+		return true, commit.Hash, nil
+	}
+
+	releaseType, ok := p.rules.Map[commitType]
+	if !ok {
+		return false, plumbing.ZeroHash, nil
+	}
+
+	switch releaseType {
+	case "patch":
+		latestSemver.BumpPatch()
+	case "minor":
+		latestSemver.BumpMinor()
+	default:
+		return false, plumbing.ZeroHash, fmt.Errorf("unknown release type %q", releaseType)
+	}
+
+	return true, commit.Hash, nil
 }
 
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
