@@ -9,7 +9,7 @@ import (
 
 type Flag []map[string]string
 
-const FlagType = "monorepoFlag"
+const FlagType = "JSON string"
 
 func (f *Flag) String() string {
 	if f == nil || len(*f) == 0 {

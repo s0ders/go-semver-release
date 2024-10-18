@@ -24,20 +24,17 @@ jobs:
       - uses: actions/checkout@v4.1.4
 
       # Install Go Semver Release
-      - name: Set up Go
-        uses: actions/setup-go@v5.0.0
-        with:
-          go-version: 1.22.4
-
       - name: Install Go Semver Release
-        run: go install github.com/s0ders/go-semver-release/v5@latest
+        run: |
+          curl -SL https://github.com/s0ders/go-semver-release/releases/latest/download/go-semver-release-linux-amd64 -o ./go-semver-release \
+          && chmod +x ./go-semver-release
 
       # Tests are good, versioning the repository (if any new release is found)
       - name: Go Semver Release
         id: go-semver
         env:
           GO_SEMVER_RELEASE_ACCESS_TOKEN: ${{ secrets.accessToken }}
-        run: go-semver-release release https://example.com/my/repo.git --config .semver.yaml
+        run: ./go-semver-release release https://github.com/my/repo.git --config .semver.yaml
 
   release:
     runs-on: ubuntu-latest
@@ -49,18 +46,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.3.0
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3.1.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Tag artifact with SemVer number
-      - name: Docker build pre-release
-        uses: docker/build-push-action@v5.3.0
-        with:
-          push: true
-          tags: <image_name>:${{ env.RELEASE_TAG }}
+      # Insert your release process here
+      # ...

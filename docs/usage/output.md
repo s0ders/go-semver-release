@@ -27,5 +27,12 @@ Here is an example of an output where two branches were parsed, please note that
 ```
 
 ## GitHub Action output
+Though this tool is CI agnostic, it will try to detect if it is being executed on a GitHub Action runner.
+If the program is in [monorepo ](configuration.md#monorepo)mode, three outputs will be generated per branch/project pair:
+* `<BRANCH_NAME>_SEMVER`, the latest semantic version
+* `<BRANCH_NAME>_NEW_RELEASE`, whether a new release was found or not
+* `<BRANCH_NAME>_PROJECT`, the name of the project inside the monorepo
 
-🚧 This section is a work in progress 🚧
+If not in monorepo mode, two outputs will be generated per branch:
+* `<BRANCH_NAME>_SEMVER`, the latest semantic version
+* `<BRANCH_NAME>_NEW_RELEASE`, whether a new release was found or not

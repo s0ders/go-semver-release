@@ -3,6 +3,7 @@ package gittest
 
 import (
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"os"
@@ -28,8 +29,8 @@ type TestRepository struct {
 }
 
 // NewRepository creates a new TestRepository.
-func NewRepository() (testRepository *TestRepository, err error) {
-	testRepository = &TestRepository{}
+func NewRepository() (*TestRepository, error) {
+	testRepository := &TestRepository{}
 
 	path, err := os.MkdirTemp("", "gittest-*")
 	if err != nil {
@@ -83,6 +84,28 @@ func NewRepository() (testRepository *TestRepository, err error) {
 	}
 
 	return testRepository, err
+}
+
+// Clone clones the current TestRepository to a temporary directory and returns the clone of that repository. This
+// method is useful when testing on repository that are expected to have a configured remote.
+func (r *TestRepository) Clone() (*TestRepository, error) {
+	testRepository := &TestRepository{}
+
+	tempDir, err := os.MkdirTemp("", "*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temporary directory: %w", err)
+	}
+
+	testRepository.Path = tempDir
+	testRepository.Repository, err = git.PlainClone(tempDir, false, &git.CloneOptions{
+		URL:      r.Path,
+		Progress: io.Discard,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cloning repository: %w", err)
+	}
+
+	return testRepository, nil
 }
 
 // AddCommit adds a new commit with a given conventional commit type to the underlying Git repository.

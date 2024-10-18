@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/s0ders/go-semver-release/v5/cmd"
+	"github.com/s0ders/go-semver-release/v6/cmd"
 )
 
 func main() {

@@ -4,21 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/s0ders/go-semver-release/v5/internal/branch"
-	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v5/internal/rule"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v5/internal/gittest"
-	"github.com/s0ders/go-semver-release/v5/internal/tag"
+	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v6/internal/branch"
+	"github.com/s0ders/go-semver-release/v6/internal/gittest"
+	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v6/internal/rule"
+	"github.com/s0ders/go-semver-release/v6/internal/tag"
 )
 
 type cmdOutput struct {
@@ -27,6 +28,25 @@ type cmdOutput struct {
 	Version    string `json:"version"`
 	Project    string `json:"project"`
 	NewRelease bool   `json:"new-release"`
+}
+
+func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
+	assert := assertion.New(t)
+	th := NewTestHelper(t)
+
+	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	checkErr(t, err, "setting branches configuration")
+
+	testRepository := NewTestRepository(t, []string{})
+
+	accessToken := "secret"
+	err = os.Setenv("GO_SEMVER_RELEASE_ACCESS_TOKEN", accessToken)
+	checkErr(t, err, "setting environment variable")
+
+	_, err = th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
+
+	assert.Equal(accessToken, th.Ctx.AccessTokenFlag, "access token flag value should be equal to environment variable value")
 }
 
 func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
@@ -39,7 +59,7 @@ func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
 	cfgContent := []byte(`
 git-name: ` + taggerName + `
 git-email: ` + taggerEmail + `
-tag-prefix: version
+tag-prefix: v
 branches:
   - name: master
   - name: alpha
@@ -118,24 +138,25 @@ rules:
 	checkErr(t, err, "running release command")
 
 	expectedMasterVersion := "1.2.2"
-	expectedMasterTag := "version" + expectedMasterVersion
-	expectedMasterOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedMasterVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualMasterOut := cmdOutput{}
-
+	expectedMasterTag := "v" + expectedMasterVersion
 	expectedAlphaVersion := "1.3.0-alpha"
-	expectedAlphaTag := "version" + expectedAlphaVersion
-	expectedAlphaOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedAlphaVersion,
-		NewRelease: true,
-		Branch:     "alpha",
+	expectedAlphaTag := "v" + expectedAlphaVersion
+
+	expectedOutputs := []cmdOutput{
+		{
+			Message:    "new release found",
+			Version:    expectedAlphaVersion,
+			NewRelease: true,
+			Branch:     "alpha",
+		},
+		{
+			Message:    "new release found",
+			Version:    expectedMasterVersion,
+			NewRelease: true,
+			Branch:     "master",
+		},
 	}
-	actualAlphaOut := cmdOutput{}
+	actualOutput := cmdOutput{}
 
 	outputs := make([]string, 0, 2)
 
@@ -145,10 +166,10 @@ rules:
 	}
 
 	// Checking master
-	err = json.Unmarshal([]byte(outputs[0]), &actualMasterOut)
+	err = json.Unmarshal([]byte(outputs[0]), &actualOutput)
 	checkErr(t, err, "unmarshalling master output")
 
-	assert.Equal(expectedMasterOut, actualMasterOut, "releaseCmd output should be equal")
+	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
 	checkErr(t, err, "checking if master tag exists")
@@ -165,10 +186,10 @@ rules:
 	assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
 
 	// Checking alpha
-	err = json.Unmarshal([]byte(outputs[1]), &actualAlphaOut)
+	err = json.Unmarshal([]byte(outputs[1]), &actualOutput)
 	checkErr(t, err, "unmarshalling alpha output")
 
-	assert.Equal(expectedAlphaOut, actualAlphaOut, "releaseCmd output should be equal")
+	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
 
 	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
 	checkErr(t, err, "checking if alpha tag exists")
@@ -297,7 +318,6 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
 		BranchesConfiguration:    `[{"name": "master"}]`,
-		RemoteConfiguration:      "true",
 		RemoteNameConfiguration:  "origin",
 		AccessTokenConfiguration: "",
 	})
@@ -421,7 +441,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 		err = json.Unmarshal(rawOutput, &actualOutput)
 		checkErr(t, err, "unmarshalling output")
 
-		assert.Equal(expectedOutputs[i], actualOutput)
+		assert.Contains(expectedOutputs, actualOutput)
 		i++
 	}
 
@@ -626,7 +646,7 @@ func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
 	_ = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
 	_, err := th.ExecuteCommand("release", "./does/not/exist")
 
-	assert.ErrorContains(err, "opening local Git repository", "should have failed trying to open inexisting Git repository")
+	assert.ErrorContains(err, "cloning Git repository", "should have failed trying to open inexisting Git repository")
 }
 
 func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
@@ -897,13 +917,13 @@ func NewTestRepository(t *testing.T, commits []string) *gittest.TestRepository {
 }
 
 type TestHelper struct {
-	Ctx *AppContext
+	Ctx *appcontext.AppContext
 	Cmd *cobra.Command
 }
 
 // NewTestHelper creates a new TestHelper with a fresh AppContext and Command
 func NewTestHelper(t *testing.T) *TestHelper {
-	ctx := &AppContext{
+	ctx := &appcontext.AppContext{
 		Viper: viper.New(),
 	}
 	cmd := NewRootCommand(ctx)

@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/s0ders/go-semver-release/v5/internal/semver"
+	"github.com/s0ders/go-semver-release/v6/internal/semver"
 )
 
 var ErrTagAlreadyExists = errors.New("tag already exists")
@@ -90,11 +90,7 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Versio
 		return fmt.Errorf("semver is nil")
 	}
 
-	tagMessage := t.TagPrefix + semver.String()
-
-	if t.ProjectName != "" {
-		tagMessage = t.ProjectName + "-" + tagMessage
-	}
+	tagMessage := t.Format(semver)
 
 	tagOpts := &git.CreateTagOptions{
 		Message: tagMessage,
@@ -116,5 +112,11 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Versio
 }
 
 func (t *Tagger) Format(semver *semver.Version) string {
-	return t.TagPrefix + semver.String()
+	tag := t.TagPrefix + semver.String()
+
+	if t.ProjectName != "" {
+		tag = t.ProjectName + "-" + tag
+	}
+
+	return tag
 }

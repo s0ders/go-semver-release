@@ -10,17 +10,18 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v5/internal/branch"
-	"github.com/s0ders/go-semver-release/v5/internal/ci"
-	"github.com/s0ders/go-semver-release/v5/internal/gpg"
-	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v5/internal/parser"
-	"github.com/s0ders/go-semver-release/v5/internal/remote"
-	"github.com/s0ders/go-semver-release/v5/internal/rule"
-	"github.com/s0ders/go-semver-release/v5/internal/tag"
+	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v6/internal/branch"
+	"github.com/s0ders/go-semver-release/v6/internal/ci"
+	"github.com/s0ders/go-semver-release/v6/internal/gpg"
+	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v6/internal/parser"
+	"github.com/s0ders/go-semver-release/v6/internal/remote"
+	"github.com/s0ders/go-semver-release/v6/internal/rule"
+	"github.com/s0ders/go-semver-release/v6/internal/tag"
 )
 
-func NewReleaseCmd(ctx *AppContext) *cobra.Command {
+func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 	releaseCmd := &cobra.Command{
 		Use:   "release <REPOSITORY_PATH_OR_URL>",
 		Short: "Version a Git repository according the the given configuration",
@@ -32,97 +33,82 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 				origin     *remote.Remote
 			)
 
-			if ctx.RemoteModeFlag {
-				origin = remote.New(ctx.RemoteNameFlag, ctx.AccessTokenFlag)
-				repository, err = origin.Clone(args[0])
-				if err != nil {
-					return fmt.Errorf("cloning Git repository: %w", err)
-				}
-			} else {
-				repository, err = git.PlainOpen(args[0])
-				if err != nil {
-					return fmt.Errorf("opening local Git repository: %w", err)
-				}
-			}
-
 			entity, err := configureGPGKey(ctx)
 			if err != nil {
 				return fmt.Errorf("configuring GPG key: %w", err)
 			}
 
-			rules, err := configureRules(ctx)
+			ctx.Rules, err = configureRules(ctx)
 			if err != nil {
 				return fmt.Errorf("loading rules configuration: %w", err)
 			}
 
-			branches, err := configureBranches(ctx)
+			ctx.Branches, err = configureBranches(ctx)
 			if err != nil {
 				return fmt.Errorf("loading branches configuration: %w", err)
 			}
 
-			projects, err := configureProjects(ctx)
+			ctx.Projects, err = configureProjects(ctx)
 			if err != nil {
 				return fmt.Errorf("loading projects configuration: %w", err)
 			}
 
+			origin = remote.New(ctx.RemoteNameFlag, ctx.AccessTokenFlag)
+
+			repository, err = origin.Clone(args[0])
+			if err != nil {
+				return fmt.Errorf("cloning Git repository: %w", err)
+			}
+
+			outputs, err := parser.New(ctx).Run(context.Background(), repository)
+			if err != nil {
+				return fmt.Errorf("computing new semver: %w", err)
+			}
+
 			tagger := tag.NewTagger(ctx.GitNameFlag, ctx.GitEmailFlag, tag.WithTagPrefix(ctx.TagPrefixFlag), tag.WithSignKey(entity))
-			semverParser := parser.New(ctx.Logger, tagger, rules, parser.WithBuildMetadata(ctx.BuildMetadataFlag), parser.WithProjects(projects))
 
-			for _, branch := range branches {
-				semverParser.SetBranch(branch.Name)
-				semverParser.SetPrerelease(branch.Prerelease)
-				semverParser.SetPrereleaseIdentifier(branch.Name)
+			for _, output := range outputs {
+				semver := output.Semver
+				release := output.NewRelease
+				commitHash := output.CommitHash
+				project := output.Project.Name
 
-				outputs, err := semverParser.Run(context.Background(), repository)
+				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefixFlag), ci.WithProject(project))
 				if err != nil {
-					return fmt.Errorf("computing new semver: %w", err)
+					return fmt.Errorf("generating github output: %w", err)
 				}
 
-				for _, output := range outputs {
-					semver := output.Semver
-					release := output.NewRelease
-					commitHash := output.CommitHash
-					project := output.Project.Name
+				logEvent := ctx.Logger.Info()
+				logEvent.Bool("new-release", release)
+				logEvent.Str("version", semver.String())
+				logEvent.Str("branch", output.Branch)
 
-					err = ci.GenerateGitHubOutput(semver, branch.Name, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefixFlag), ci.WithProject(project))
+				if project != "" {
+					logEvent.Str("project", project)
+
+					tagger.SetProjectName(project)
+				}
+
+				switch {
+				case !release:
+					logEvent.Msg("no new release")
+					return nil
+				case release && ctx.DryRunFlag:
+					logEvent.Msg("dry-run enabled, next release found")
+					return nil
+				default:
+					logEvent.Msg("new release found")
+
+					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
-						return fmt.Errorf("generating github output: %w", err)
+						return fmt.Errorf("tagging repository: %w", err)
 					}
 
-					logEvent := ctx.Logger.Info()
-					logEvent.Bool("new-release", release)
-					logEvent.Str("version", semver.String())
-					logEvent.Str("branch", branch.Name)
+					ctx.Logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
 
-					if project != "" {
-						logEvent.Str("project", project)
-
-						tagger.SetProjectName(project)
-					}
-
-					switch {
-					case !release:
-						logEvent.Msg("no new release")
-						return nil
-					case release && ctx.DryRunFlag:
-						logEvent.Msg("dry-run enabled, next release found")
-						return nil
-					default:
-						logEvent.Msg("new release found")
-
-						err = tagger.TagRepository(repository, semver, commitHash)
-						if err != nil {
-							return fmt.Errorf("tagging repository: %w", err)
-						}
-
-						ctx.Logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
-
-						if ctx.RemoteModeFlag {
-							err = origin.PushTag(tagger.Format(semver))
-							if err != nil {
-								return fmt.Errorf("pushing tag to remote: %w", err)
-							}
-						}
+					err = origin.PushTag(tagger.Format(semver))
+					if err != nil {
+						return fmt.Errorf("pushing tag to remote: %w", err)
 					}
 				}
 			}
@@ -134,7 +120,7 @@ func NewReleaseCmd(ctx *AppContext) *cobra.Command {
 	return releaseCmd
 }
 
-func configureRules(ctx *AppContext) (rule.Rules, error) {
+func configureRules(ctx *appcontext.AppContext) (rule.Rules, error) {
 	flag := ctx.RulesFlag
 
 	if flag.String() == "{}" {
@@ -151,7 +137,7 @@ func configureRules(ctx *AppContext) (rule.Rules, error) {
 	return unmarshalledRules, nil
 }
 
-func configureBranches(ctx *AppContext) ([]branch.Branch, error) {
+func configureBranches(ctx *appcontext.AppContext) ([]branch.Branch, error) {
 	branchesJSON := []map[string]any(ctx.BranchesFlag)
 
 	unmarshalledBranches, err := branch.Unmarshall(branchesJSON)
@@ -162,7 +148,7 @@ func configureBranches(ctx *AppContext) ([]branch.Branch, error) {
 	return unmarshalledBranches, nil
 }
 
-func configureProjects(ctx *AppContext) ([]monorepo.Project, error) {
+func configureProjects(ctx *appcontext.AppContext) ([]monorepo.Project, error) {
 	flag := ctx.MonorepositoryFlag
 
 	if flag.String() == "[]" {
@@ -179,7 +165,7 @@ func configureProjects(ctx *AppContext) ([]monorepo.Project, error) {
 	return projects, nil
 }
 
-func configureGPGKey(ctx *AppContext) (*openpgp.Entity, error) {
+func configureGPGKey(ctx *appcontext.AppContext) (*openpgp.Entity, error) {
 	flag := ctx.GPGKeyPathFlag
 
 	if flag == "" {

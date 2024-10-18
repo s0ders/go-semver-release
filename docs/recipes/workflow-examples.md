@@ -29,3 +29,4 @@ Below are simple pipeline examples for various CI providers:
 
 * [GitHub Actions](https://github.com/s0ders/go-semver-release/blob/main/docs/examples/github-actions-remote-mode.yml) using remote mode
 * [GitHub Actions](https://github.com/s0ders/go-semver-release/blob/main/docs/examples/github-actions-local-mode.yml) using local mode
+* [GitLab CI/CD](https://github.com/s0ders/go-semver-release/blob/main/docs/examples/gitlab-ci.yml) using remote mode
