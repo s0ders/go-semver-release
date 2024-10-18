@@ -1,8 +1,8 @@
-name: CI
+name: Alpha Release Channel
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "alpha" ]
 
 env:
   GO_VERSION: 1.23.1
@@ -91,66 +91,6 @@ jobs:
           ./go-semver-release-linux-amd64 release https://github.com/s0ders/go-semver-release.git \
           --config .semver.yaml \
           --access-token ${{ secrets.GO_SEMVER_RELEASE_ACCESS_TOKEN }} \
+          --branches='[{"name": "alpha", "prereleas": true}]'
           --gpg-key-path "${GO_SEMVER_GPG_KEY_PATH}" \
-          --verbose 
-
-  docker-release:
-    name: Docker release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    needs:
-      - versioning
-    if: ${{needs.versioning.outputs.release == 'true'}}
-    env:
-      VERSION: ${{needs.versioning.outputs.semver}}
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Docker build
-        uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5.3.0
-        with:
-          context: .
-          file: ./build/Dockerfile
-          push: true
-          build-args: |
-            APP_VERSION="${{ env.VERSION }}"
-            APP_BUILD_NUMBER="${{ github.run_id }}"
-            APP_COMMIT_HASH="${{ github.sha }}"
-          tags: s0ders/go-semver-release:${{ env.VERSION }}
-
-  slsa-build:
-    name: SLSA build and release
-    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-    needs:
-      - versioning
-      - docker-release
-    if: ${{needs.versioning.outputs.release == 'true'}}
-    strategy:
-      matrix:
-        os:
-          - linux
-          - windows
-          - darwin
-        arch:
-          - amd64
-          - arm64
-    permissions:
-      id-token: write
-      contents: write
-      actions: read
-    with:
-      go-version: 1.23
-      config-file: .github/slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
-      evaluated-envs: "VERSION:${{ needs.versioning.outputs.semver }}, COMMIT_HASH:${{ github.sha }}, BUILD_NUMBER:${{ github.run_id }}"
-      upload-assets: true
-      upload-tag-name: ${{ needs.versioning.outputs.semver }}
+          --verbose
