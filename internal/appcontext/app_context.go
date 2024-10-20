@@ -1,3 +1,7 @@
+// Package appcontext provides a structure to store the current application execution context.
+//
+// The use of this structure allows to avoid the use of global variables to share the states of variables across
+// structures and functions.
 package appcontext
 
 import (
