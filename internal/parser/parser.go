@@ -24,14 +24,12 @@ import (
 	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v5/internal/rule"
 	"github.com/s0ders/go-semver-release/v5/internal/semver"
-	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
 	rules                rule.Rules
-	tagger               *tag.Tagger
 	logger               zerolog.Logger
 	releaseBranch        string
 	buildMetadata        string
@@ -55,10 +53,10 @@ func WithBuildMetadata(metadata string) OptionFunc {
 	}
 }
 
-func New(logger zerolog.Logger, tagger *tag.Tagger, rules rule.Rules, options ...OptionFunc) *Parser {
+// TODO: pass AppContext
+func New(logger zerolog.Logger, rules rule.Rules, options ...OptionFunc) *Parser {
 	parser := &Parser{
 		logger: logger,
-		tagger: tagger,
 		rules:  rules,
 	}
 
@@ -305,24 +303,31 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	return latestTag, nil
 }
 
+// TODO: pass origin name as param
 func (p *Parser) checkoutBranch(repository *git.Repository) error {
-	worktree, err := repository.Worktree()
+	remoteBranchRef := plumbing.NewRemoteReferenceName("origin", p.releaseBranch)
+	_, err := repository.Reference(remoteBranchRef, true)
 	if err != nil {
-		return fmt.Errorf("fetching worktree: %w", err)
+		return fmt.Errorf("remote branch not found: %v", err)
 	}
 
-	if worktree == nil {
-		return fmt.Errorf("no worktree, check that repository is initialized")
+	localBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
+	ref := plumbing.NewSymbolicReference(localBranchRef, remoteBranchRef)
+	err = repository.Storer.SetReference(ref)
+	if err != nil {
+		return fmt.Errorf("error creating local branch: %v", err)
 	}
 
-	// Checkout to release branch
-	releaseBranchRef := plumbing.NewBranchReferenceName(p.releaseBranch)
-	branchCheckOutOpts := git.CheckoutOptions{
-		Branch: releaseBranchRef,
+	// Checkout the new local branch
+	w, err := repository.Worktree()
+	if err != nil {
+		return fmt.Errorf("error getting worktree: %v", err)
+	}
+
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: localBranchRef,
 		Force:  true,
-	}
-
-	err = worktree.Checkout(&branchCheckOutOpts)
+	})
 	if err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return fmt.Errorf("branch %q does not exist: %w", p.releaseBranch, err)
