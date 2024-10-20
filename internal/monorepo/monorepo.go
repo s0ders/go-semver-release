@@ -1,3 +1,4 @@
+// Package monorepo provides functions to work with monorepository configuration.
 package monorepo
 
 import (
