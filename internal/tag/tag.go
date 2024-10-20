@@ -90,11 +90,7 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Versio
 		return fmt.Errorf("semver is nil")
 	}
 
-	tagMessage := t.TagPrefix + semver.String()
-
-	if t.ProjectName != "" {
-		tagMessage = t.ProjectName + "-" + tagMessage
-	}
+	tagMessage := t.Format(semver)
 
 	tagOpts := &git.CreateTagOptions{
 		Message: tagMessage,
@@ -116,5 +112,11 @@ func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Versio
 }
 
 func (t *Tagger) Format(semver *semver.Version) string {
-	return t.TagPrefix + semver.String()
+	tag := t.TagPrefix + semver.String()
+
+	if t.ProjectName != "" {
+		tag = t.ProjectName + "-" + tag
+	}
+
+	return tag
 }
