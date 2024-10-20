@@ -4,20 +4,21 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/s0ders/go-semver-release/v5/internal/branch"
-	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v5/internal/rule"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	assertion "github.com/stretchr/testify/assert"
 
+	"github.com/s0ders/go-semver-release/v5/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v5/internal/branch"
 	"github.com/s0ders/go-semver-release/v5/internal/gittest"
+	"github.com/s0ders/go-semver-release/v5/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v5/internal/rule"
 	"github.com/s0ders/go-semver-release/v5/internal/tag"
 )
 
@@ -28,6 +29,8 @@ type cmdOutput struct {
 	Project    string `json:"project"`
 	NewRelease bool   `json:"new-release"`
 }
+
+// TODO: add test to check env. var. config
 
 func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
 	assert := assertion.New(t)
@@ -297,7 +300,6 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
 		BranchesConfiguration:    `[{"name": "master"}]`,
-		RemoteConfiguration:      "true",
 		RemoteNameConfiguration:  "origin",
 		AccessTokenConfiguration: "",
 	})
@@ -626,7 +628,7 @@ func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
 	_ = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
 	_, err := th.ExecuteCommand("release", "./does/not/exist")
 
-	assert.ErrorContains(err, "opening local Git repository", "should have failed trying to open inexisting Git repository")
+	assert.ErrorContains(err, "cloning Git repository", "should have failed trying to open inexisting Git repository")
 }
 
 func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
@@ -897,13 +899,13 @@ func NewTestRepository(t *testing.T, commits []string) *gittest.TestRepository {
 }
 
 type TestHelper struct {
-	Ctx *AppContext
+	Ctx *appcontext.AppContext
 	Cmd *cobra.Command
 }
 
 // NewTestHelper creates a new TestHelper with a fresh AppContext and Command
 func NewTestHelper(t *testing.T) *TestHelper {
-	ctx := &AppContext{
+	ctx := &appcontext.AppContext{
 		Viper: viper.New(),
 	}
 	cmd := NewRootCommand(ctx)
