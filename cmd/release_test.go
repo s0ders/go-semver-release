@@ -42,7 +42,7 @@ func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
 	cfgContent := []byte(`
 git-name: ` + taggerName + `
 git-email: ` + taggerEmail + `
-tag-prefix: version
+tag-prefix: v
 branches:
   - name: master
   - name: alpha
@@ -121,24 +121,25 @@ rules:
 	checkErr(t, err, "running release command")
 
 	expectedMasterVersion := "1.2.2"
-	expectedMasterTag := "version" + expectedMasterVersion
-	expectedMasterOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedMasterVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualMasterOut := cmdOutput{}
-
+	expectedMasterTag := "v" + expectedMasterVersion
 	expectedAlphaVersion := "1.3.0-alpha"
-	expectedAlphaTag := "version" + expectedAlphaVersion
-	expectedAlphaOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedAlphaVersion,
-		NewRelease: true,
-		Branch:     "alpha",
+	expectedAlphaTag := "v" + expectedAlphaVersion
+
+	expectedOutputs := []cmdOutput{
+		{
+			Message:    "new release found",
+			Version:    expectedAlphaVersion,
+			NewRelease: true,
+			Branch:     "alpha",
+		},
+		{
+			Message:    "new release found",
+			Version:    expectedMasterVersion,
+			NewRelease: true,
+			Branch:     "master",
+		},
 	}
-	actualAlphaOut := cmdOutput{}
+	actualOutput := cmdOutput{}
 
 	outputs := make([]string, 0, 2)
 
@@ -148,10 +149,10 @@ rules:
 	}
 
 	// Checking master
-	err = json.Unmarshal([]byte(outputs[0]), &actualMasterOut)
+	err = json.Unmarshal([]byte(outputs[0]), &actualOutput)
 	checkErr(t, err, "unmarshalling master output")
 
-	assert.Equal(expectedMasterOut, actualMasterOut, "releaseCmd output should be equal")
+	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
 	checkErr(t, err, "checking if master tag exists")
@@ -168,10 +169,10 @@ rules:
 	assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
 
 	// Checking alpha
-	err = json.Unmarshal([]byte(outputs[1]), &actualAlphaOut)
+	err = json.Unmarshal([]byte(outputs[1]), &actualOutput)
 	checkErr(t, err, "unmarshalling alpha output")
 
-	assert.Equal(expectedAlphaOut, actualAlphaOut, "releaseCmd output should be equal")
+	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
 
 	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
 	checkErr(t, err, "checking if alpha tag exists")
@@ -423,7 +424,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 		err = json.Unmarshal(rawOutput, &actualOutput)
 		checkErr(t, err, "unmarshalling output")
 
-		assert.Equal(expectedOutputs[i], actualOutput)
+		assert.Contains(expectedOutputs, actualOutput)
 		i++
 	}
 

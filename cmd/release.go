@@ -54,33 +54,27 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("loading projects configuration: %w", err)
 			}
 
-			singleBranch := len(branches) == 1
 			origin = remote.New(ctx.RemoteNameFlag, ctx.AccessTokenFlag)
 
-			branchesName := make([]string, len(branches))
-
-			for i, br := range branches {
-				branchesName[i] = br.Name
-			}
-
-			repository, err = origin.Clone(args[0], singleBranch)
+			repository, err = origin.Clone(args[0])
 			if err != nil {
 				return fmt.Errorf("cloning Git repository: %w", err)
 			}
 
 			tagger := tag.NewTagger(ctx.GitNameFlag, ctx.GitEmailFlag, tag.WithTagPrefix(ctx.TagPrefixFlag), tag.WithSignKey(entity))
-			semverParser := parser.New(ctx.Logger, tagger, rules, parser.WithBuildMetadata(ctx.BuildMetadataFlag), parser.WithProjects(projects))
+			semverParser := parser.New(ctx.Logger, rules, parser.WithBuildMetadata(ctx.BuildMetadataFlag), parser.WithProjects(projects))
 
 			for _, branch := range branches {
 				semverParser.SetBranch(branch.Name)
 				semverParser.SetPrerelease(branch.Prerelease)
 				semverParser.SetPrereleaseIdentifier(branch.Name)
 
-				outputs, err = semverParser.Run(context.Background(), repository)
+				currentOutput, err := semverParser.Run(context.Background(), repository)
 				if err != nil {
 					return fmt.Errorf("computing new semver: %w", err)
 				}
 
+				outputs = append(outputs, currentOutput...)
 			}
 
 			for _, output := range outputs {
@@ -122,7 +116,6 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 					ctx.Logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
 
-					// TODO: check if push tag works on local repositories
 					err = origin.PushTag(tagger.Format(semver))
 					if err != nil {
 						return fmt.Errorf("pushing tag to remote: %w", err)
