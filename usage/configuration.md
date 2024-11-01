@@ -12,11 +12,12 @@ $ go-semver-release release --help
 
 ### Configuration precedence
 
-The order of precedence for the configuration is:
+The order of precedence for the configuration, from highest to lowest, is:
 
-* Explicitly set flag values have the highest precedence
-* Then values set in the configuration file
-* Finally, flag default values have the lowest precedence, each flag default value is given in the help message of the command
+1. Flag values
+2. Environment variable (prefixed by `GO_SEMVER_RELEASE`) values
+3. Configuration file values
+4. Flag default value
 
 ### Configuration file
 
@@ -96,21 +97,44 @@ CLI flags: `--remote-name`, `--access-token`
 
 If the path to the Git repository supplied to Go Semver Release is a local path, it will operate in local mode which offers the benefits of avoiding the use of access token. However, it can be easier to simply let Go Semver Release clone a repository, parse it and push the newly found SemVer tag, if any.
 
-To enable the remote mode, simply provide a URL to the Git repository, the remote you to set the following in your configuration file:
-
-```yaml
-remote-name: "origin"
-```
+To enable the remote mode, simply provide a URL to the Git repository when invoking the `release`command. The name of the remote can be set if it's not the default `origin`.
 
 An access token is required so that Go Semver Release can clone the Git repository and push tags to it. All modern Git remote providers offer this feature (e.g., [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [GitLab](https://docs.gitlab.com/ee/user/project/settings/project\_access\_tokens.html), [Bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/)).
 
 Please do not set the access token directly in the configuration file. A much safer alternative it to set the access token as a secret on the remote repository and, in your CI workflow, pass it to Go Semver Release either via the `--access-token` flag or via the `GO_SEMVER_RELEASE_ACCESS_TOKEN` environment variable.
+
+Examples:
+
+```bash
+$ export GO_SEMVER_RELEASE_ACCESS_TOKEN="secret"
+$ go-semver-release release <PATH> --remote-name "origin"
+```
+
+```yaml
+remote-name: "origin"
+```
 
 ### Monorepo
 
 CLI flag: `--monorepo`
 
 The program can also version separately multiple projects stored in a single repository also called "monorepo" or "mono repository". To do so, the configuration file must include a `monorepo` section stating the name and path of the various projects inside that repository.
+
+Each project will then be versioned separately meaning that each project will have its SemVer tag in the form `<project>-<semver>` for instance `foo-1.2.3` or `bar-v0.0.1`
+
+**How does it work?**
+
+The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key (e.g. `foo-1.0.0`). Then, for each project, the program will parse the commits older than the latest found tag and for each commit, will check if one of the changes made in that commit belongs to the path of that project, if so, the latest SemVer is incremented according to the type of that commit.
+
+This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have their SemVer bumped according to the commit type.
+
+Examples:
+
+{% code fullWidth="false" %}
+```bash
+$ go-semver-release release <PATH> --monorepo='[{"name": "foo", "path": "./foo/"}, {"name": "bar", "path": "./bar/"}]'
+```
+{% endcode %}
 
 ```yaml
 monorepo:
@@ -120,13 +144,7 @@ monorepo:
     path: ./xyz/bar/
 ```
 
-Each project will then be versioned separately meaning that each project will have its SemVer tag in the form `<project>-<semver>` for instance `foo-1.2.3` or `bar-v0.0.1`
 
-**How does it work?**
-
-The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key (e.g. `foo-1.0.0`). Then, for each project, the program will parse the commits older than the latest found tag and for each commit, will check if one of the changes made in that commit belongs to the path of that project, if so, the latest SemVer is incremented according to the type of that commit.
-
-This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have their SemVer bumped according to the commit type.
 
 ### Tag prefix
 
@@ -143,6 +161,12 @@ Example:
 ```bash
 $ go-semver-release release <PATH> --tag-prefix v
 ```
+
+```yaml
+tag-prefix: v
+```
+
+
 
 ### Build metadata
 

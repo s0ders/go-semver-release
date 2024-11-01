@@ -8,9 +8,8 @@ The following showcases performances benchmarks of Go Semver Release against oth
 
 Each program was executed 10 times (avoids statistic outliers) computing the latest semantic version of a [sample repository](https://github.com/s0ders/big-sample-repo) of 10,000 commits on a single "main" branch without any prior tag:
 
-| Program                                                                        | Time (mean ± σ)   | Range (min ... max) |
-| ------------------------------------------------------------------------------ | ----------------- | ------------------- |
-| [Go Semver Release](https://github.com/s0ders/go-semver-release)               | 1.127 s ± 0.244 s | 0.986 s ... 1.600 s |
-| [Go Semantic Release](https://github.com/go-semantic-release/semantic-release) | 5.150 s ± 0.046 s | 5.041 s ... 5.207 s |
-| [Semantic Release](https://github.com/semantic-release/semantic-release)       | 5.150 s ± 0.046 s | 5.041 s ... 5.207 s |
+| Program                                                                  | Time (mean ± σ)   | Range (min ... max) |
+| ------------------------------------------------------------------------ | ----------------- | ------------------- |
+| [Go Semver Release](https://github.com/s0ders/go-semver-release)         | 1.127 s ± 0.244 s | 0.986 s ... 1.600 s |
+| [Semantic Release](https://github.com/semantic-release/semantic-release) | 5.150 s ± 0.046 s | 5.041 s ... 5.207 s |
 
