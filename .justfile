@@ -8,7 +8,7 @@ appVersion := "v0.0.0+local"
 buildNumber := "local"
 commitHash := "local"
 
-importPath := "github.com/s0ders/go-semver-release/v5/"
+importPath := "github.com/s0ders/go-semver-release/v6/"
 ldFlags := "-X " + importPath + "cmd.cmdVersion=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.buildCommitHash=" + commitHash + " -w -s"
 
 tests:
@@ -38,7 +38,7 @@ clean:
     rm -rf ./bin/*
 
 lint:
-	golangci-lint run
+	golangci-lint run ./...
 	gocyclo -over 15 .
 
 vuln:

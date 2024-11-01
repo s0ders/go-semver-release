@@ -12,9 +12,9 @@ import (
 )
 
 type Remote struct {
-	name       string
 	auth       *http.BasicAuth
 	repository *git.Repository
+	name       string
 }
 
 func New(name string, token string) *Remote {

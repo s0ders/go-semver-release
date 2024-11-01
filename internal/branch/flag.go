@@ -9,7 +9,7 @@ import (
 
 type Flag []map[string]any
 
-const FlagType = "branchesFlag"
+const FlagType = "JSON string"
 
 func (f *Flag) String() string {
 	if f == nil || len(*f) == 0 {

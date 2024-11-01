@@ -1,4 +1,4 @@
-module github.com/s0ders/go-semver-release/v5
+module github.com/s0ders/go-semver-release/v6
 
 go 1.23.1
 

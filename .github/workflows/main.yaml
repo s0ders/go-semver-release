@@ -5,10 +5,6 @@ on:
     branches: [ "main" ]
 
 env:
-  DOCKER_REPO: docker.io/s0ders
-  DOCKER_IMAGE: docker.io/s0ders/go-semver-release
-  GIT_CI_USERNAME: go-semver-ci
-  GIT_CI_EMAIL: go-semver@release.ci
   GO_VERSION: 1.23.1
 
 permissions: read-all

@@ -1,0 +1,28 @@
+stages:
+  - build
+  - test
+  - deploy
+
+build-job:
+  stage: build
+  script:
+    - echo "Compiling the code..."
+    - echo "Compile complete."
+
+unit-test-job:
+  stage: test
+  script:
+    - echo "Running unit tests... This will take about 60 seconds."
+    # Insert your testing process here
+
+versioning:
+  stage: version
+  script:
+    - curl -SL https://github.com/s0ders/go-semver-release/releases/latest/download/go-semver-release-linux-amd64 -o ./go-semver-release && chmod +x ./go-semver-release
+    - ./go-semver-release https://gitlab.com/my/repo --config .semver.yaml
+
+deploy-job:
+  stage: deploy
+  script:
+    - echo "Deploying application..."
+    # Insert your release process here
