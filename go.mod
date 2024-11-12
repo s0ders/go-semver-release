@@ -3,7 +3,7 @@ module github.com/s0ders/go-semver-release/v6
 go 1.23.1
 
 require (
-	github.com/ProtonMail/go-crypto v1.0.0
+	github.com/ProtonMail/go-crypto v1.1.2
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/cobra v1.8.1
