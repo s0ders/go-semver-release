@@ -92,10 +92,10 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				switch {
 				case !release:
 					logEvent.Msg("no new release")
-					return nil
+					break
 				case release && ctx.DryRunFlag:
 					logEvent.Msg("dry-run enabled, next release found")
-					return nil
+					break
 				default:
 					logEvent.Msg("new release found")
 

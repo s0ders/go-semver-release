@@ -791,6 +791,71 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	checkErr(t, err, "scanning error")
 }
 
+func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
+
+	defer func() {
+		err = testRepository.Remove()
+		checkErr(t, err, "removing repository")
+	}()
+
+	// "bar" commits, "foo" has no applicable commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
+	checkErr(t, err, "adding commit")
+
+	th := NewTestHelper(t)
+	err = th.SetFlags(map[string]string{
+		BranchesConfiguration: `[{"name": "master"}]`,
+		MonorepoConfiguration: `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
+	})
+	checkErr(t, err, "setting flags")
+
+	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
+
+	i := 0
+	expectedOutputs := []cmdOutput{
+		{
+			Message:    "no new release",
+			Version:    "0.0.0",
+			NewRelease: false,
+			Branch:     "master",
+			Project:    "foo",
+		},
+		{
+			Message:    "new release found",
+			Version:    "1.0.2",
+			NewRelease: true,
+			Branch:     "master",
+			Project:    "bar",
+		},
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+
+	for scanner.Scan() {
+		rawOutput := scanner.Bytes()
+
+		actualOutput := cmdOutput{}
+
+		err = json.Unmarshal(rawOutput, &actualOutput)
+		checkErr(t, err, "unmarshalling output")
+
+		assert.Equal(expectedOutputs[i], actualOutput)
+		i++
+	}
+	err = scanner.Err()
+	checkErr(t, err, "scanning error")
+	assert.Equal(len(expectedOutputs), i)
+}
+
 func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := NewAppContext()
