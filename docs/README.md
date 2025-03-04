@@ -23,7 +23,7 @@ This documentation is also available at [https://go-semver-release.akira.sh](htt
 * 🏷️ Automatic semantic versioning of your Git repository via annotated Git tags
 * 🌐 Local or remote mode of execution (local removes the need for secret token)
 * 🌴 Support for multiple release branch, prerelease and build metadata
-* 🗂️ Support monorepo (i.e. multiple projects inside a single repository, all versioned separately)
+* 🗂️ Support for monorepo (i.e., multiple projects inside a single repository, all versioned separately)
 * ⚙️ Custom tag prefix
 * 📝 Tag signature using GPG
 
