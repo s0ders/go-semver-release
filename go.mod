@@ -1,6 +1,7 @@
 module github.com/s0ders/go-semver-release/v6
 
 go 1.23.1
+toolchain go1.24.1
 
 require (
 	github.com/ProtonMail/go-crypto v1.1.6
@@ -10,7 +11,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.11.0
+	golang.org/x/sync v0.12.0
 )
 
 require (
