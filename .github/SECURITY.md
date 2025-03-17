@@ -2,12 +2,8 @@
 
 ## Supported Versions
 
-The following versions are supported with security updates.
-
-| Version | Supported          |
-|---------|--------------------|
-| 6.0.x   | :white_check_mark: |
-| < 6.0   | :x:                |
+When a new vulnerability in this project or its dependencies is found, the code or its dependencies will be updated to fix it and new release will be published.
+Hence, no previous version will be re-released with a patch but a new release will be published.
 
 ## Reporting a Vulnerability
 
