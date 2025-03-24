@@ -5,7 +5,7 @@ go 1.23.1
 require (
 	github.com/ProtonMail/go-crypto v1.1.6
 	github.com/go-git/go-git/v5 v5.14.0
-	github.com/rs/zerolog v1.33.0
+	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.0
