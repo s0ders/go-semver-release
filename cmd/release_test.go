@@ -975,7 +975,7 @@ func NewTestRepository(t *testing.T, commits []string) *gittest.TestRepository {
 	}
 
 	t.Cleanup(func() {
-		os.RemoveAll(testRepository.Path)
+		_ = os.RemoveAll(testRepository.Path)
 	})
 
 	return testRepository
