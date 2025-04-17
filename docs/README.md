@@ -42,7 +42,7 @@ All you need to have is an initialized Git repository, a release branch (e.g. `m
 
 Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). Go Semver Release focuses on versioning only, no package publishing, release log generation or other features.
 
-If you want a simple tool that handle the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work with minimal dependencies and work faster.
+If you want a simple tool that handles the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work faster and with minimal dependencies.
 
 ## Documentation
 
