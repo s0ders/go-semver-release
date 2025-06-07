@@ -89,7 +89,7 @@ func TestCI_GenerateGitHub_ReadOnlyOutput(t *testing.T) {
 
 	filePath := os.Getenv("GITHUB_OUTPUT")
 
-	err = os.Chmod(filePath, 0444)
+	err = os.Chmod(filePath, 0o444)
 	checkErr(t, "changing output file permissions", err)
 
 	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
@@ -106,7 +106,7 @@ func setup() error {
 
 	filePath := filepath.Join(dirPath, "output")
 
-	err = os.WriteFile(filePath, []byte(""), 0644)
+	err = os.WriteFile(filePath, []byte(""), 0o644)
 	if err != nil {
 		return fmt.Errorf("setting up output file: %w", err)
 	}

@@ -52,14 +52,14 @@ type ComputeNewSemverOutput struct {
 func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	var output []ComputeNewSemverOutput
 
-	for _, branch := range p.ctx.Branches {
-		err := p.checkoutBranch(repository, branch.Name)
+	for _, gitBranch := range p.ctx.Branches {
+		err := p.checkoutBranch(repository, gitBranch.Name)
 		if err != nil {
-			return output, fmt.Errorf("checking out to branch %q: %w", branch.Name, err)
+			return output, fmt.Errorf("checking out to gitBranch %q: %w", gitBranch.Name, err)
 		}
 
 		if len(p.ctx.Projects) == 0 {
-			computerNewSemverOutput, err := p.ComputeNewSemver(repository, monorepo.Project{}, branch)
+			computerNewSemverOutput, err := p.ComputeNewSemver(repository, monorepo.Project{}, gitBranch)
 			if err != nil {
 				return nil, fmt.Errorf("computing new semver: %w", err)
 			}
@@ -73,7 +73,7 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 
 		for i, project := range p.ctx.Projects {
 			g.Go(func() error {
-				result, err := p.ComputeNewSemver(repository, project, branch)
+				result, err := p.ComputeNewSemver(repository, project, gitBranch)
 				if err != nil {
 					return fmt.Errorf("computing project %q new semver: %w", project.Name, err)
 				}
@@ -132,7 +132,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 		}
 		p.mu.Unlock()
 
-		// Show all commit that are at least one second older than the latest one pointed by SemVer tag
+		// Show all commits that are at least one second older than the latest one pointed by SemVer tag
 		since := latestSemverTagCommit.Committer.When.Add(time.Second)
 		logOptions.Since = &since
 	}
@@ -263,7 +263,6 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}

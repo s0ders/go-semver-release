@@ -33,3 +33,9 @@ type AppContext struct {
 	DryRunFlag         bool
 	VerboseFlag        bool
 }
+
+func New() *AppContext {
+	return &AppContext{
+		Viper: viper.New(),
+	}
+}

@@ -80,7 +80,6 @@ func TestSemver_String(t *testing.T) {
 	for _, tc := range tests {
 		assert.Equal(tc.want, tc.have.String(), "the strings should be equal")
 	}
-
 }
 
 func TestSemver_NewFromString_HappyScenario(t *testing.T) {

@@ -30,7 +30,6 @@ func TestBranchFlag_String(t *testing.T) {
 }
 
 func TestBranchFlag_Set(t *testing.T) {
-
 	var flag Flag
 
 	err := flag.Set("[{\"name\": \"foo\"}]")

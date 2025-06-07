@@ -4,10 +4,11 @@ import (
 	"os"
 
 	"github.com/s0ders/go-semver-release/v6/cmd"
+	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
 )
 
 func main() {
-	ctx := cmd.NewAppContext()
+	ctx := appcontext.New()
 	rootCmd := cmd.NewRootCommand(ctx)
 
 	err := rootCmd.Execute()
