@@ -62,6 +62,9 @@ If you want a simple tool that handles the generation of the next semantic versi
 * [Benchmark](miscellaneous/benchmark.md)
 * [How it works](miscellaneous/how-it-works.md)
 
+## Support
+
+If you are using this project and find it useful, please consider giving it a star!
 <br>
 <hr>
 
