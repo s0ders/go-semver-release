@@ -263,7 +263,6 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}

@@ -1,11 +1,12 @@
 package remote
 
 import (
+	"testing"
+	"time"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
-	"testing"
-	"time"
 
 	assertion "github.com/stretchr/testify/assert"
 

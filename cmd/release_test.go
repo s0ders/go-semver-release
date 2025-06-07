@@ -83,7 +83,7 @@ rules:
 
 	cfgFilePath := filepath.Join(cfgFileDirectory, "config.yml")
 
-	err = os.WriteFile(cfgFilePath, cfgContent, 0644)
+	err = os.WriteFile(cfgFilePath, cfgContent, 0o644)
 	checkErr(t, err, "writing configuration file")
 
 	// Create test repository
