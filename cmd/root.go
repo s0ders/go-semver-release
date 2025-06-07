@@ -37,12 +37,6 @@ const (
 	TagPrefixConfiguration     = "tag-prefix"
 )
 
-func NewAppContext() *appcontext.AppContext {
-	return &appcontext.AppContext{
-		Viper: viper.New(),
-	}
-}
-
 func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "go-semver-release",
@@ -69,7 +63,7 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&ctx.GPGKeyPathFlag, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced tags")
 	rootCmd.PersistentFlags().Var(&ctx.MonorepositoryFlag, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
 	rootCmd.PersistentFlags().StringVar(&ctx.RemoteNameFlag, RemoteNameConfiguration, "origin", "Name of the Git repository remote")
-	rootCmd.PersistentFlags().Var(&ctx.RulesFlag, RulesConfiguration, "An hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
+	rootCmd.PersistentFlags().Var(&ctx.RulesFlag, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 	rootCmd.PersistentFlags().StringVar(&ctx.TagPrefixFlag, TagPrefixConfiguration, "v", "Prefix added to the version tag name")
 	rootCmd.PersistentFlags().BoolVarP(&ctx.VerboseFlag, "verbose", "v", false, "Verbose output")
 

@@ -858,7 +858,7 @@ func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
 
 func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	rules, err := configureRules(ctx)
 	checkErr(t, err, "configuring rules")
@@ -868,7 +868,7 @@ func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
 
 func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	_, err := configureBranches(ctx)
 	assert.ErrorIs(err, branch.ErrNoBranch)
@@ -876,7 +876,7 @@ func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
 
 func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	projects, err := configureProjects(ctx)
 	checkErr(t, err, "configuring projects")
@@ -886,7 +886,7 @@ func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
 
 func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	ctx.RulesFlag = map[string][]string{
 		"minor": {"feat"},
@@ -899,7 +899,7 @@ func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 
 func TestReleaseCmd_InvalidBranch(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	ctx.BranchesFlag = []map[string]any{{"prerelease": true}}
 
@@ -909,7 +909,7 @@ func TestReleaseCmd_InvalidBranch(t *testing.T) {
 
 func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	ctx.MonorepositoryFlag = []map[string]string{{"path": "foo"}}
 
@@ -919,7 +919,7 @@ func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
 
 func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	ctx.GPGKeyPathFlag = "./does/not/exist"
 
@@ -930,7 +930,7 @@ func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 
 func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
 	if err != nil {
