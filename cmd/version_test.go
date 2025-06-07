@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
 )
 
 func TestCmd_Version(t *testing.T) {
 	assert := assert.New(t)
 	actual := new(bytes.Buffer)
-	ctx := NewAppContext()
+	ctx := appcontext.New()
 
 	rootCmd := NewRootCommand(ctx)
 	rootCmd.SetOut(actual)
