@@ -54,7 +54,7 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&ctx.AccessToken, AccessTokenConfiguration, "", "Access token used to push tag to Git remote")
-	rootCmd.PersistentFlags().VarP(&ctx.BranchesFlag, BranchesConfiguration, "b", "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
+	rootCmd.PersistentFlags().VarP(&ctx.BranchesCfg, BranchesConfiguration, "b", "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
 	rootCmd.PersistentFlags().StringVar(&ctx.BuildMetadata, BuildMetadataConfiguration, "", "Build metadata (e.g. build number) that will be appended to the SemVer")
 	rootCmd.PersistentFlags().StringVar(&ctx.CfgFile, "config", "", "Configuration file path (default \"./"+defaultConfigFile+"."+configFileFormat+"\")")
 	rootCmd.PersistentFlags().BoolVarP(&ctx.DryRun, DryRunConfiguration, "d", false, "Only compute the next SemVer, do not push any tag")
@@ -63,7 +63,7 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&ctx.GPGKeyPath, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced tags")
 	rootCmd.PersistentFlags().Var(&ctx.MonorepositoryCfg, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
 	rootCmd.PersistentFlags().StringVar(&ctx.RemoteName, RemoteNameConfiguration, "origin", "Name of the Git repository remote")
-	rootCmd.PersistentFlags().Var(&ctx.RulesFlag, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
+	rootCmd.PersistentFlags().Var(&ctx.RulesCfg, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 	rootCmd.PersistentFlags().StringVar(&ctx.TagPrefix, TagPrefixConfiguration, "v", "Prefix added to the version tag name")
 	rootCmd.PersistentFlags().BoolVarP(&ctx.Verbose, "verbose", "v", false, "Verbose output")
 

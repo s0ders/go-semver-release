@@ -80,7 +80,7 @@ func TestParser_FetchLatestSemverTag_NoTag(t *testing.T) {
 
 	parser := New(th.Ctx)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{})
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{})
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Nil(latest, "latest semver tag should be nil")
@@ -107,7 +107,7 @@ func TestParser_FetchLatestSemverTag_OneTag(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{})
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{})
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Equal(tagName, latest.Name, "latest semver tagName should be equal")
@@ -138,7 +138,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{})
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{})
 	checkErr(t, "fetching latest semver tag", err)
 
 	want := "3.0.0"
@@ -158,7 +158,7 @@ func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver", err)
 
 	want := "0.0.0"
@@ -182,7 +182,7 @@ func TestParser_ComputeNewSemver_UntaggedRepository_PatchRelease(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver", err)
 
 	want := "0.0.1"
@@ -202,18 +202,16 @@ func TestParser_ComputeNewSemver_UnknownReleaseType(t *testing.T) {
 	_, err = testRepository.AddCommit("feat")
 	checkErr(t, "adding commit", err)
 
-	invalidRules := rule.Rules{
-		Map: map[string]string{
-			"feat": "unknown",
-			"fix":  "patch",
-		},
+	invalidRules := map[string]string{
+		"feat": "unknown",
+		"fix":  "patch",
 	}
 
 	th := NewTestHelper(t)
-	th.Ctx.Rules = invalidRules
+	th.Ctx.RulesCfg = invalidRules
 	parser := New(th.Ctx)
 
-	_, err = parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	_, err = parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	assert.ErrorContains(err, "unknown release type")
 }
 
@@ -233,7 +231,7 @@ func TestParser_ComputeNewSemver_UntaggedRepository_MinorRelease(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver", err)
 
 	want := "0.1.0"
@@ -256,7 +254,7 @@ func TestParser_ComputeNewSemver_UntaggedRepository_MajorRelease(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver ", err)
 
 	want := "1.0.0"
@@ -289,7 +287,7 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver ", err)
 
 	want := "1.1.1"
@@ -314,7 +312,7 @@ func TestParser_ComputeNewSemver_UninitializedRepository(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	_, err = parser.ComputeNewSemver(repository, monorepo.Project{}, th.Ctx.Branches[0])
+	_, err = parser.ComputeNewSemver(repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	assert.ErrorIs(err, plumbing.ErrReferenceNotFound)
 }
 
@@ -335,7 +333,7 @@ func TestParser_ComputeNewSemver_BuildMetadata(t *testing.T) {
 	th.Ctx.BuildMetadata = "metadata"
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Version{
@@ -365,10 +363,10 @@ func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
 	prereleaseID := "master"
 
 	th := NewTestHelper(t)
-	th.Ctx.Branches[0].Prerelease = true
+	th.Ctx.BranchesCfg[0].Prerelease = true
 	parser := New(th.Ctx)
 
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Version{
@@ -445,13 +443,13 @@ func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
 	checkErr(t, fmt.Sprintf("creating tag %q", wantTag), err)
 
 	th := NewTestHelper(t)
-	th.Ctx.Projects = []monorepo.Project{
+	th.Ctx.MonorepositoryCfg = []monorepo.Item{
 		{Name: "foo", Path: "foo"},
 		{Name: "bar", Path: "bar"},
 	}
 	parser := New(th.Ctx)
 
-	gotTag, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.Projects[0])
+	gotTag, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.MonorepositoryCfg[0])
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Equal(gotTag.Name, wantTag, "should have found tag")
@@ -473,7 +471,12 @@ func TestMonorepoParser_CommitContainsProjectFiles_True(t *testing.T) {
 	commit, err := testRepository.CommitObject(hash)
 	checkErr(t, "getting commit", err)
 
-	contains, err := commitContainsProjectFiles(commit, "foo")
+	monorepoItem := monorepo.Item{
+		Name: "foo",
+		Path: "foo",
+	}
+
+	contains, err := commitContainsProjectFiles(commit, monorepoItem)
 	checkErr(t, "checking project files", err)
 
 	assert.True(contains, "commit contains project files")
@@ -495,7 +498,12 @@ func TestMonorepoParser_CommitContainsProjectFiles_False(t *testing.T) {
 	commit, err := testRepository.CommitObject(hash)
 	checkErr(t, "getting commit", err)
 
-	contains, err := commitContainsProjectFiles(commit, "bar")
+	monorepoItem := monorepo.Item{
+		Name: "bar",
+		Path: "bar",
+	}
+
+	contains, err := commitContainsProjectFiles(commit, monorepoItem)
 	checkErr(t, "checking project files", err)
 
 	assert.False(contains, "commit does not contain project files")
@@ -532,7 +540,7 @@ func TestParser_Run_Monorepo(t *testing.T) {
 	checkErr(t, "adding commit", err)
 
 	th := NewTestHelper(t)
-	th.Ctx.Projects = []monorepo.Project{
+	th.Ctx.MonorepositoryCfg = []monorepo.Item{
 		{Name: "foo", Path: "foo"},
 		{Name: "bar", Path: "bar"},
 	}
@@ -597,7 +605,7 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 	checkErr(t, "adding commit", err)
 
 	th := NewTestHelper(t)
-	th.Ctx.Projects = []monorepo.Project{
+	th.Ctx.MonorepositoryCfg = []monorepo.Item{
 		{Name: "foo", Path: "foo"},
 		{Name: "bar", Path: "bar"},
 	}
@@ -628,7 +636,7 @@ func TestParser_Run_InvalidBranch(t *testing.T) {
 	})
 
 	th := NewTestHelper(t)
-	th.Ctx.Branches = []branch.Branch{{Name: "does_not_exist"}}
+	th.Ctx.BranchesCfg = []branch.Item{{Name: "does_not_exist"}}
 
 	parser := New(th.Ctx)
 
@@ -675,10 +683,10 @@ type TestHelper struct {
 
 func NewTestHelper(t *testing.T) *TestHelper {
 	ctx := &appcontext.AppContext{
-		Rules:      rule.Default,
-		RemoteName: "origin",
-		Branches:   []branch.Branch{{Name: "master"}},
-		Logger:     zerolog.New(io.Discard),
+		RulesCfg:    rule.Default,
+		RemoteName:  "origin",
+		BranchesCfg: []branch.Item{{Name: "master"}},
+		Logger:      zerolog.New(io.Discard),
 	}
 
 	return &TestHelper{

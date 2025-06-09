@@ -52,7 +52,7 @@ type ComputeNewSemverOutput struct {
 func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	var output []ComputeNewSemverOutput
 
-	for _, gitBranch := range p.ctx.Branches {
+	for _, gitBranch := range p.ctx.BranchesCfg {
 		err := p.checkoutBranch(repository, gitBranch.Name)
 		if err != nil {
 			return output, fmt.Errorf("checking out to gitBranch %q: %w", gitBranch.Name, err)
@@ -95,7 +95,7 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
-func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.Item, branch branch.Branch) (ComputeNewSemverOutput, error) {
+func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.Item, branch branch.Item) (ComputeNewSemverOutput, error) {
 	output := ComputeNewSemverOutput{}
 
 	if project.Name != "" {
@@ -192,7 +192,7 @@ func (p *Parser) ProcessCommit(commit *object.Commit, latestSemver *semver.Versi
 	}
 
 	if project.Name != "" {
-		containsProjectFiles, err := commitContainsProjectFiles(commit, project.Paths)
+		containsProjectFiles, err := commitContainsProjectFiles(commit, project)
 		if err != nil {
 			return false, plumbing.ZeroHash, fmt.Errorf("checking if commit contains project files: %w", err)
 		}
@@ -210,7 +210,7 @@ func (p *Parser) ProcessCommit(commit *object.Commit, latestSemver *semver.Versi
 		return true, commit.Hash, nil
 	}
 
-	releaseType, ok := p.ctx.Rules.Map[commitType]
+	releaseType, ok := p.ctx.RulesCfg[commitType]
 	if !ok {
 		return false, plumbing.ZeroHash, nil
 	}
@@ -309,7 +309,7 @@ func (p *Parser) checkoutBranch(repository *git.Repository, branchName string) e
 
 // commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the
 // given project's path.
-func commitContainsProjectFiles(commit *object.Commit, projectPaths []string) (bool, error) {
+func commitContainsProjectFiles(commit *object.Commit, project monorepo.Item) (bool, error) {
 	commitTree, err := commit.Tree()
 	if err != nil {
 		return false, fmt.Errorf("getting commit tree: %w", err)
@@ -331,9 +331,15 @@ func commitContainsProjectFiles(commit *object.Commit, projectPaths []string) (b
 	for _, change := range changes {
 		dir := filepath.Dir(change.To.Name)
 
-		for _, projectPath := range projectPaths {
-			if strings.HasPrefix(dir, projectPath) {
-				return true, nil
+		if project.Path != "" && strings.HasPrefix(dir, project.Path) {
+			return true, nil
+		}
+
+		if len(project.Paths) != 0 {
+			for _, projectPath := range project.Paths {
+				if strings.HasPrefix(dir, projectPath) {
+					return true, nil
+				}
 			}
 		}
 	}

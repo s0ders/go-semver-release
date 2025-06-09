@@ -3,10 +3,13 @@ package monorepo
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/pflag"
 )
+
+var ErrExclusiveFlag = fmt.Errorf("the given flags are mutually exclusive")
+
+var FlagType = "monorepo"
 
 type Flag []Item
 
@@ -15,11 +18,12 @@ func (f *Flag) String() string {
 		return "[]"
 	}
 
-	var parts []string
-	for _, item := range *f {
-		parts = append(parts, fmt.Sprintf("%s:%v", item.Name, item.Paths))
+	b, err := json.Marshal(f)
+	if err != nil {
+		return err.Error()
 	}
-	return "[" + strings.Join(parts, ", ") + "]"
+
+	return string(b)
 }
 
 func (f *Flag) Set(value string) error {
@@ -36,12 +40,18 @@ func (f *Flag) Set(value string) error {
 		return fmt.Errorf("parsing monorepo configuration: %w", err)
 	}
 
+	for _, item := range items {
+		if len(item.Paths) != 0 && item.Path != "" {
+			return fmt.Errorf("monorepo item %q has both path and paths set: %w", item.Name, ErrExclusiveFlag)
+		}
+	}
+
 	*f = Flag(items)
 	return nil
 }
 
 func (f *Flag) Type() string {
-	return "monorepo"
+	return FlagType
 }
 
 // GetItems returns the parsed monorepo items
