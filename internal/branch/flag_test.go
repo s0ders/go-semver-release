@@ -9,7 +9,10 @@ import (
 func TestBranchFlag_String(t *testing.T) {
 	assert := assert.New(t)
 
-	normalBranchConfiguration := []map[string]any{{"name": "master"}, {"name": "rc", "prerelease": true}}
+	normalBranchConfiguration := []Item{
+		{Name: "master", Prerelease: false},
+		{Name: "rc", Prerelease: true},
+	}
 	normalBranchConfigurationFlag := Flag(normalBranchConfiguration)
 
 	var emptyFlag Flag
@@ -20,7 +23,7 @@ func TestBranchFlag_String(t *testing.T) {
 	}
 
 	tests := []test{
-		{got: &normalBranchConfigurationFlag, want: "[{\"name\":\"master\"},{\"name\":\"rc\",\"prerelease\":true}]"},
+		{got: &normalBranchConfigurationFlag, want: "[{\"name\":\"master\",\"prerelease\":false},{\"name\":\"rc\",\"prerelease\":true}]"},
 		{got: &emptyFlag, want: "[]"},
 	}
 

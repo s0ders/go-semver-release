@@ -15,11 +15,9 @@ import (
 
 type AppContext struct {
 	Viper             *viper.Viper
-	Branches          []branch.Branch
-	Rules             rule.Rules
-	BranchesFlag      branch.Flag
+	BranchesCfg       branch.Flag
 	MonorepositoryCfg monorepo.Flag
-	RulesFlag         rule.Flag
+	RulesCfg          rule.Flag
 	Logger            zerolog.Logger
 	CfgFile           string
 	GitName           string

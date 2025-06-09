@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -11,13 +12,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/branch"
 	"github.com/s0ders/go-semver-release/v6/internal/ci"
 	"github.com/s0ders/go-semver-release/v6/internal/gpg"
 	"github.com/s0ders/go-semver-release/v6/internal/parser"
 	"github.com/s0ders/go-semver-release/v6/internal/remote"
 	"github.com/s0ders/go-semver-release/v6/internal/rule"
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
+)
+
+const (
+	MessageDryRun       string = "dry-run enabled, next release found"
+	MessageNewRelease   string = "new release found"
+	MessageNoNewRelease string = "no new release"
 )
 
 func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
@@ -37,14 +43,17 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("configuring GPG key: %w", err)
 			}
 
-			ctx.Rules, err = configureRules(ctx)
-			if err != nil {
-				return fmt.Errorf("loading rules configuration: %w", err)
-			}
+			if ctx.RulesCfg.String() == "{}" {
+				ctx.Logger.Debug().Msg("no rules configuration provided, using default release rules")
 
-			ctx.Branches, err = configureBranches(ctx)
-			if err != nil {
-				return fmt.Errorf("loading branches configuration: %w", err)
+				b, err := json.Marshal(rule.Default)
+				if err != nil {
+					return fmt.Errorf("marshalling default rules: %w", err)
+				}
+
+				if err = ctx.RulesCfg.Set(string(b)); err != nil {
+					return fmt.Errorf("setting default rules flag: %w", err)
+				}
 			}
 
 			origin = remote.New(ctx.RemoteName, ctx.AccessToken)
@@ -69,7 +78,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefix), ci.WithProject(project))
 				if err != nil {
-					return fmt.Errorf("generating github output: %w", err)
+					return fmt.Errorf("generating GitHub output: %w", err)
 				}
 
 				logEvent := ctx.Logger.Info()
@@ -85,11 +94,11 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 				switch {
 				case !release:
-					logEvent.Msg("no new release")
+					logEvent.Msg(MessageNoNewRelease)
 				case release && ctx.DryRun:
-					logEvent.Msg("dry-run enabled, next release found")
+					logEvent.Msg(MessageDryRun)
 				default:
-					logEvent.Msg("new release found")
+					logEvent.Msg(MessageNewRelease)
 
 					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
@@ -110,34 +119,6 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 	}
 
 	return releaseCmd
-}
-
-func configureRules(ctx *appcontext.AppContext) (rule.Rules, error) {
-	flag := ctx.RulesFlag
-
-	if flag.String() == "{}" {
-		return rule.Default, nil
-	}
-
-	rulesJSON := map[string][]string(flag)
-
-	unmarshalledRules, err := rule.Unmarshall(rulesJSON)
-	if err != nil {
-		return unmarshalledRules, fmt.Errorf("parsing rules configuration: %w", err)
-	}
-
-	return unmarshalledRules, nil
-}
-
-func configureBranches(ctx *appcontext.AppContext) ([]branch.Branch, error) {
-	branchesJSON := []map[string]any(ctx.BranchesFlag)
-
-	unmarshalledBranches, err := branch.Unmarshall(branchesJSON)
-	if err != nil {
-		return nil, fmt.Errorf("parsing branches configuration: %w", err)
-	}
-
-	return unmarshalledBranches, nil
 }
 
 func configureGPGKey(ctx *appcontext.AppContext) (*openpgp.Entity, error) {

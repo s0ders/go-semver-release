@@ -54,16 +54,16 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&ctx.AccessToken, AccessTokenConfiguration, "", "Access token used to push tag to Git remote")
-	rootCmd.PersistentFlags().VarP(&ctx.BranchesFlag, BranchesConfiguration, "b", "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
-	rootCmd.PersistentFlags().StringVar(&ctx.BuildMetadata, BuildMetadataConfiguration, "", "Build metadata (e.g. build number) that will be appended to the SemVer")
+	rootCmd.PersistentFlags().VarP(&ctx.BranchesCfg, BranchesConfiguration, "b", "An array of branches configuration such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
+	rootCmd.PersistentFlags().StringVar(&ctx.BuildMetadata, BuildMetadataConfiguration, "", "Build metadata that will be appended to the SemVer")
 	rootCmd.PersistentFlags().StringVar(&ctx.CfgFile, "config", "", "Configuration file path (default \"./"+defaultConfigFile+"."+configFileFormat+"\")")
 	rootCmd.PersistentFlags().BoolVarP(&ctx.DryRun, DryRunConfiguration, "d", false, "Only compute the next SemVer, do not push any tag")
 	rootCmd.PersistentFlags().StringVar(&ctx.GitEmail, GitEmailConfiguration, "go-semver@release.ci", "Email used in semantic version tags")
-	rootCmd.PersistentFlags().StringVar(&ctx.GitName, GitNameConfiguration, "Go Semver Release", "Name used in semantic version tags")
-	rootCmd.PersistentFlags().StringVar(&ctx.GPGKeyPath, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced tags")
-	rootCmd.PersistentFlags().Var(&ctx.MonorepositoryCfg, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
+	rootCmd.PersistentFlags().StringVar(&ctx.GitName, GitNameConfiguration, "Go Semver Release", "Name used in semantic version Git tags")
+	rootCmd.PersistentFlags().StringVar(&ctx.GPGKeyPath, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced Git tags")
+	rootCmd.PersistentFlags().Var(&ctx.MonorepositoryCfg, MonorepoConfiguration, "An array of monorepository configuration such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
 	rootCmd.PersistentFlags().StringVar(&ctx.RemoteName, RemoteNameConfiguration, "origin", "Name of the Git repository remote")
-	rootCmd.PersistentFlags().Var(&ctx.RulesFlag, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
+	rootCmd.PersistentFlags().Var(&ctx.RulesCfg, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
 	rootCmd.PersistentFlags().StringVar(&ctx.TagPrefix, TagPrefixConfiguration, "v", "Prefix added to the version tag name")
 	rootCmd.PersistentFlags().BoolVarP(&ctx.Verbose, "verbose", "v", false, "Verbose output")
 
@@ -76,6 +76,13 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	return rootCmd
 }
 
+// initializeConfig manages how the configuration variables of the application are initialized.
+// It loads configuration with the following order of precedence:
+// (1) command line flags, (2) environment variables, (3) viper configuration file.
+// The key point to understand how configuration management is handled throughout this application is that everything
+// ends up being mapped to the variable inside appcontext.AppContext that are either populated by Cobra using CLI flag
+// values, or by Viper using configuration file or environment variables. Viper is only used to bind flags and
+// configuration file values.
 func initializeConfig(cmd *cobra.Command, ctx *appcontext.AppContext) error {
 	if ctx.CfgFile != "" {
 		ctx.Viper.SetConfigFile(ctx.CfgFile)

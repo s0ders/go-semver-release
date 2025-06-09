@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
-type Flag map[string][]string
+type Flag map[string]string
 
-const FlagType = "JSON string"
+const FlagType = "rules"
 
 func (f *Flag) String() string {
 	if f == nil || len(*f) == 0 {
@@ -18,19 +18,48 @@ func (f *Flag) String() string {
 
 	b, err := json.Marshal(f)
 	if err != nil {
-		return "{}"
+		return err.Error()
 	}
 
 	return string(b)
 }
 
 func (f *Flag) Set(value string) error {
-	var temp map[string][]string
-	if err := json.Unmarshal([]byte(value), &temp); err != nil {
-		return fmt.Errorf("unmarshalling rule flag value: %w", err)
+	// Clear existing values
+	*f = Flag{}
+
+	if value == "" || value == "[]" {
+		return nil
 	}
 
-	*f = temp
+	var rules map[string][]string
+
+	if err := json.Unmarshal([]byte(value), &rules); err != nil {
+		return fmt.Errorf("unmarshalling %s flag value: %w", FlagType, err)
+	}
+
+	commitTypesHashmap := make(map[string]string)
+
+	for releaseType, commitTypes := range rules {
+		if _, ok := ValidReleaseTypes[releaseType]; !ok {
+			return fmt.Errorf("%w: %q", ErrInvalidReleaseType, releaseType)
+		}
+
+		for _, commitType := range commitTypes {
+			if _, ok := ValidCommitTypes[commitType]; !ok {
+				return fmt.Errorf("%w: %q", ErrInvalidCommitType, commitType)
+			}
+
+			if _, ok := commitTypesHashmap[commitType]; ok {
+				return fmt.Errorf("%w: %q", ErrDuplicateReleaseRule, commitType)
+			}
+
+			commitTypesHashmap[commitType] = releaseType
+		}
+	}
+
+	*f = commitTypesHashmap
+
 	return nil
 }
 
