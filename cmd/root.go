@@ -44,7 +44,7 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			ctx.Logger = zerolog.New(cmd.OutOrStdout()).Level(zerolog.InfoLevel)
 
-			if ctx.VerboseFlag {
+			if ctx.Verbose {
 				ctx.Logger = ctx.Logger.Level(zerolog.DebugLevel)
 			}
 
@@ -53,19 +53,19 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 		TraverseChildren: true,
 	}
 
-	rootCmd.PersistentFlags().StringVar(&ctx.AccessTokenFlag, AccessTokenConfiguration, "", "Access token used to push tag to Git remote")
+	rootCmd.PersistentFlags().StringVar(&ctx.AccessToken, AccessTokenConfiguration, "", "Access token used to push tag to Git remote")
 	rootCmd.PersistentFlags().VarP(&ctx.BranchesFlag, BranchesConfiguration, "b", "An array of branches such as [{\"name\": \"main\"}, {\"name\": \"rc\", \"prerelease\": true}]")
-	rootCmd.PersistentFlags().StringVar(&ctx.BuildMetadataFlag, BuildMetadataConfiguration, "", "Build metadata (e.g. build number) that will be appended to the SemVer")
-	rootCmd.PersistentFlags().StringVar(&ctx.CfgFileFlag, "config", "", "Configuration file path (default \"./"+defaultConfigFile+"."+configFileFormat+"\")")
-	rootCmd.PersistentFlags().BoolVarP(&ctx.DryRunFlag, DryRunConfiguration, "d", false, "Only compute the next SemVer, do not push any tag")
-	rootCmd.PersistentFlags().StringVar(&ctx.GitEmailFlag, GitEmailConfiguration, "go-semver@release.ci", "Email used in semantic version tags")
-	rootCmd.PersistentFlags().StringVar(&ctx.GitNameFlag, GitNameConfiguration, "Go Semver Release", "Name used in semantic version tags")
-	rootCmd.PersistentFlags().StringVar(&ctx.GPGKeyPathFlag, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced tags")
-	rootCmd.PersistentFlags().Var(&ctx.MonorepositoryFlag, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
-	rootCmd.PersistentFlags().StringVar(&ctx.RemoteNameFlag, RemoteNameConfiguration, "origin", "Name of the Git repository remote")
+	rootCmd.PersistentFlags().StringVar(&ctx.BuildMetadata, BuildMetadataConfiguration, "", "Build metadata (e.g. build number) that will be appended to the SemVer")
+	rootCmd.PersistentFlags().StringVar(&ctx.CfgFile, "config", "", "Configuration file path (default \"./"+defaultConfigFile+"."+configFileFormat+"\")")
+	rootCmd.PersistentFlags().BoolVarP(&ctx.DryRun, DryRunConfiguration, "d", false, "Only compute the next SemVer, do not push any tag")
+	rootCmd.PersistentFlags().StringVar(&ctx.GitEmail, GitEmailConfiguration, "go-semver@release.ci", "Email used in semantic version tags")
+	rootCmd.PersistentFlags().StringVar(&ctx.GitName, GitNameConfiguration, "Go Semver Release", "Name used in semantic version tags")
+	rootCmd.PersistentFlags().StringVar(&ctx.GPGKeyPath, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced tags")
+	rootCmd.PersistentFlags().Var(&ctx.MonorepositoryCfg, MonorepoConfiguration, "An array of branches such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
+	rootCmd.PersistentFlags().StringVar(&ctx.RemoteName, RemoteNameConfiguration, "origin", "Name of the Git repository remote")
 	rootCmd.PersistentFlags().Var(&ctx.RulesFlag, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")
-	rootCmd.PersistentFlags().StringVar(&ctx.TagPrefixFlag, TagPrefixConfiguration, "v", "Prefix added to the version tag name")
-	rootCmd.PersistentFlags().BoolVarP(&ctx.VerboseFlag, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().StringVar(&ctx.TagPrefix, TagPrefixConfiguration, "v", "Prefix added to the version tag name")
+	rootCmd.PersistentFlags().BoolVarP(&ctx.Verbose, "verbose", "v", false, "Verbose output")
 
 	releaseCmd := NewReleaseCmd(ctx)
 	versionCmd := NewVersionCmd()
@@ -77,15 +77,15 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 }
 
 func initializeConfig(cmd *cobra.Command, ctx *appcontext.AppContext) error {
-	if ctx.CfgFileFlag != "" {
-		ctx.Viper.SetConfigFile(ctx.CfgFileFlag)
+	if ctx.CfgFile != "" {
+		ctx.Viper.SetConfigFile(ctx.CfgFile)
 	} else {
 		ctx.Viper.AddConfigPath(".")
 		ctx.Viper.SetConfigType(configFileFormat)
 		ctx.Viper.SetConfigName(defaultConfigFile)
 	}
 
-	absCfgPath, err := filepath.Abs(ctx.CfgFileFlag)
+	absCfgPath, err := filepath.Abs(ctx.CfgFile)
 	if err != nil {
 		return fmt.Errorf("getting configuration file absolute path: %w", err)
 	}

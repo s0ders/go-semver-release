@@ -14,7 +14,6 @@ import (
 	"github.com/s0ders/go-semver-release/v6/internal/branch"
 	"github.com/s0ders/go-semver-release/v6/internal/ci"
 	"github.com/s0ders/go-semver-release/v6/internal/gpg"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v6/internal/parser"
 	"github.com/s0ders/go-semver-release/v6/internal/remote"
 	"github.com/s0ders/go-semver-release/v6/internal/rule"
@@ -48,12 +47,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("loading branches configuration: %w", err)
 			}
 
-			ctx.Projects, err = configureProjects(ctx)
-			if err != nil {
-				return fmt.Errorf("loading projects configuration: %w", err)
-			}
-
-			origin = remote.New(ctx.RemoteNameFlag, ctx.AccessTokenFlag)
+			origin = remote.New(ctx.RemoteName, ctx.AccessToken)
 
 			repository, err = origin.Clone(args[0])
 			if err != nil {
@@ -65,7 +59,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("computing new semver: %w", err)
 			}
 
-			tagger := tag.NewTagger(ctx.GitNameFlag, ctx.GitEmailFlag, tag.WithTagPrefix(ctx.TagPrefixFlag), tag.WithSignKey(entity))
+			tagger := tag.NewTagger(ctx.GitName, ctx.GitEmail, tag.WithTagPrefix(ctx.TagPrefix), tag.WithSignKey(entity))
 
 			for _, output := range outputs {
 				semver := output.Semver
@@ -73,7 +67,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				commitHash := output.CommitHash
 				project := output.Project.Name
 
-				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefixFlag), ci.WithProject(project))
+				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefix), ci.WithProject(project))
 				if err != nil {
 					return fmt.Errorf("generating github output: %w", err)
 				}
@@ -92,7 +86,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				switch {
 				case !release:
 					logEvent.Msg("no new release")
-				case release && ctx.DryRunFlag:
+				case release && ctx.DryRun:
 					logEvent.Msg("dry-run enabled, next release found")
 				default:
 					logEvent.Msg("new release found")
@@ -146,33 +140,16 @@ func configureBranches(ctx *appcontext.AppContext) ([]branch.Branch, error) {
 	return unmarshalledBranches, nil
 }
 
-func configureProjects(ctx *appcontext.AppContext) ([]monorepo.Project, error) {
-	flag := ctx.MonorepositoryFlag
-
-	if flag.String() == "[]" {
-		return nil, nil
-	}
-
-	monorepoJSON := []map[string]string(flag)
-
-	projects, err := monorepo.Unmarshall(monorepoJSON)
-	if err != nil {
-		return nil, fmt.Errorf("parsing monorepository projects configuration: %w", err)
-	}
-
-	return projects, nil
-}
-
 func configureGPGKey(ctx *appcontext.AppContext) (*openpgp.Entity, error) {
-	flag := ctx.GPGKeyPathFlag
+	flag := ctx.GPGKeyPath
 
 	if flag == "" {
 		return nil, nil
 	}
 
-	ctx.Logger.Debug().Str("path", ctx.GPGKeyPathFlag).Msg("using the following armored key for signing")
+	ctx.Logger.Debug().Str("path", ctx.GPGKeyPath).Msg("using the following armored key for signing")
 
-	armoredKeyFile, err := os.ReadFile(ctx.GPGKeyPathFlag)
+	armoredKeyFile, err := os.ReadFile(ctx.GPGKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading armored key: %w", err)
 	}

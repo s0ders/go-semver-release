@@ -17,7 +17,6 @@ import (
 	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
 	"github.com/s0ders/go-semver-release/v6/internal/branch"
 	"github.com/s0ders/go-semver-release/v6/internal/gittest"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v6/internal/rule"
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
 )
@@ -46,7 +45,7 @@ func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
 	_, err = th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	assert.Equal(accessToken, th.Ctx.AccessTokenFlag, "access token flag value should be equal to environment variable value")
+	assert.Equal(accessToken, th.Ctx.AccessToken, "access token flag value should be equal to environment variable value")
 }
 
 func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
@@ -874,16 +873,6 @@ func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
 	assert.ErrorIs(err, branch.ErrNoBranch)
 }
 
-func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
-
-	projects, err := configureProjects(ctx)
-	checkErr(t, err, "configuring projects")
-
-	assert.Nil(projects, "no monorepo configuration, should have gotten nil")
-}
-
 func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := appcontext.New()
@@ -907,21 +896,11 @@ func TestReleaseCmd_InvalidBranch(t *testing.T) {
 	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
 }
 
-func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
-
-	ctx.MonorepositoryFlag = []map[string]string{{"path": "foo"}}
-
-	_, err := configureProjects(ctx)
-	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
-}
-
 func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := appcontext.New()
 
-	ctx.GPGKeyPathFlag = "./does/not/exist"
+	ctx.GPGKeyPath = "./does/not/exist"
 
 	_, err := configureGPGKey(ctx)
 
@@ -958,7 +937,7 @@ func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 		}
 	}()
 
-	ctx.GPGKeyPathFlag = keyFilePath
+	ctx.GPGKeyPath = keyFilePath
 
 	_, err = configureGPGKey(ctx)
 	assert.ErrorContains(err, "loading armored key", "should have failed trying to read armored key ring from empty file")
