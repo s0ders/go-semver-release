@@ -1,50 +1,17 @@
 // Package monorepo provides functions to work with monorepository configuration.
 package monorepo
 
-import (
-	"errors"
-	"path/filepath"
-)
-
-var (
-	ErrNoProjects = errors.New("no projects found in configuration file despite operating in monorepo mode")
-	ErrNoName     = errors.New("project has no name")
-	ErrNoPath     = errors.New("project has no path")
-)
-
 type Project struct {
 	Path string
 	Name string
 }
 
-// Unmarshall takes a raw Viper configuration and returns a slice of Project representing various projects in a
-// monorepo.
-func Unmarshall(input []map[string]string) ([]Project, error) {
-	if len(input) == 0 {
-		return nil, ErrNoProjects
-	}
+// TOD0: where to tell viper about this?
+type Config struct {
+	Items []Item `yaml:"monorepo" mapstructure:"monorepo"`
+}
 
-	projects := make([]Project, len(input))
-
-	for i, p := range input {
-
-		name, ok := p["name"]
-		if !ok {
-			return nil, ErrNoName
-		}
-
-		path, ok := p["path"]
-		if !ok {
-			return nil, ErrNoPath
-		}
-
-		project := Project{
-			Name: name,
-			Path: filepath.Clean(path),
-		}
-
-		projects[i] = project
-	}
-
-	return projects, nil
+type Item struct {
+	Name  string   `yaml:"name" mapstructure:"name"`
+	Paths []string `yaml:"paths" mapstructure:"paths"`
 }

@@ -332,7 +332,7 @@ func TestParser_ComputeNewSemver_BuildMetadata(t *testing.T) {
 	checkErr(t, "adding commit", err)
 
 	th := NewTestHelper(t)
-	th.Ctx.BuildMetadataFlag = "metadata"
+	th.Ctx.BuildMetadata = "metadata"
 	parser := New(th.Ctx)
 
 	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{}, th.Ctx.Branches[0])
@@ -675,10 +675,10 @@ type TestHelper struct {
 
 func NewTestHelper(t *testing.T) *TestHelper {
 	ctx := &appcontext.AppContext{
-		Rules:          rule.Default,
-		RemoteNameFlag: "origin",
-		Branches:       []branch.Branch{{Name: "master"}},
-		Logger:         zerolog.New(io.Discard),
+		Rules:      rule.Default,
+		RemoteName: "origin",
+		Branches:   []branch.Branch{{Name: "master"}},
+		Logger:     zerolog.New(io.Discard),
 	}
 
 	return &TestHelper{
