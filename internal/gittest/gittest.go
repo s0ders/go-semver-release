@@ -11,9 +11,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/storage/memory"
 )
 
 const sampleFile = "sample.txt"
@@ -42,6 +44,16 @@ func NewRepository() (*TestRepository, error) {
 	repository, err := git.PlainInit(path, false)
 	if err != nil {
 		return testRepository, fmt.Errorf("initializing repository: %s", err)
+	}
+
+	err = repository.Storer.SetReference(
+		plumbing.NewSymbolicReference(
+			plumbing.HEAD,
+			plumbing.NewBranchReferenceName("main"),
+		),
+	)
+	if err != nil {
+		return testRepository, fmt.Errorf("create main branch: %s", err)
 	}
 
 	testRepository.Repository = repository
@@ -86,18 +98,14 @@ func NewRepository() (*TestRepository, error) {
 	return testRepository, err
 }
 
-// Clone clones the current TestRepository to a temporary directory and returns the clone of that repository. This
+// Clone clones the current TestRepository to memory and returns the clone of that repository. This
 // method is useful when testing on repository that are expected to have a configured remote.
 func (r *TestRepository) Clone() (*TestRepository, error) {
 	testRepository := &TestRepository{}
 
-	tempDir, err := os.MkdirTemp("", "*")
-	if err != nil {
-		return nil, fmt.Errorf("creating temporary directory: %w", err)
-	}
-
-	testRepository.Path = tempDir
-	testRepository.Repository, err = git.PlainClone(tempDir, false, &git.CloneOptions{
+	var err error
+	testRepository.Path = "."
+	testRepository.Repository, err = git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
 		URL:      r.Path,
 		Progress: io.Discard,
 	})
@@ -106,6 +114,15 @@ func (r *TestRepository) Clone() (*TestRepository, error) {
 	}
 
 	return testRepository, nil
+}
+
+// Add commit to specified branch
+func (r *TestRepository) AddCommitToBranch(commitType string, branch string) (plumbing.Hash, error) {
+	err := r.CheckoutBranch(branch, false)
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("checkout branch: %w", err)
+	}
+	return r.AddCommit(commitType)
 }
 
 // AddCommit adds a new commit with a given conventional commit type to the underlying Git repository.
@@ -117,14 +134,17 @@ func (r *TestRepository) AddCommit(commitType string) (plumbing.Hash, error) {
 		return commitHash, fmt.Errorf("fetching worktree: %w", err)
 	}
 
-	commitFilePath := filepath.Join(r.Path, sampleFile)
+	newFile, err := worktree.Filesystem.Create(sampleFile)
+	if err != nil {
+		return commitHash, fmt.Errorf("creating commit file: %w", err)
+	}
 
-	err = os.WriteFile(commitFilePath, []byte(strconv.Itoa(rand.IntN(10000))), 0o644)
+	_, err = newFile.Write([]byte(strconv.Itoa(rand.IntN(10000))))
 	if err != nil {
 		return commitHash, fmt.Errorf("writing commit file: %w", err)
 	}
 
-	_, err = worktree.Add(sampleFile)
+	_, err = worktree.Add(newFile.Name())
 	if err != nil {
 		return commitHash, fmt.Errorf("adding commit file to worktree: %w", err)
 	}
@@ -162,20 +182,25 @@ func (r *TestRepository) AddCommitWithSpecificFile(commitType, filePath string) 
 		return commitHash, fmt.Errorf("fetching worktree: %w", err)
 	}
 
-	commitFilePath := filepath.Clean(filepath.Join(r.Path, filePath))
+	commitFilePath := filepath.Clean(filePath)
 	dirs := filepath.Dir(commitFilePath)
 
-	err = os.MkdirAll(dirs, os.ModePerm)
+	err = worktree.Filesystem.MkdirAll(dirs, os.ModePerm)
 	if err != nil {
 		return commitHash, fmt.Errorf("creating parent directory: %w", err)
 	}
 
-	err = os.WriteFile(commitFilePath, []byte(strconv.Itoa(rand.IntN(10000))), 0o644)
+	newFile, err := worktree.Filesystem.Create(commitFilePath)
+	if err != nil {
+		return commitHash, fmt.Errorf("creating commit file: %w", err)
+	}
+
+	_, err = newFile.Write([]byte(strconv.Itoa(rand.IntN(10000))))
 	if err != nil {
 		return commitHash, fmt.Errorf("writing commit file: %w", err)
 	}
 
-	_, err = worktree.Add(filepath.Clean(filePath))
+	_, err = worktree.Add(filePath)
 	if err != nil {
 		return commitHash, fmt.Errorf("adding commit file to worktree: %w", err)
 	}
@@ -205,6 +230,15 @@ func (r *TestRepository) AddCommitWithSpecificFile(commitType, filePath string) 
 	return commitHash, nil
 }
 
+// Adds tag to a specific branch
+func (r *TestRepository) AddTagToBranch(tagName string, branch string) error {
+	ref, err := r.Reference(plumbing.NewBranchReferenceName(branch), true)
+	if err != nil {
+		return err
+	}
+	return r.AddTag(tagName, ref.Hash())
+}
+
 // AddTag adds a new tag to the underlying Git repository with a given name and pointing to a given hash.
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 	commit, err := r.CommitObject(hash)
@@ -231,24 +265,21 @@ func (r *TestRepository) Remove() error {
 	return os.RemoveAll(r.Path)
 }
 
-// CheckoutBranch creates a new branch with the given name and checkout to it.
-func (r *TestRepository) CheckoutBranch(name string) error {
-	head, err := r.Head()
-	if err != nil {
-		return err
-	}
+// CheckoutBranch checkouts a branch or creates a new branch with the given name and checkout to it.
+func (r *TestRepository) CheckoutBranch(name string, create bool) error {
+	branch := plumbing.NewBranchReferenceName(name)
 
-	refName := "refs/heads/" + name
-	ref := plumbing.NewHashReference(plumbing.ReferenceName(refName), head.Hash())
+	if create {
+		head, err := r.Head()
+		if err != nil {
+			return err
+		}
 
-	err = r.Storer.SetReference(ref)
-	if err != nil {
-		return err
-	}
-
-	branchCoOpts := &git.CheckoutOptions{
-		Branch: plumbing.ReferenceName(refName),
-		Force:  true,
+		ref := plumbing.NewHashReference(branch, head.Hash())
+		err = r.Storer.SetReference(ref)
+		if err != nil {
+			return err
+		}
 	}
 
 	worktree, err := r.Worktree()
@@ -256,7 +287,10 @@ func (r *TestRepository) CheckoutBranch(name string) error {
 		return err
 	}
 
-	err = worktree.Checkout(branchCoOpts)
+	err = worktree.Checkout(&git.CheckoutOptions{
+		Branch: branch,
+		Force:  true,
+	})
 	if err != nil {
 		return err
 	}
