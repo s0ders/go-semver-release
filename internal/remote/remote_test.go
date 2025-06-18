@@ -56,7 +56,7 @@ func TestRemote_PushTag(t *testing.T) {
 		checkErr(t, err, "removing test repository")
 	}()
 
-	commitHash, err := testRepository.AddCommit("fix")
+	c, err := testRepository.AddCommit("fix")
 	checkErr(t, err, "adding commit to test repository")
 
 	remote := New("origin", "password")
@@ -64,7 +64,7 @@ func TestRemote_PushTag(t *testing.T) {
 	clonedRepository, err := remote.Clone(testRepository.Path)
 	checkErr(t, err, "cloning repository")
 
-	_, err = clonedRepository.CreateTag(tagName, commitHash, &git.CreateTagOptions{
+	_, err = clonedRepository.CreateTag(tagName, c.Hash, &git.CreateTagOptions{
 		Message: tagName,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
@@ -88,7 +88,7 @@ func TestRemote_PushTag_UnavailableRemote(t *testing.T) {
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating test repository")
 
-	commitHash, err := testRepository.AddCommit("fix")
+	c, err := testRepository.AddCommit("fix")
 	checkErr(t, err, "adding commit to test repository")
 
 	remote := New("origin", "password")
@@ -96,7 +96,7 @@ func TestRemote_PushTag_UnavailableRemote(t *testing.T) {
 	clonedRepository, err := remote.Clone(testRepository.Path)
 	checkErr(t, err, "cloning repository")
 
-	_, err = clonedRepository.CreateTag(tagName, commitHash, &git.CreateTagOptions{
+	_, err = clonedRepository.CreateTag(tagName, c.Hash, &git.CreateTagOptions{
 		Message: tagName,
 		Tagger: &object.Signature{
 			Name:  "Go Semver Release",
