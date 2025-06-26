@@ -28,13 +28,19 @@ type cmdOutput struct {
 	Version    string `json:"version"`
 	Project    string `json:"project"`
 	NewRelease bool   `json:"new-release"`
+	Error      string `json:"error"`
 }
+
+var (
+	taggerName  string = "My CI Robot"
+	taggerEmail string = "my-robot@release.ci"
+)
 
 func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
 	assert := assertion.New(t)
 	th := NewTestHelper(t)
 
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	err := th.SetFlag(BranchesConfiguration, `[{"name": "main"}]`)
 	checkErr(t, err, "setting branches configuration")
 
 	testRepository := NewTestRepository(t, []string{})
@@ -50,18 +56,15 @@ func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
 }
 
 func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
-	assert := assertion.New(t)
-
-	taggerName := "My CI Robot"
-	taggerEmail := "my-robot@release.ci"
-
 	// Create configuration file
 	cfgContent := []byte(`
 git-name: ` + taggerName + `
 git-email: ` + taggerEmail + `
 tag-prefix: v
 branches:
-  - name: master
+  - name: main
+  - name: beta
+    prerelease: true
   - name: alpha
     prerelease: true
 rules:
@@ -86,26 +89,212 @@ rules:
 	err = os.WriteFile(cfgFilePath, cfgContent, 0o644)
 	checkErr(t, err, "writing configuration file")
 
-	// Create test repository
-	masterCommits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
-	}
+	// Create test steps
+	type e = []*cmdOutput
+	steps := []gittest.Step{
+		gittest.NewCommitStep("main", "fix"),
+		gittest.NewCallbackStep("", e{
+			{
+				Message:    MessageNewRelease,
+				Branch:     "main",
+				Version:    "0.1.0",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "beta",
+				Version:    "0.0.0",
+				Project:    "",
+				NewRelease: false,
+				Error:      "remote branch \"refs/remotes/origin/beta\" not found: reference not found",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "alpha",
+				Version:    "0.0.0",
+				Project:    "",
+				NewRelease: false,
+				Error:      "remote branch \"refs/remotes/origin/alpha\" not found: reference not found",
+			},
+		}),
 
-	alphaCommits := []string{
-		"fix",  // 1.2.3-alpha
-		"feat", // 1.3.0-alpha
+		gittest.NewCommitStep("main", "feat"),
+		gittest.NewCommitStep("main", "fix"),
+		gittest.NewCallbackStep("", e{
+			{
+				Message:    MessageNewRelease,
+				Branch:     "main",
+				Version:    "0.2.0",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "beta",
+				Version:    "0.0.0",
+				Project:    "",
+				NewRelease: false,
+				Error:      "remote branch \"refs/remotes/origin/beta\" not found: reference not found",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "alpha",
+				Version:    "0.0.0",
+				Project:    "",
+				NewRelease: false,
+				Error:      "remote branch \"refs/remotes/origin/alpha\" not found: reference not found",
+			},
+		}),
+
+		gittest.NewCommitStep("main", "fix"),
+		gittest.NewCommitStep("beta", "feat!"),
+		gittest.NewCallbackStep("", e{
+			{
+				Message:    MessageNewRelease,
+				Branch:     "main",
+				Version:    "0.2.1",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNewRelease,
+				Branch:     "beta",
+				Version:    "1.0.0-beta.1",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "alpha",
+				Version:    "0.0.0",
+				Project:    "",
+				NewRelease: false,
+				Error:      "remote branch \"refs/remotes/origin/alpha\" not found: reference not found",
+			},
+		}),
+
+		gittest.NewCommitStep("main", "chores"),
+		gittest.NewCommitStep("beta", "refactor"),
+		gittest.NewCommitStep("main", "test"),
+		gittest.NewCommitStep("beta", "ci"),
+		gittest.NewCallbackStep("", e{
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "main",
+				Version:    "0.2.1",
+				Project:    "",
+				NewRelease: false,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "beta",
+				Version:    "1.0.0-beta.1",
+				Project:    "",
+				NewRelease: false,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "alpha",
+				Version:    "0.0.0",
+				Project:    "",
+				NewRelease: false,
+				Error:      "remote branch \"refs/remotes/origin/alpha\" not found: reference not found",
+			},
+		}),
+
+		gittest.NewCommitStep("alpha", "perf"),
+		gittest.NewCallbackStep("main", e{
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "main",
+				Version:    "0.2.1",
+				Project:    "",
+				NewRelease: false,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "beta",
+				Version:    "1.0.0-beta.1",
+				Project:    "",
+				NewRelease: false,
+				Error:      "",
+			},
+			{
+				Message:    MessageNewRelease,
+				Branch:     "alpha",
+				Version:    "1.0.1-alpha.1",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+		}),
+
+		gittest.NewCommitStep("main", "revert"),
+		gittest.NewCommitStep("main", "style"),
+		gittest.NewCommitStep("alpha", "feat"),
+		gittest.NewCommitStep("beta", "fix"),
+		gittest.NewCallbackStep("", e{
+			{
+				Message:    MessageNewRelease,
+				Branch:     "main",
+				Version:    "0.2.2",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNewRelease,
+				Branch:     "beta",
+				Version:    "1.0.0-beta.2",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNewRelease,
+				Branch:     "alpha",
+				Version:    "1.1.0-alpha.1",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+		}),
+
+		gittest.NewMergeStep("main", "beta", false),
+		gittest.NewCallbackStep("", e{
+			{
+				Message:    MessageNewRelease,
+				Branch:     "main",
+				Version:    "1.0.0",
+				Project:    "",
+				NewRelease: true,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "beta",
+				Version:    "1.0.0-beta.2",
+				Project:    "",
+				NewRelease: false,
+				Error:      "",
+			},
+			{
+				Message:    MessageNoNewRelease,
+				Branch:     "alpha",
+				Version:    "1.1.0-alpha.1",
+				Project:    "",
+				NewRelease: false,
+				Error:      "",
+			},
+		}),
 	}
 
 	testRepository, err := gittest.NewRepository()
@@ -116,102 +305,37 @@ rules:
 		checkErr(t, err, "removing repository")
 	}()
 
-	for _, commit := range masterCommits {
-		_, err = testRepository.AddCommit(commit)
-		checkErr(t, err, "creating sample commit")
-	}
-
-	// Creating alpha branch and associated commits
-	err = testRepository.CheckoutBranch("alpha")
-	checkErr(t, err, "checking out alpha branch")
-
-	for _, commit := range alphaCommits {
-		_, err = testRepository.AddCommit(commit)
-		checkErr(t, err, "creating sample commit")
-	}
-
 	th := NewTestHelper(t)
 	err = th.SetFlag("config", cfgFilePath)
 	checkErr(t, err, "setting flags")
 
-	releaseOutput, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "running release command")
+	var i int
+	err = gittest.ExecuteSteps(testRepository, steps, func(expected e) error {
+		releaseOutput, err := th.ExecuteCommand("release", testRepository.Path)
+		checkErr(t, err, "running release command")
 
-	expectedMasterVersion := "1.2.2"
-	expectedMasterTag := "v" + expectedMasterVersion
-	expectedAlphaVersion := "1.3.0-alpha"
-	expectedAlphaTag := "v" + expectedAlphaVersion
-
-	expectedOutputs := []cmdOutput{
-		{
-			Message:    "new release found",
-			Version:    expectedAlphaVersion,
-			NewRelease: true,
-			Branch:     "alpha",
-		},
-		{
-			Message:    "new release found",
-			Version:    expectedMasterVersion,
-			NewRelease: true,
-			Branch:     "master",
-		},
-	}
-	actualOutput := cmdOutput{}
-
-	outputs := make([]string, 0, 2)
-
-	scanner := bufio.NewScanner(bytes.NewReader(releaseOutput))
-	for scanner.Scan() {
-		outputs = append(outputs, scanner.Text())
-	}
-
-	// Checking master
-	err = json.Unmarshal([]byte(outputs[0]), &actualOutput)
-	checkErr(t, err, "unmarshalling master output")
-
-	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
-
-	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
-	checkErr(t, err, "checking if master tag exists")
-
-	assert.Equal(true, exists, "master tag not found")
-
-	expectedTagRef, err := testRepository.Tag(expectedMasterTag)
-	checkErr(t, err, "getting master tag ref")
-
-	expectedTagObj, err := testRepository.TagObject(expectedTagRef.Hash())
-	checkErr(t, err, "getting master tag object")
-
-	assert.Equal(taggerName, expectedTagObj.Tagger.Name)
-	assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
-
-	// Checking alpha
-	err = json.Unmarshal([]byte(outputs[1]), &actualOutput)
-	checkErr(t, err, "unmarshalling alpha output")
-
-	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
-
-	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
-	checkErr(t, err, "checking if alpha tag exists")
-
-	assert.Equal(true, exists, "alpha tag not found")
+		checkRelease(t, testRepository, i, releaseOutput, expected)
+		i++
+		return nil
+	})
+	checkErr(t, err, "execute test steps")
 }
 
 func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",   // 0.1.0
-		"feat!", // 1.0.0 (breaking change)
-		"feat",  // 1.1.0
-		"fix",   // 1.2.0
+		"fix",
+		"feat!",
+		"feat",
+		"fix",
 	}
 
 	testRepository := NewTestRepository(t, commits)
 
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
+		BranchesConfiguration: `[{"name": "main"}]`,
 		RulesConfiguration:    `{"minor": ["feat", "fix"]}`,
 	})
 	checkErr(t, err, "setting flags")
@@ -219,13 +343,13 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	output, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.2.0"
+	expectedVersion := "0.1.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "new release found",
+		Message:    MessageNewRelease,
 		Version:    expectedVersion,
 		NewRelease: true,
-		Branch:     "master",
+		Branch:     "main",
 	}
 	actualOut := cmdOutput{}
 
@@ -235,28 +359,28 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if master tag exists")
+	checkErr(t, err, "checking if main tag exists")
 
-	assert.Equal(true, exists, "master tag not found")
+	assert.Equal(true, exists, "main tag not found")
 }
 
 func TestReleaseCmd_LocalRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
+		"fix",
+		"feat!",
+		"feat",
+		"fix",
+		"fix",
+		"chores",
+		"refactor",
+		"test",
+		"ci",
+		"feat",
+		"perf",
+		"revert",
+		"style",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -267,19 +391,19 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 	}()
 
 	th := NewTestHelper(t)
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	err := th.SetFlag(BranchesConfiguration, `[{"name": "main"}]`)
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.2.2"
+	expectedVersion := "0.1.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "new release found",
+		Message:    MessageNewRelease,
 		Version:    expectedVersion,
 		NewRelease: true,
-		Branch:     "master",
+		Branch:     "main",
 	}
 	actualOut := cmdOutput{}
 
@@ -298,26 +422,26 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
+		"fix",
+		"feat!",
+		"feat",
+		"fix",
+		"fix",
+		"chores",
+		"refactor",
+		"test",
+		"ci",
+		"feat",
+		"perf",
+		"revert",
+		"style",
 	}
 
 	testRepository := NewTestRepository(t, commits)
 
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
-		BranchesConfiguration:    `[{"name": "master"}]`,
+		BranchesConfiguration:    `[{"name": "main"}]`,
 		RemoteNameConfiguration:  "origin",
 		AccessTokenConfiguration: "",
 	})
@@ -326,13 +450,13 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.2.2"
+	expectedVersion := "0.1.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "new release found",
+		Message:    MessageNewRelease,
 		Version:    expectedVersion,
 		NewRelease: true,
-		Branch:     "master",
+		Branch:     "main",
 	}
 	actualOut := cmdOutput{}
 
@@ -353,27 +477,27 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
-	// Create commits on master
-	masterCommits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
+	// Create commits on main
+	mainCommits := []string{
+		"fix",
+		"feat!",
+		"feat",
+		"fix",
+		"fix",
+		"chores",
+		"refactor",
+		"test",
+		"ci",
+		"feat",
+		"perf",
+		"revert",
+		"style",
 	}
 
-	if len(masterCommits) != 0 {
-		for _, commit := range masterCommits {
+	if len(mainCommits) != 0 {
+		for _, commit := range mainCommits {
 			_, err = testRepository.AddCommit(commit)
-			checkErr(t, err, "creating sample commit on master")
+			checkErr(t, err, "creating sample commit on main")
 		}
 	}
 
@@ -398,9 +522,9 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	checkErr(t, err, "checking out to branch rc")
 
 	rcCommits := []string{
-		"feat!", // 2.0.0
-		"feat",  // 2.1.0
-		"perf",  // 2.1.1
+		"feat!",
+		"feat",
+		"perf",
 	}
 
 	for _, commit := range rcCommits {
@@ -409,7 +533,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	}
 
 	th := NewTestHelper(t)
-	err = th.SetFlag(BranchesConfiguration, `[{"name": "master"}, {"name": "rc", "prerelease": true}]`)
+	err = th.SetFlag(BranchesConfiguration, `[{"name": "main"}, {"name": "rc", "prerelease": true}]`)
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
@@ -418,14 +542,14 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	i := 0
 	expectedOutputs := []cmdOutput{
 		{
-			Message:    "new release found",
-			Version:    "1.2.2",
+			Message:    MessageNewRelease,
+			Version:    "0.1.0",
 			NewRelease: true,
-			Branch:     "master",
+			Branch:     "main",
 		},
 		{
-			Message:    "new release found",
-			Version:    "2.1.1-rc",
+			Message:    MessageNewRelease,
+			Version:    "1.0.0-rc.1",
 			NewRelease: true,
 			Branch:     "rc",
 		},
@@ -441,7 +565,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 		err = json.Unmarshal(rawOutput, &actualOutput)
 		checkErr(t, err, "unmarshalling output")
 
-		assert.Contains(expectedOutputs, actualOutput)
+		assert.Equal(expectedOutputs[i], actualOutput)
 		i++
 	}
 
@@ -454,10 +578,10 @@ func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
 	metadata := "foobarbaz"
 
 	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-		"feat",  // 1.1.0
-		"fix",   // 1.1.1
+		"fix",
+		"feat!",
+		"feat",
+		"fix",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -465,20 +589,20 @@ func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
 		BuildMetadataConfiguration: metadata,
-		BranchesConfiguration:      `[{"name": "master"}]`,
+		BranchesConfiguration:      `[{"name": "main"}]`,
 	})
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.1.1" + "+" + metadata
+	expectedVersion := "0.1.0" + "+" + metadata
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "new release found",
+		Message:    MessageNewRelease,
 		Version:    expectedVersion,
 		NewRelease: true,
-		Branch:     "master",
+		Branch:     "main",
 	}
 	actualOut := cmdOutput{}
 
@@ -497,27 +621,27 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-		"feat",  // 1.1.0
-		"fix",   // 1.1.1
+		"fix",
+		"feat!",
+		"feat",
+		"fix",
 	}
 
 	testRepository := NewTestRepository(t, commits)
 
 	th := NewTestHelper(t)
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master", "prerelease": true}]`)
+	err := th.SetFlag(BranchesConfiguration, `[{"name": "main", "prerelease": true}]`)
 	checkErr(t, err, "setting flags")
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.1.1-master"
+	expectedVersion := "0.1.0-main.1"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "new release found",
+		Message:    MessageNewRelease,
 		Version:    expectedVersion,
 		NewRelease: true,
-		Branch:     "master",
+		Branch:     "main",
 	}
 	actualOut := cmdOutput{}
 
@@ -536,26 +660,26 @@ func TestReleaseCmd_DryRunRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
+		"fix",
+		"feat!",
 	}
 
 	testRepository := NewTestRepository(t, commits)
 
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
+		BranchesConfiguration: `[{"name": "main"}]`,
 		DryRunConfiguration:   `true`,
 	})
 	checkErr(t, err, "setting flags")
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.0.0"
+	expectedVersion := "0.1.0"
 	expectedTag := expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "dry-run enabled, next release found",
-		Branch:     "master",
+		Message:    MessageDryRun,
+		Branch:     "main",
 		Version:    expectedVersion,
 		NewRelease: true,
 	}
@@ -578,16 +702,16 @@ func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 	testRepository := NewTestRepository(t, []string{})
 
 	th := NewTestHelper(t)
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	err := th.SetFlag(BranchesConfiguration, `[{"name": "main"}]`)
 	checkErr(t, err, "setting flags")
 
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
 	expectedOut := cmdOutput{
-		Message:    "no new release",
+		Message:    MessageNoNewRelease,
 		NewRelease: false,
-		Branch:     "master",
+		Branch:     "main",
 		Version:    "0.0.0",
 	}
 	actualOut := cmdOutput{}
@@ -632,7 +756,7 @@ func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
 	testRepository := NewTestRepository(t, []string{})
 
 	th := NewTestHelper(t)
-	err = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	err = th.SetFlag(BranchesConfiguration, `[{"name": "main"}]`)
 	checkErr(t, err, "setting flags")
 
 	_, err = th.ExecuteCommand("release", testRepository.Path)
@@ -643,7 +767,7 @@ func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
 	assert := assertion.New(t)
 
 	th := NewTestHelper(t)
-	_ = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	_ = th.SetFlag(BranchesConfiguration, `[{"name": "main"}]`)
 	_, err := th.ExecuteCommand("release", "./does/not/exist")
 
 	assert.ErrorContains(err, "cloning Git repository", "should have failed trying to open inexisting Git repository")
@@ -670,7 +794,7 @@ func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
 	}
 
 	th := NewTestHelper(t)
-	err = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
+	err = th.SetFlag(BranchesConfiguration, `[{"name": "main"}]`)
 	checkErr(t, err, "setting flags")
 
 	_, err = th.ExecuteCommand("release", tempDirPath)
@@ -682,15 +806,15 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",  // 0.1.0 (with custom rule)
-		"feat", // 0.2.0
+		"fix",
+		"feat",
 	}
 
 	testRepository := NewTestRepository(t, commits)
 
 	th := NewTestHelper(t)
 	err := th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
+		BranchesConfiguration: `[{"name": "main"}]`,
 		RulesConfiguration:    `{"minor": ["feat", "fix"]}`,
 	})
 	checkErr(t, err, "setting flags")
@@ -698,13 +822,13 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "0.2.0"
+	expectedVersion := "0.1.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
-		Message:    "new release found",
+		Message:    MessageNewRelease,
 		Version:    expectedVersion,
 		NewRelease: true,
-		Branch:     "master",
+		Branch:     "main",
 	}
 	actualOut := cmdOutput{}
 
@@ -748,7 +872,7 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 
 	th := NewTestHelper(t)
 	err = th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
+		BranchesConfiguration: `[{"name": "main"}]`,
 		MonorepoConfiguration: `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
 	})
 	checkErr(t, err, "setting flags")
@@ -759,17 +883,17 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	i := 0
 	expectedOutputs := []cmdOutput{
 		{
-			Message:    "new release found",
-			Version:    "0.1.1",
+			Message:    MessageNewRelease,
+			Version:    "0.1.0",
 			NewRelease: true,
-			Branch:     "master",
+			Branch:     "main",
 			Project:    "foo",
 		},
 		{
-			Message:    "new release found",
-			Version:    "1.0.2",
+			Message:    MessageNewRelease,
+			Version:    "0.1.0",
 			NewRelease: true,
-			Branch:     "master",
+			Branch:     "main",
 			Project:    "bar",
 		},
 	}
@@ -812,7 +936,7 @@ func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
 
 	th := NewTestHelper(t)
 	err = th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
+		BranchesConfiguration: `[{"name": "main"}]`,
 		MonorepoConfiguration: `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
 	})
 	checkErr(t, err, "setting flags")
@@ -823,17 +947,17 @@ func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
 	i := 0
 	expectedOutputs := []cmdOutput{
 		{
-			Message:    "no new release",
+			Message:    MessageNoNewRelease,
 			Version:    "0.0.0",
 			NewRelease: false,
-			Branch:     "master",
+			Branch:     "main",
 			Project:    "foo",
 		},
 		{
-			Message:    "new release found",
-			Version:    "1.0.2",
+			Message:    MessageNewRelease,
+			Version:    "0.1.0",
 			NewRelease: true,
-			Branch:     "master",
+			Branch:     "main",
 			Project:    "bar",
 		},
 	}
@@ -1027,6 +1151,43 @@ func ExecuteCommand(cmd *cobra.Command, args ...string) ([]byte, error) {
 	cmd.SetArgs(args)
 	err := cmd.Execute()
 	return output.Bytes(), err
+}
+
+func checkRelease(t *testing.T, r *gittest.TestRepository, i int, output []byte, expected []*cmdOutput) {
+	assert := assertion.New(t)
+
+	parts := make([]string, 0, len(expected))
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		parts = append(parts, scanner.Text())
+	}
+
+	for j, part := range parts {
+		expectedOutput := *expected[j]
+		actualOutput := cmdOutput{}
+		err := json.Unmarshal([]byte(part), &actualOutput)
+		checkErr(t, err, "unmarshalling main output")
+
+		assert.Equal(expectedOutput, actualOutput, "releaseCmd output should be equal [%d:%d]", i, j)
+
+		if actualOutput.NewRelease {
+			expectedTag := "v" + actualOutput.Version
+
+			exists, err := tag.Exists(r.Repository, expectedTag)
+			checkErr(t, err, "checking if main tag exists")
+
+			assert.Equal(true, exists, "main tag not found [%d:%d]", i, j)
+
+			expectedTagRef, err := r.Tag(expectedTag)
+			checkErr(t, err, "getting main tag ref")
+
+			expectedTagObj, err := r.TagObject(expectedTagRef.Hash())
+			checkErr(t, err, "getting main tag object")
+
+			assert.Equal(taggerName, expectedTagObj.Tagger.Name)
+			assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
+		}
+	}
 }
 
 func checkErr(t *testing.T, err error, message string) {
