@@ -9,9 +9,14 @@ import (
 func TestBranch_Unmarshall(t *testing.T) {
 	assert := assertion.New(t)
 
-	have := []map[string]any{{"name": "main"}, {"name": "alpha", "prerelease": true}}
+	have := []map[string]any{
+		{"name": "alpha", "prerelease": true},
+		{"name": "main"},
+		{"name": "beta", "prerelease": true},
+	}
 	want := []Branch{
 		{Name: "main"},
+		{Name: "beta", Prerelease: true},
 		{Name: "alpha", Prerelease: true},
 	}
 
@@ -20,7 +25,7 @@ func TestBranch_Unmarshall(t *testing.T) {
 		t.Fatalf("unmarshalling branches: %s", err)
 	}
 
-	assert.Equal(want, branches)
+	assert.Equal(want, branches, "should return all branches in order")
 }
 
 func TestBranch_UnmarshallErrors(t *testing.T) {
