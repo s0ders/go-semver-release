@@ -10,14 +10,14 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/object/commitgraph"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
@@ -45,6 +45,13 @@ type ComputeNewSemverOutput struct {
 	Branch     string
 	CommitHash plumbing.Hash
 	NewRelease bool
+	Error      error
+}
+
+type TagInfo struct {
+	Semver *semver.Version
+	Name   string
+	Commit *object.Commit
 }
 
 // Run execute a parser on a repository and analyze the given branches and projects contained inside the given
@@ -52,19 +59,27 @@ type ComputeNewSemverOutput struct {
 func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	var output []ComputeNewSemverOutput
 
+	// This map holds the latest version for each channel.
+	// This is to be able to determine lower tier channel versions based of a potential new higher tier version bumped in this run.
+	semverMap := make(map[string]*TagInfo)
+
+	index := commitgraph.NewObjectCommitNodeIndex(repository.Storer)
+
 	for _, gitBranch := range p.ctx.Branches {
-		err := p.checkoutBranch(repository, gitBranch.Name)
-		if err != nil {
-			return output, fmt.Errorf("checking out to gitBranch %q: %w", gitBranch.Name, err)
-		}
+		branchErr := p.checkoutBranch(repository, gitBranch.Name)
 
 		if len(p.ctx.Projects) == 0 {
-			computerNewSemverOutput, err := p.ComputeNewSemver(repository, monorepo.Project{}, gitBranch)
-			if err != nil {
-				return nil, fmt.Errorf("computing new semver: %w", err)
+			var result ComputeNewSemverOutput
+			if branchErr != nil {
+				result = createResultWithError(gitBranch.Name, branchErr)
+			} else {
+				var err error
+				result, err = p.ComputeNewSemver(repository, index, monorepo.Project{}, gitBranch, semverMap)
+				if err != nil {
+					return nil, fmt.Errorf("computing new semver: %w", err)
+				}
 			}
-
-			output = append(output, computerNewSemverOutput)
+			output = append(output, result)
 		}
 
 		outputBuf := make([]ComputeNewSemverOutput, len(p.ctx.Projects))
@@ -73,11 +88,16 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 
 		for i, project := range p.ctx.Projects {
 			g.Go(func() error {
-				result, err := p.ComputeNewSemver(repository, project, gitBranch)
-				if err != nil {
-					return fmt.Errorf("computing project %q new semver: %w", project.Name, err)
+				var result ComputeNewSemverOutput
+				if branchErr != nil {
+					result = createResultWithError(gitBranch.Name, branchErr)
+				} else {
+					var err error
+					result, err = p.ComputeNewSemver(repository, index, project, gitBranch, semverMap)
+					if err != nil {
+						return fmt.Errorf("computing project %q new semver: %w", project.Name, err)
+					}
 				}
-
 				outputBuf[i] = result
 				return nil
 			})
@@ -95,84 +115,131 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
-func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.Project, branch branch.Branch) (ComputeNewSemverOutput, error) {
+func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.CommitNodeIndex, project monorepo.Project, branch branch.Branch, semverMap map[string]*TagInfo) (ComputeNewSemverOutput, error) {
 	output := ComputeNewSemverOutput{}
 
 	if project.Name != "" {
 		output.Project = project
 	}
 
-	latestSemverTag, err := p.FetchLatestSemverTag(repository, project)
+	// fetch latest commit to only check against versions that where release before this commit
+	p.mu.Lock()
+	head, err := repository.Head()
 	if err != nil {
-		return output, fmt.Errorf("fetching latest semver tag: %w", err)
+		return output, fmt.Errorf("fetching head: %w", err)
 	}
 
-	var (
-		latestSemver *semver.Version
-		history      []*object.Commit
-		logOptions   git.LogOptions
-	)
+	latestCommit, err := repository.CommitObject(head.Hash())
+	if err != nil {
+		return output, fmt.Errorf("fetching last commit: %w", err)
+	}
 
-	if latestSemverTag == nil {
-		p.ctx.Logger.Debug().Msg("no previous tag, creating one")
+	latestNode, err := index.Get(latestCommit.Hash)
+	if err != nil {
+		return output, fmt.Errorf("fetching commit node: %w", err)
+	}
+	p.mu.Unlock()
 
-		latestSemver = &semver.Version{Major: 0, Minor: 0, Patch: 0}
-	} else {
-		p.ctx.Logger.Debug().Str("tag", latestSemverTag.Name).Msg("latest semver tag found")
-
-		latestSemver, err = semver.NewFromString(latestSemverTag.Name)
-		if err != nil {
-			return output, fmt.Errorf("building semver from git tag: %w", err)
-		}
-
-		p.mu.Lock()
-		latestSemverTagCommit, err := latestSemverTag.Commit()
-		if err != nil {
-			return output, fmt.Errorf("fetching latest semver tag commit: %w", err)
-		}
-		p.mu.Unlock()
-
-		// Show all commits that are at least one second older than the latest one pointed by SemVer tag
-		since := latestSemverTagCommit.Committer.When.Add(time.Second)
-		logOptions.Since = &since
+	latestTagInfo, err := p.FetchLatestSemverTag(repository, project, branch, latestCommit)
+	if err != nil {
+		return output, fmt.Errorf("fetching latest semver tag: %w", err)
 	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	repositoryLogs, err := repository.Log(&logOptions)
-	if err != nil {
-		return output, fmt.Errorf("fetching commit history: %w", err)
+	// check latest tag info against higher tier channel tag info, if available
+	var latestSemver *semver.Version
+	currentTagInfo := semverMap[project.Name]
+	if currentTagInfo != nil && currentTagInfo.Commit.Committer.When.Compare(latestCommit.Committer.When) < 1 &&
+		(latestTagInfo.Semver == nil || semver.Compare(currentTagInfo.Semver, latestTagInfo.Semver) == 1) {
+
+		latestTagInfo = currentTagInfo
+		latestSemver = currentTagInfo.Semver.Clone()
+	} else {
+		latestSemver = latestTagInfo.Semver
+	}
+
+	var firstRelease bool
+	if latestSemver == nil {
+		p.ctx.Logger.Debug().Msg("no previous tag, creating one")
+		if !branch.Prerelease {
+			latestSemver = &semver.Version{Major: 0, Minor: 1, Patch: 0}
+		} else {
+			latestSemver = &semver.Version{Major: 0, Minor: 1, Patch: 0, Prerelease: &semver.Prerelease{Name: branch.Name, Build: 1}}
+		}
+		firstRelease = true
+	} else {
+		p.ctx.Logger.Debug().Str("tag", latestTagInfo.Name).Msg("latest semver tag found")
 	}
 
 	// Create commit history
-	_ = repositoryLogs.ForEach(func(c *object.Commit) error {
+	history := []*object.Commit{}
+
+	repositoryLogs := commitgraph.NewCommitNodeIterTopoOrder(latestNode, nil, nil)
+	err = repositoryLogs.ForEach(func(cn commitgraph.CommitNode) error {
+		c, err := cn.Commit()
+		if err != nil {
+			return err
+		}
+		if latestTagInfo.Commit != nil && latestTagInfo.Commit.Hash == c.Hash {
+			return storer.ErrStop
+		}
 		history = append(history, c)
 		return nil
 	})
+	repositoryLogs.Close()
 
-	// Sort commit history from oldest to most recent
-	sort.Slice(history, func(i, j int) bool {
-		return history[i].Committer.When.Before(history[j].Committer.When)
-	})
+	if err != nil {
+		return output, fmt.Errorf("traverse logs: %w", err)
+	}
 
 	var newRelease bool
+	var releaseType string
 	var commitHash plumbing.Hash
 
-	for _, commit := range history {
-		newReleaseFound, hash, err := p.ProcessCommit(commit, latestSemver, project)
+	for i := len(history) - 1; i >= 0; i-- {
+		commit := history[i]
+		commitReleaseFound, commitReleaseType, hash, err := p.ProcessCommit(commit, project)
 		if err != nil {
 			return output, fmt.Errorf("parsing commit history: %w", err)
 		}
 
-		if newReleaseFound {
+		if commitReleaseFound {
 			newRelease = true
 			commitHash = hash
 		}
+
+		if commitReleaseType != "" && !firstRelease {
+			if (releaseType == "") ||
+				(releaseType == "minor" && commitReleaseType == "major") ||
+				(releaseType == "patch" && (commitReleaseType == "minor" || commitReleaseType == "major")) {
+				releaseType = commitReleaseType
+			}
+		}
 	}
 
-	if branch.Prerelease {
-		latestSemver.Prerelease = branch.Name
+	if firstRelease && commitHash.IsZero() {
+		commitHash = latestCommit.Hash
+	}
+
+	if releaseType != "" {
+		if (branch.Prerelease && latestSemver.Prerelease == nil) ||
+			(latestSemver.Prerelease != nil && latestSemver.Prerelease.Name != branch.Name) {
+			latestSemver.Prerelease = &semver.Prerelease{Name: branch.Name}
+		}
+		switch releaseType {
+		case "major":
+			latestSemver.BumpMajor()
+		case "minor":
+			latestSemver.BumpMinor()
+		case "patch":
+			latestSemver.BumpPatch()
+		}
+	} else if firstRelease && !newRelease {
+		latestSemver.Major = 0
+		latestSemver.Minor = 0
+		latestSemver.Patch = 0
 	}
 
 	latestSemver.Metadata = p.ctx.BuildMetadataFlag
@@ -182,22 +249,30 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	output.CommitHash = commitHash
 	output.NewRelease = newRelease
 
+	if semverMap != nil && newRelease {
+		semverMap[project.Name] = &TagInfo{
+			Semver: latestSemver,
+			Name:   "(inherited)",
+			Commit: latestCommit,
+		}
+	}
+
 	return output, nil
 }
 
 // ProcessCommit parse a commit message and bump the latest semantic version accordingly.
-func (p *Parser) ProcessCommit(commit *object.Commit, latestSemver *semver.Version, project monorepo.Project) (bool, plumbing.Hash, error) {
+func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Project) (bool, string, plumbing.Hash, error) {
 	if !conventionalCommitRegex.MatchString(commit.Message) {
-		return false, plumbing.ZeroHash, nil
+		return false, "", plumbing.ZeroHash, nil
 	}
 
 	if project.Name != "" {
 		containsProjectFiles, err := commitContainsProjectFiles(commit, project.Path)
 		if err != nil {
-			return false, plumbing.ZeroHash, fmt.Errorf("checking if commit contains project files: %w", err)
+			return false, "", plumbing.ZeroHash, fmt.Errorf("checking if commit contains project files: %w", err)
 		}
 		if !containsProjectFiles {
-			return false, plumbing.ZeroHash, nil
+			return false, "", plumbing.ZeroHash, nil
 		}
 	}
 
@@ -206,30 +281,24 @@ func (p *Parser) ProcessCommit(commit *object.Commit, latestSemver *semver.Versi
 	commitType := match[1]
 
 	if breakingChange {
-		latestSemver.BumpMajor()
-		return true, commit.Hash, nil
+		return true, "major", commit.Hash, nil
 	}
 
 	releaseType, ok := p.ctx.Rules.Map[commitType]
 	if !ok {
-		return false, plumbing.ZeroHash, nil
+		return false, "", plumbing.ZeroHash, nil
 	}
 
-	switch releaseType {
-	case "patch":
-		latestSemver.BumpPatch()
-	case "minor":
-		latestSemver.BumpMinor()
-	default:
-		return false, plumbing.ZeroHash, fmt.Errorf("unknown release type %q", releaseType)
+	if releaseType != "patch" && releaseType != "minor" {
+		return false, "", plumbing.ZeroHash, fmt.Errorf("unknown release type %q", releaseType)
 	}
 
-	return true, commit.Hash, nil
+	return true, releaseType, commit.Hash, nil
 }
 
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
-func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project) (*object.Tag, error) {
+func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project, branch branch.Branch, latestCommit *object.Commit) (*TagInfo, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -238,12 +307,23 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		return nil, fmt.Errorf("fetching tag objects: %w", err)
 	}
 
-	var (
-		latestSemver *semver.Version
-		latestTag    *object.Tag
-	)
+	result := &TagInfo{}
+
+	channel := branch.Name
+	if !branch.Prerelease {
+		channel = ""
+	}
 
 	err = tags.ForEach(func(tag *object.Tag) error {
+		tagCommit, err := tag.Commit()
+		if err != nil {
+			return nil
+		}
+
+		if latestCommit != nil && tagCommit.Committer.When.After(latestCommit.Committer.When) {
+			return nil
+		}
+
 		if !semver.Regex.MatchString(tag.Name) {
 			return nil
 		}
@@ -253,21 +333,28 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		}
 
 		currentSemver, err := semver.NewFromString(tag.Name)
+
+		if currentSemver != nil && semver.CompareChannel(currentSemver, channel) == -1 {
+			return nil
+		}
+
 		if err != nil {
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}
 
-		if latestSemver == nil || semver.Compare(latestSemver, currentSemver) == -1 {
-			latestSemver = currentSemver
-			latestTag = tag
+		if result.Semver == nil || semver.Compare(result.Semver, currentSemver) == -1 {
+			result.Semver = currentSemver
+			result.Name = tag.Name
+			result.Commit = tagCommit
 		}
 		return nil
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
-	return latestTag, nil
+	return result, nil
 }
 
 // checkoutBranch moves the HEAD pointer of the given repository to the given branch. This function expects the
@@ -305,6 +392,18 @@ func (p *Parser) checkoutBranch(repository *git.Repository, branchName string) e
 	}
 
 	return nil
+}
+
+// empty ComputeNewSemverOutput with error
+func createResultWithError(branch string, err error) ComputeNewSemverOutput {
+	return ComputeNewSemverOutput{
+		Semver:     &semver.Version{},
+		Project:    monorepo.Project{},
+		Branch:     branch,
+		CommitHash: plumbing.ZeroHash,
+		NewRelease: false,
+		Error:      err,
+	}
 }
 
 // commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the
