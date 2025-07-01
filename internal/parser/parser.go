@@ -191,7 +191,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.
 	repositoryLogs.Close()
 
 	if err != nil {
-		return output, fmt.Errorf("traverse logs: %w", err)
+		return output, fmt.Errorf("traversing logs: %w", err)
 	}
 
 	var newRelease bool
@@ -210,6 +210,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.
 			commitHash = hash
 		}
 
+		// If the commit that has just been parsed brings a new release, check if a release was previously found. If so, only keep the "highest" type of release.
 		if commitReleaseType != "" && !firstRelease {
 			if (releaseType == "") ||
 				(releaseType == "minor" && commitReleaseType == "major") ||
@@ -394,7 +395,7 @@ func (p *Parser) checkoutBranch(repository *git.Repository, branchName string) e
 	return nil
 }
 
-// empty ComputeNewSemverOutput with error
+// createResultWithError returns an empty ComputeNewSemverOutput with an error.
 func createResultWithError(branch string, err error) ComputeNewSemverOutput {
 	return ComputeNewSemverOutput{
 		Semver:     &semver.Version{},
