@@ -136,7 +136,7 @@ func PrereleaseFromString(str string) (*Prerelease, error) {
 	parts := strings.Split(str, ".")
 	length := len(parts)
 	if length == 0 {
-		return nil, fmt.Errorf("Prerelease `%s` has the wrong format", str)
+		return nil, fmt.Errorf("prerelease `%s` has the wrong format", str)
 	}
 	if length >= 1 {
 		name = parts[0]
