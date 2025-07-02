@@ -21,6 +21,12 @@ import (
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
 )
 
+const (
+	MessageDryRun       string = "dry-run enabled, next release found"
+	MessageNewRelease   string = "new release found"
+	MessageNoNewRelease string = "no new release"
+)
+
 func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 	releaseCmd := &cobra.Command{
 		Use:   "release <REPOSITORY_PATH_OR_URL>",
@@ -82,6 +88,9 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				logEvent.Bool("new-release", release)
 				logEvent.Str("version", semver.String())
 				logEvent.Str("branch", output.Branch)
+				if output.Error != nil {
+					logEvent.Err(output.Error)
+				}
 
 				if project != "" {
 					logEvent.Str("project", project)
@@ -91,11 +100,11 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 				switch {
 				case !release:
-					logEvent.Msg("no new release")
+					logEvent.Msg(MessageNoNewRelease)
 				case release && ctx.DryRunFlag:
-					logEvent.Msg("dry-run enabled, next release found")
+					logEvent.Msg(MessageDryRun)
 				default:
-					logEvent.Msg("new release found")
+					logEvent.Msg(MessageNewRelease)
 
 					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
