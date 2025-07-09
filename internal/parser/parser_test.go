@@ -81,7 +81,7 @@ func TestParser_FetchLatestSemverTag_NoTag(t *testing.T) {
 
 	parser := New(th.Ctx)
 
-	latestTagInfo, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{}, nil)
+	latestTagInfo, _, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Nil(latestTagInfo.Semver, "latest semver struct should be nil")
@@ -109,7 +109,7 @@ func TestParser_FetchLatestSemverTag_OneTag(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	latestTagInfo, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{}, nil)
+	latestTagInfo, _, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	wantSemver := &semver.Version{Major: 1, Minor: 0, Patch: 0}
@@ -157,7 +157,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 	parser := New(th.Ctx)
 
 	// test main branch
-	latestTagInfo, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{}, nil)
+	latestTagInfo, _, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want := "3.0.0"
@@ -167,7 +167,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 	assert.Equal(want, latestTagInfo.Name, "latest semver tag should be equal")
 
 	// test beta branch
-	latestTagInfo, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
+	latestTagInfo, _, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want = "4.0.0-beta.2"
@@ -177,7 +177,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 	assert.Equal(want, latestTagInfo.Name, "latest semver tag should be equal")
 
 	// test alpha branch
-	latestTagInfo, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "alpha", Prerelease: true}, nil)
+	latestTagInfo, _, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "alpha", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want = "5.0.0-alpha.3"
@@ -222,7 +222,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags_NewPrereleaseBranch(t *testing
 	parser := New(th.Ctx)
 
 	// test beta branch
-	latestTagInfo, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
+	latestTagInfo, _, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want := "3.0.0"
@@ -232,7 +232,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags_NewPrereleaseBranch(t *testing
 	assert.Equal(want, latestTagInfo.Name, "latest semver tag should be equal")
 
 	// test new beta branch
-	latestTagInfo, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
+	latestTagInfo, _, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want = "3.0.0"
@@ -253,7 +253,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags_NewPrereleaseBranch(t *testing
 		checkErr(t, "creating tag", err)
 	}
 
-	latestTagInfo, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
+	latestTagInfo, _, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "beta", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want = "4.0.0-beta.5"
@@ -263,7 +263,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags_NewPrereleaseBranch(t *testing
 	assert.Equal(want, latestTagInfo.Name, "latest semver tag should be equal")
 
 	// test new alpha branch
-	latestTagInfo, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "alpha", Prerelease: true}, nil)
+	latestTagInfo, _, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "alpha", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want = "4.0.0-beta.5"
@@ -284,7 +284,7 @@ func TestParser_FetchLatestSemverTag_MultipleTags_NewPrereleaseBranch(t *testing
 		checkErr(t, "creating tag", err)
 	}
 
-	latestTagInfo, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "alpha", Prerelease: true}, nil)
+	latestTagInfo, _, err = parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Project{}, branch.Branch{Name: "alpha", Prerelease: true}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want = "5.0.0-alpha.5"
@@ -929,7 +929,7 @@ func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
 	}
 	parser := New(th.Ctx)
 
-	latestTagInfo, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.Projects[0], branch.Branch{}, nil)
+	latestTagInfo, _, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.Projects[0], branch.Branch{}, nil)
 	checkErr(t, "fetching latest semver tag", err)
 
 	wantSemver := &semver.Version{Major: 1, Minor: 0, Patch: 0}
