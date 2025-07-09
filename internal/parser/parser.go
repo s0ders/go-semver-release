@@ -140,7 +140,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.
 	}
 	p.mu.Unlock()
 
-	latestTagInfo, err := p.FetchLatestSemverTag(repository, project, branch, latestCommit)
+	latestTagInfo, channelCommit, err := p.FetchLatestSemverTag(repository, project, branch, latestCommit)
 	if err != nil {
 		return output, fmt.Errorf("fetching latest semver tag: %w", err)
 	}
@@ -173,41 +173,28 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.
 		p.ctx.Logger.Debug().Str("tag", latestTagInfo.Name).Msg("latest semver tag found")
 	}
 
-	// Create commit history
-	history := []*object.Commit{}
+	// Process commit history
+	var newRelease bool
+	var releaseType string
 
 	repositoryLogs := commitgraph.NewCommitNodeIterTopoOrder(latestNode, nil, nil)
 	err = repositoryLogs.ForEach(func(cn commitgraph.CommitNode) error {
-		c, err := cn.Commit()
+		commit, err := cn.Commit()
 		if err != nil {
 			return err
 		}
-		if latestTagInfo.Commit != nil && latestTagInfo.Commit.Hash == c.Hash {
+		if (latestTagInfo.Commit != nil && latestTagInfo.Commit.Hash == commit.Hash) ||
+			(channelCommit != nil && channelCommit.Hash == commit.Hash) {
 			return storer.ErrStop
 		}
-		history = append(history, c)
-		return nil
-	})
-	repositoryLogs.Close()
 
-	if err != nil {
-		return output, fmt.Errorf("traversing logs: %w", err)
-	}
-
-	var newRelease bool
-	var releaseType string
-	var commitHash plumbing.Hash
-
-	for i := len(history) - 1; i >= 0; i-- {
-		commit := history[i]
-		commitReleaseFound, commitReleaseType, hash, err := p.ProcessCommit(commit, project)
+		commitReleaseFound, commitReleaseType, _, err := p.ProcessCommit(commit, project)
 		if err != nil {
-			return output, fmt.Errorf("parsing commit history: %w", err)
+			return fmt.Errorf("parsing commit history: %w", err)
 		}
 
 		if commitReleaseFound {
 			newRelease = true
-			commitHash = hash
 		}
 
 		// If the commit that has just been parsed brings a new release, check if a release was previously found. If so, only keep the "highest" type of release.
@@ -218,10 +205,12 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.
 				releaseType = commitReleaseType
 			}
 		}
-	}
+		return nil
+	})
+	repositoryLogs.Close()
 
-	if firstRelease && commitHash.IsZero() {
-		commitHash = latestCommit.Hash
+	if err != nil {
+		return output, fmt.Errorf("traversing logs: %w", err)
 	}
 
 	if releaseType != "" {
@@ -247,7 +236,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, index commitgraph.
 
 	output.Semver = latestSemver
 	output.Branch = branch.Name
-	output.CommitHash = commitHash
+	output.CommitHash = latestCommit.Hash
 	output.NewRelease = newRelease
 
 	if semverMap != nil && newRelease {
@@ -299,16 +288,18 @@ func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Project) 
 
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
-func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project, branch branch.Branch, latestCommit *object.Commit) (*TagInfo, error) {
+func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Project, branch branch.Branch, latestCommit *object.Commit) (*TagInfo, *object.Commit, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	tags, err := repository.TagObjects()
 	if err != nil {
-		return nil, fmt.Errorf("fetching tag objects: %w", err)
+		return nil, nil, fmt.Errorf("fetching tag objects: %w", err)
 	}
 
 	result := &TagInfo{}
+	var channelSemver *semver.Version
+	var channelCommit *object.Commit
 
 	channel := branch.Name
 	if !branch.Prerelease {
@@ -334,8 +325,9 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 		}
 
 		currentSemver, err := semver.NewFromString(tag.Name)
+		channelCompareResult := semver.CompareChannel(currentSemver, channel)
 
-		if currentSemver != nil && semver.CompareChannel(currentSemver, channel) == -1 {
+		if currentSemver != nil && channelCompareResult == -1 {
 			return nil
 		}
 
@@ -343,19 +335,27 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}
 
+		// Take the latest semver from same or higher tier channel
 		if result.Semver == nil || semver.Compare(result.Semver, currentSemver) == -1 {
 			result.Semver = currentSemver
 			result.Name = tag.Name
 			result.Commit = tagCommit
 		}
+
+		// Take the commit from the latest version of the same channel
+		if channelCompareResult == 0 && (channelSemver == nil || semver.Compare(channelSemver, currentSemver) == -1) {
+			channelSemver = currentSemver
+			channelCommit = tagCommit
+		}
+
 		return nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("looping over tags: %w", err)
+		return nil, nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
-	return result, nil
+	return result, channelCommit, nil
 }
 
 // checkoutBranch moves the HEAD pointer of the given repository to the given branch. This function expects the
