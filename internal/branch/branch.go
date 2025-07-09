@@ -4,6 +4,8 @@ package branch
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 )
 
 var (
@@ -50,6 +52,20 @@ func Unmarshall(input []map[string]any) ([]Branch, error) {
 
 		branches[i] = branch
 	}
+
+	// Sort branches to ensure processing the branches in the right order.
+	slices.SortFunc(branches, func(b1, b2 Branch) int {
+		switch {
+		case !b2.Prerelease && b1.Prerelease:
+			return 1
+		case b2.Prerelease && !b1.Prerelease:
+			return -1
+		case b1.Prerelease && b2.Prerelease:
+			return strings.Compare(b2.Name, b1.Name)
+		default:
+			return 0
+		}
+	})
 
 	return branches, nil
 }
