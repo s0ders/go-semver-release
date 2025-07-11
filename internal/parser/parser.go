@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -40,11 +41,14 @@ func New(ctx *appcontext.AppContext) *Parser {
 }
 
 type ComputeNewSemverOutput struct {
-	Semver     *semver.Version
-	Project    monorepo.Project
-	Branch     string
-	CommitHash plumbing.Hash
-	NewRelease bool
+	Semver         *semver.Version
+	Project        monorepo.Project
+	Branch         string
+	CommitHash     plumbing.Hash
+	NewRelease     bool
+	LastReleaseTag *object.Tag
+	ForceRelease   bool
+	NeverReleased  bool
 }
 
 // Run execute a parser on a repository and analyze the given branches and projects contained inside the given
@@ -63,34 +67,138 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 			if err != nil {
 				return nil, fmt.Errorf("computing new semver: %w", err)
 			}
-
 			output = append(output, computerNewSemverOutput)
+			continue
 		}
 
 		outputBuf := make([]ComputeNewSemverOutput, len(p.ctx.Projects))
 
 		g, _ := errgroup.WithContext(ctx)
 
+		// First pass: Compute a new semantic version for projects which are actually released
 		for i, project := range p.ctx.Projects {
 			g.Go(func() error {
+				if !project.Release {
+					outputBuf[i] = ComputeNewSemverOutput{
+						NeverReleased: true,
+						NewRelease:    false,
+						Project:       project,
+						Branch:        gitBranch.Name,
+					}
+					return nil
+				}
 				result, err := p.ComputeNewSemver(repository, project, gitBranch)
 				if err != nil {
 					return fmt.Errorf("computing project %q new semver: %w", project.Name, err)
 				}
-
 				outputBuf[i] = result
 				return nil
 			})
 		}
 
 		if err := g.Wait(); err != nil {
-			return nil, fmt.Errorf("parsing monorepository projects: %w", err)
+			return nil, fmt.Errorf("parsing monorepository projects (1st pass): %w", err)
+		}
+
+		// Second pass: For each not-released project, first get a list of its dependencies, and then check if there
+		// are commits on dependent projects since last release. Skip if there was no release at all yet or if the
+		// project is not released by configuration override. Run second pass only if there is at least one project with
+		// a dependency.
+		if slices.ContainsFunc(p.ctx.Projects, func(project monorepo.Project) bool { return len(project.DependsOn) > 0 }) {
+			g, _ = errgroup.WithContext(ctx)
+			for i, project := range p.ctx.Projects {
+				g.Go(func() error {
+					if !project.Release || outputBuf[i].NewRelease || outputBuf[i].LastReleaseTag == nil || len(project.DependsOn) == 0 {
+						return nil
+					}
+					var dependencies []monorepo.Project
+					p.collectDependencies(project, &dependencies)
+					release, err := p.HasDependenciesChanged(repository, *outputBuf[i].LastReleaseTag, dependencies, outputBuf)
+					if err != nil {
+						return err
+					}
+					if release {
+						outputBuf[i].Semver.BumpMinor()
+						outputBuf[i].NewRelease = true
+						outputBuf[i].ForceRelease = true
+					}
+					return nil
+				})
+			}
+			if err := g.Wait(); err != nil {
+				return nil, fmt.Errorf("parsing monorepository projects (2nd pass): %w", err)
+			}
 		}
 
 		output = append(output, outputBuf...)
 	}
 
 	return output, nil
+}
+
+func (p *Parser) HasDependenciesChanged(repository *git.Repository, latestSemverTag object.Tag, dependencies []monorepo.Project, computeNewSemVerOutput []ComputeNewSemverOutput) (bool, error) {
+
+	var (
+		history    []*object.Commit
+		logOptions git.LogOptions
+	)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	latestSemverTagCommit, err := latestSemverTag.Commit()
+	if err != nil {
+		return false, fmt.Errorf("fetching latest semver tag commit: %w", err)
+	}
+
+	since := latestSemverTagCommit.Committer.When
+	logOptions = git.LogOptions{
+		Since: &since,
+	}
+
+	repositoryLogs, err := repository.Log(&logOptions)
+	if err != nil {
+		return false, fmt.Errorf("fetching commit history: %w", err)
+	}
+
+	// Create commit history
+	_ = repositoryLogs.ForEach(func(c *object.Commit) error {
+		history = append(history, c)
+		return nil
+	})
+
+	for _, dependency := range dependencies {
+		// First, check if the dependency is regularly released, in this case three is no need to loop through commit history.
+		for i := range computeNewSemVerOutput {
+			if computeNewSemVerOutput[i].Project.Name == dependency.Name {
+				if computeNewSemVerOutput[i].NewRelease {
+					return true, nil
+				}
+			}
+		}
+		if dependency.Release {
+			continue
+		}
+		// Looping through commit history and check if there are commits for this dependency.
+		for _, commit := range history {
+			containsProjectFiles, err := commitContainsProjectFiles(commit, dependency.Path)
+			if err != nil {
+				return false, fmt.Errorf("checking if commit contains project files: %w", err)
+			}
+			if containsProjectFiles {
+				match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
+				breakingChange := match[3] == "!" || strings.HasPrefix(commit.Message, "BREAKING CHANGE")
+				commitType := match[1]
+				_, doAction := p.ctx.Rules.Map[commitType]
+				if doAction || breakingChange {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	// If this is reached, we've checked all dependencies and there is no need to release the project.
+	return false, nil
 }
 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
@@ -181,6 +289,10 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.P
 	output.Branch = branch.Name
 	output.CommitHash = commitHash
 	output.NewRelease = newRelease
+	output.NeverReleased = !project.Release
+	if latestSemverTag != nil {
+		output.LastReleaseTag = latestSemverTag
+	}
 
 	return output, nil
 }
@@ -305,6 +417,18 @@ func (p *Parser) checkoutBranch(repository *git.Repository, branchName string) e
 	}
 
 	return nil
+}
+
+func (p *Parser) collectDependencies(project monorepo.Project, dependencies *[]monorepo.Project) {
+	for _, dep := range project.DependsOn {
+		for _, p := range p.ctx.Projects {
+			if p.Name == dep {
+				if !slices.ContainsFunc(*dependencies, func(item monorepo.Project) bool { return item.Name == dep }) {
+					*dependencies = append(*dependencies, p)
+				}
+			}
+		}
+	}
 }
 
 // commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the

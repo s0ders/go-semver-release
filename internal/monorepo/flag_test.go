@@ -9,7 +9,7 @@ import (
 func TestBranchFlag_String(t *testing.T) {
 	assert := assert.New(t)
 
-	monorepoConfiguration := []map[string]string{{"name": "foo", "path": "./foo/"}, {"name": "bar", "path": "./bar./"}}
+	monorepoConfiguration := []map[string]any{{"name": "foo", "path": "./foo/"}, {"name": "bar", "path": "./bar./"}}
 	monorepoConfigurationFlag := Flag(monorepoConfiguration)
 
 	var emptyFlag Flag

@@ -533,8 +533,8 @@ func TestParser_Run_Monorepo(t *testing.T) {
 
 	th := NewTestHelper(t)
 	th.Ctx.Projects = []monorepo.Project{
-		{Name: "foo", Path: "foo"},
-		{Name: "bar", Path: "bar"},
+		{Name: "foo", Path: "foo", Release: true},
+		{Name: "bar", Path: "bar", Release: true},
 	}
 	parser := New(th.Ctx)
 
@@ -545,6 +545,8 @@ func TestParser_Run_Monorepo(t *testing.T) {
 	checkErr(t, "computing projects new semver", err)
 
 	assert.Len(output, 2, "parser run output should contain two elements")
+
+	fmt.Printf("%v", output[1].Semver)
 
 	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
 
@@ -598,8 +600,8 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 
 	th := NewTestHelper(t)
 	th.Ctx.Projects = []monorepo.Project{
-		{Name: "foo", Path: "foo"},
-		{Name: "bar", Path: "bar"},
+		{Name: "foo", Path: "foo", Release: true},
+		{Name: "bar", Path: "bar", Release: true},
 	}
 	parser := New(th.Ctx)
 
