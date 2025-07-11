@@ -911,7 +911,7 @@ func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := appcontext.New()
 
-	ctx.MonorepositoryFlag = []map[string]string{{"path": "foo"}}
+	ctx.MonorepositoryFlag = []map[string]any{{"path": "foo"}}
 
 	_, err := configureProjects(ctx)
 	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")

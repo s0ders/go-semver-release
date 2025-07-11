@@ -72,6 +72,16 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				release := output.NewRelease
 				commitHash := output.CommitHash
 				project := output.Project.Name
+				forceRelease := output.ForceRelease
+
+				if output.NeverReleased && project != "" {
+					logEvent := ctx.Logger.Info()
+					logEvent.Bool("new-release", false)
+					logEvent.Str("branch", output.Branch)
+					logEvent.Str("project", project)
+					logEvent.Msg("project not released by configuration override")
+					continue
+				}
 
 				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefixFlag), ci.WithProject(project))
 				if err != nil {
@@ -92,6 +102,10 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				switch {
 				case !release:
 					logEvent.Msg("no new release")
+				case release && ctx.DryRunFlag && forceRelease:
+					logEvent.Msg("dry-run enabled, release forced by changes to dependent project(s)")
+				case release && forceRelease:
+					logEvent.Msg("release forced by changes to dependent project(s)")
 				case release && ctx.DryRunFlag:
 					logEvent.Msg("dry-run enabled, next release found")
 				default:
@@ -153,7 +167,7 @@ func configureProjects(ctx *appcontext.AppContext) ([]monorepo.Project, error) {
 		return nil, nil
 	}
 
-	monorepoJSON := []map[string]string(flag)
+	monorepoJSON := []map[string]any(flag)
 
 	projects, err := monorepo.Unmarshall(monorepoJSON)
 	if err != nil {

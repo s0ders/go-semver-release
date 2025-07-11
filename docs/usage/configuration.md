@@ -138,6 +138,46 @@ monorepo:
     path: ./xyz/bar/
 ```
 
+The program can also take into consideration dependencies between projects in a monorepo. Since this program is not targeted towards a specific programming language or build system, the dependencies have to be defined in the configuratrion of this program.
+
+For example, if the project `bar` depends on the project `foo`, the configuration can be written as follows:
+
+```bash
+$ go-semver-release release <PATH> --monorepo='[{"name": "foo", "path": "./foo/"}, {"name": "bar", "path": "./bar/", "depends-on": ["foo"]}]'
+```
+```yaml
+monorepo:
+  - name: foo
+    path: ./foo/
+  - name: bar
+    path: ./xyz/bar/
+    depends-on: [foo]
+```
+
+If project `foo` is released then `bar` will be released as well, even if no changes were made to project `bar`. In this case, the minor version of `bar` will be bumped.
+
+Since very often not every project in a monorepo is released, it is also possible to mark certain projects so that there are never released formally.
+
+For example, if you do not want to create a formal release (version number) for the project `bar`, change the configuration as follows:
+
+```bash
+$ go-semver-release release <PATH> --monorepo='[{"name": "foo", "path": "./foo/", "release": "no"}, {"name": "bar", "path": "./bar/", "depends-on": ["foo"]}]'
+```
+```yaml
+monorepo:
+  - name: foo
+    path: ./foo/
+    release: no
+  - name: bar
+    path: ./xyz/bar/
+    depends-on: [foo]
+
+```
+
+In this case, the program will check if there have been any commits to the path of project `foo` (which would normally cause a release of project `foo`) since the last release of project `bar`, and if so, it will bump the version of project `bar`, but it will not create a tag for project `foo`.
+
+This mechanism also supports transitive dependencies (project `bar` depending on project `foo` depending on project `abc`).
+
 ### Tag prefix
 
 CLI flag: `--tag-prefix`
