@@ -95,7 +95,7 @@ func initializeConfig(cmd *cobra.Command, ctx *appcontext.AppContext) error {
 	ctx.Viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	ctx.Viper.AutomaticEnv()
 
-	if err := ctx.Viper.ReadInConfig(); err != nil {
+	if err = ctx.Viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 
 		if !errors.As(err, &configFileNotFoundError) {
@@ -103,7 +103,7 @@ func initializeConfig(cmd *cobra.Command, ctx *appcontext.AppContext) error {
 		}
 	}
 
-	if err := bindFlags(cmd, ctx.Viper); err != nil {
+	if err = bindFlags(cmd, ctx.Viper); err != nil {
 		return err
 	}
 
