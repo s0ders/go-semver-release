@@ -1,6 +1,6 @@
 // Package appcontext provides a structure to store the current application execution context.
 //
-// The use of this structure allows to avoid the use of global variables to share the states of variables across
+// The use of this structure allows avoiding the use of global variables to share the states of variables across
 // structures and functions.
 package appcontext
 
@@ -14,24 +14,21 @@ import (
 )
 
 type AppContext struct {
-	Viper              *viper.Viper
-	Branches           []branch.Branch
-	Projects           []monorepo.Project
-	Rules              rule.Rules
-	BranchesFlag       branch.Flag
-	MonorepositoryFlag monorepo.Flag
-	RulesFlag          rule.Flag
-	Logger             zerolog.Logger
-	CfgFileFlag        string
-	GitNameFlag        string
-	GitEmailFlag       string
-	TagPrefixFlag      string
-	AccessTokenFlag    string
-	RemoteNameFlag     string
-	GPGKeyPathFlag     string
-	BuildMetadataFlag  string
-	DryRunFlag         bool
-	VerboseFlag        bool
+	Viper             *viper.Viper
+	BranchesCfg       branch.Flag
+	MonorepositoryCfg monorepo.Flag
+	RulesCfg          rule.Flag
+	Logger            zerolog.Logger
+	CfgFile           string
+	GitName           string
+	GitEmail          string
+	TagPrefix         string
+	AccessToken       string
+	RemoteName        string
+	GPGKeyPath        string
+	BuildMetadata     string
+	DryRun            bool
+	Verbose           bool
 }
 
 func New() *AppContext {

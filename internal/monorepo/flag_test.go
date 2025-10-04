@@ -6,10 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBranchFlag_String(t *testing.T) {
+func TestMonorepoFlag_String(t *testing.T) {
 	assert := assert.New(t)
 
-	monorepoConfiguration := []map[string]string{{"name": "foo", "path": "./foo/"}, {"name": "bar", "path": "./bar./"}}
+	monorepoConfiguration := []Item{
+		{Name: "foo", Path: "./foo/"},
+		{Name: "bar", Path: "./bar./"},
+	}
+
 	monorepoConfigurationFlag := Flag(monorepoConfiguration)
 
 	var emptyFlag Flag
@@ -20,7 +24,7 @@ func TestBranchFlag_String(t *testing.T) {
 	}
 
 	tests := []test{
-		{got: &monorepoConfigurationFlag, want: "[{\"name\":\"foo\",\"path\":\"./foo/\"},{\"name\":\"bar\",\"path\":\"./bar./\"}]"},
+		{got: &monorepoConfigurationFlag, want: "[{\"name\":\"foo\",\"path\":\"./foo/\",\"paths\":null},{\"name\":\"bar\",\"path\":\"./bar./\",\"paths\":null}]"},
 		{got: &emptyFlag, want: "[]"},
 	}
 
@@ -29,7 +33,7 @@ func TestBranchFlag_String(t *testing.T) {
 	}
 }
 
-func TestBranchFlag_Set(t *testing.T) {
+func TestMonorepoFlag_Set(t *testing.T) {
 	var flag Flag
 
 	err := flag.Set("[{\"name\": \"foo\"}]")
@@ -39,7 +43,7 @@ func TestBranchFlag_Set(t *testing.T) {
 	assert.Error(t, err, "should have errored, invalid JSON string")
 }
 
-func TestBranchFlag_Type(t *testing.T) {
+func TestMonorepoFlag_Type(t *testing.T) {
 	var f Flag
 
 	assert.Equal(t, FlagType, f.Type())

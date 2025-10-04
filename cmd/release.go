@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -11,14 +12,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/branch"
 	"github.com/s0ders/go-semver-release/v6/internal/ci"
 	"github.com/s0ders/go-semver-release/v6/internal/gpg"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v6/internal/parser"
 	"github.com/s0ders/go-semver-release/v6/internal/remote"
 	"github.com/s0ders/go-semver-release/v6/internal/rule"
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
+)
+
+const (
+	MessageDryRun       string = "dry-run enabled, next release found"
+	MessageNewRelease   string = "new release found"
+	MessageNoNewRelease string = "no new release"
 )
 
 func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
@@ -38,22 +43,20 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("configuring GPG key: %w", err)
 			}
 
-			ctx.Rules, err = configureRules(ctx)
-			if err != nil {
-				return fmt.Errorf("loading rules configuration: %w", err)
+			if ctx.RulesCfg.String() == "{}" {
+				ctx.Logger.Debug().Msg("no rules configuration provided, using default release rules")
+
+				b, err := json.Marshal(rule.Default)
+				if err != nil {
+					return fmt.Errorf("marshalling default rules: %w", err)
+				}
+
+				if err = ctx.RulesCfg.Set(string(b)); err != nil {
+					return fmt.Errorf("setting default rules flag: %w", err)
+				}
 			}
 
-			ctx.Branches, err = configureBranches(ctx)
-			if err != nil {
-				return fmt.Errorf("loading branches configuration: %w", err)
-			}
-
-			ctx.Projects, err = configureProjects(ctx)
-			if err != nil {
-				return fmt.Errorf("loading projects configuration: %w", err)
-			}
-
-			origin = remote.New(ctx.RemoteNameFlag, ctx.AccessTokenFlag)
+			origin = remote.New(ctx.RemoteName, ctx.AccessToken)
 
 			repository, err = origin.Clone(args[0])
 			if err != nil {
@@ -65,7 +68,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("computing new semver: %w", err)
 			}
 
-			tagger := tag.NewTagger(ctx.GitNameFlag, ctx.GitEmailFlag, tag.WithTagPrefix(ctx.TagPrefixFlag), tag.WithSignKey(entity))
+			tagger := tag.NewTagger(ctx.GitName, ctx.GitEmail, tag.WithTagPrefix(ctx.TagPrefix), tag.WithSignKey(entity))
 
 			for _, output := range outputs {
 				semver := output.Semver
@@ -73,9 +76,9 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				commitHash := output.CommitHash
 				project := output.Project.Name
 
-				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefixFlag), ci.WithProject(project))
+				err = ci.GenerateGitHubOutput(semver, output.Branch, ci.WithNewRelease(release), ci.WithTagPrefix(ctx.TagPrefix), ci.WithProject(project))
 				if err != nil {
-					return fmt.Errorf("generating github output: %w", err)
+					return fmt.Errorf("generating GitHub output: %w", err)
 				}
 
 				logEvent := ctx.Logger.Info()
@@ -91,11 +94,11 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 				switch {
 				case !release:
-					logEvent.Msg("no new release")
-				case release && ctx.DryRunFlag:
-					logEvent.Msg("dry-run enabled, next release found")
+					logEvent.Msg(MessageNoNewRelease)
+				case release && ctx.DryRun:
+					logEvent.Msg(MessageDryRun)
 				default:
-					logEvent.Msg("new release found")
+					logEvent.Msg(MessageNewRelease)
 
 					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
@@ -118,61 +121,16 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 	return releaseCmd
 }
 
-func configureRules(ctx *appcontext.AppContext) (rule.Rules, error) {
-	flag := ctx.RulesFlag
-
-	if flag.String() == "{}" {
-		return rule.Default, nil
-	}
-
-	rulesJSON := map[string][]string(flag)
-
-	unmarshalledRules, err := rule.Unmarshall(rulesJSON)
-	if err != nil {
-		return unmarshalledRules, fmt.Errorf("parsing rules configuration: %w", err)
-	}
-
-	return unmarshalledRules, nil
-}
-
-func configureBranches(ctx *appcontext.AppContext) ([]branch.Branch, error) {
-	branchesJSON := []map[string]any(ctx.BranchesFlag)
-
-	unmarshalledBranches, err := branch.Unmarshall(branchesJSON)
-	if err != nil {
-		return nil, fmt.Errorf("parsing branches configuration: %w", err)
-	}
-
-	return unmarshalledBranches, nil
-}
-
-func configureProjects(ctx *appcontext.AppContext) ([]monorepo.Project, error) {
-	flag := ctx.MonorepositoryFlag
-
-	if flag.String() == "[]" {
-		return nil, nil
-	}
-
-	monorepoJSON := []map[string]string(flag)
-
-	projects, err := monorepo.Unmarshall(monorepoJSON)
-	if err != nil {
-		return nil, fmt.Errorf("parsing monorepository projects configuration: %w", err)
-	}
-
-	return projects, nil
-}
-
 func configureGPGKey(ctx *appcontext.AppContext) (*openpgp.Entity, error) {
-	flag := ctx.GPGKeyPathFlag
+	flag := ctx.GPGKeyPath
 
 	if flag == "" {
 		return nil, nil
 	}
 
-	ctx.Logger.Debug().Str("path", ctx.GPGKeyPathFlag).Msg("using the following armored key for signing")
+	ctx.Logger.Debug().Str("path", ctx.GPGKeyPath).Msg("using the following armored key for signing")
 
-	armoredKeyFile, err := os.ReadFile(ctx.GPGKeyPathFlag)
+	armoredKeyFile, err := os.ReadFile(ctx.GPGKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading armored key: %w", err)
 	}

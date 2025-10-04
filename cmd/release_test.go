@@ -15,10 +15,7 @@ import (
 	assertion "github.com/stretchr/testify/assert"
 
 	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/branch"
 	"github.com/s0ders/go-semver-release/v6/internal/gittest"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v6/internal/rule"
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
 )
 
@@ -46,8 +43,10 @@ func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
 	_, err = th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	assert.Equal(accessToken, th.Ctx.AccessTokenFlag, "access token flag value should be equal to environment variable value")
+	assert.Equal(accessToken, th.Ctx.AccessToken, "access token flag value should be equal to environment variable value")
 }
+
+// TODO: add monorepo config key
 
 func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
 	assert := assertion.New(t)
@@ -55,7 +54,7 @@ func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
 	taggerName := "My CI Robot"
 	taggerEmail := "my-robot@release.ci"
 
-	// Create configuration file
+	// Create a configuration file
 	cfgContent := []byte(`
 git-name: ` + taggerName + `
 git-email: ` + taggerEmail + `
@@ -86,7 +85,7 @@ rules:
 	err = os.WriteFile(cfgFilePath, cfgContent, 0o644)
 	checkErr(t, err, "writing configuration file")
 
-	// Create test repository
+	// Create a test repository
 	masterCommits := []string{
 		"fix",      // 0.0.1
 		"feat!",    // 1.0.0 (breaking change)
@@ -856,72 +855,94 @@ func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
 	assert.Equal(len(expectedOutputs), i)
 }
 
-func TestReleaseCmd_ConfigureRules_DefaultRules(t *testing.T) {
+func TestReleaseCmd_Monorepo_ProjectWithPaths(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := appcontext.New()
 
-	rules, err := configureRules(ctx)
-	checkErr(t, err, "configuring rules")
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
 
-	assert.Equal(rule.Default, rules)
-}
+	defer func() {
+		err = testRepository.Remove()
+		checkErr(t, err, "removing repository")
+	}()
 
-func TestReleaseCmd_ConfigureBranches_NoBranches(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
+	// "bar" commits, "foo" has no applicable commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar2/foo2.txt")
+	checkErr(t, err, "adding commit")
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar2/foo2.txt")
+	checkErr(t, err, "adding commit")
 
-	_, err := configureBranches(ctx)
-	assert.ErrorIs(err, branch.ErrNoBranch)
-}
+	th := NewTestHelper(t)
+	err = th.SetFlags(map[string]string{
+		BranchesConfiguration: `[{"name": "master"}]`,
+		MonorepoConfiguration: `[{"name": "bar", "paths": ["bar", "bar2"]}]`,
+	})
+	checkErr(t, err, "setting flags")
 
-func TestReleaseCmd_ConfigureProjects_NoProjects(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
+	out, err := th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
 
-	projects, err := configureProjects(ctx)
-	checkErr(t, err, "configuring projects")
-
-	assert.Nil(projects, "no monorepo configuration, should have gotten nil")
-}
-
-func TestReleaseCmd_InvalidCustomRules(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
-
-	ctx.RulesFlag = map[string][]string{
-		"minor": {"feat"},
-		"patch": {"feat"},
+	i := 0
+	expectedOutputs := []cmdOutput{
+		{
+			Message:    "new release found",
+			Version:    "1.0.2",
+			NewRelease: true,
+			Branch:     "master",
+			Project:    "bar",
+		},
 	}
 
-	_, err := configureRules(ctx)
-	assert.ErrorIs(err, rule.ErrDuplicateReleaseRule, "should have failed parsing invalid custom rule")
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+
+	for scanner.Scan() {
+		rawOutput := scanner.Bytes()
+
+		actualOutput := cmdOutput{}
+
+		err = json.Unmarshal(rawOutput, &actualOutput)
+		checkErr(t, err, "unmarshalling output")
+
+		assert.Equal(expectedOutputs[i], actualOutput)
+		i++
+	}
+	err = scanner.Err()
+	checkErr(t, err, "scanning error")
+	assert.Equal(len(expectedOutputs), i)
 }
 
-func TestReleaseCmd_InvalidBranch(t *testing.T) {
+func TestReleaseCmd_Monorepo_ExclusivePathAndPaths(t *testing.T) {
 	assert := assertion.New(t)
-	ctx := appcontext.New()
 
-	ctx.BranchesFlag = []map[string]any{{"prerelease": true}}
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating sample repository")
 
-	_, err := configureBranches(ctx)
-	assert.ErrorIs(err, branch.ErrNoName, "should have failed parsing branch with no name")
-}
+	defer func() {
+		err = testRepository.Remove()
+		checkErr(t, err, "removing repository")
+	}()
 
-func TestReleaseCmd_InvalidMonorepoProjects(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
+	// "bar" commits, "foo" has no applicable commits
+	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
+	checkErr(t, err, "adding commit")
 
-	ctx.MonorepositoryFlag = []map[string]string{{"path": "foo"}}
+	th := NewTestHelper(t)
+	err = th.SetFlags(map[string]string{
+		BranchesConfiguration: `[{"name": "master"}]`,
+		MonorepoConfiguration: `[{"name": "bar", "path": "bar", "paths": ["./bar/", "./bar2/"]}]`,
+	})
 
-	_, err := configureProjects(ctx)
-	assert.ErrorIs(err, monorepo.ErrNoName, "should have failed parsing project with no name")
+	// TODO: refine to target specific monorepo.ErrExlusive...
+	assert.Error(err, "should have failed trying to set exclusive path and paths")
 }
 
 func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 	assert := assertion.New(t)
 	ctx := appcontext.New()
 
-	ctx.GPGKeyPathFlag = "./does/not/exist"
+	ctx.GPGKeyPath = "./does/not/exist"
 
 	_, err := configureGPGKey(ctx)
 
@@ -958,7 +979,7 @@ func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
 		}
 	}()
 
-	ctx.GPGKeyPathFlag = keyFilePath
+	ctx.GPGKeyPath = keyFilePath
 
 	_, err = configureGPGKey(ctx)
 	assert.ErrorContains(err, "loading armored key", "should have failed trying to read armored key ring from empty file")
