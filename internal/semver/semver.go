@@ -39,7 +39,7 @@ func (v *Version) BumpPatch() {
 	v.Metadata = ""
 }
 
-// IsZero checks if all component of a semantic version number are equal to zero.
+// IsZero checks if all components of a semantic version number are equal to zero.
 func (v *Version) IsZero() bool {
 	isZero := v.Major == v.Minor && v.Minor == v.Patch && v.Patch == 0
 	return isZero
