@@ -16,6 +16,7 @@ import (
 
 	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
 	"github.com/s0ders/go-semver-release/v6/internal/gittest"
+	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v6/internal/tag"
 )
 
@@ -45,6 +46,8 @@ func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
 
 	assert.Equal(accessToken, th.Ctx.AccessToken, "access token flag value should be equal to environment variable value")
 }
+
+// TODO: add test to check configuration order of precedence
 
 // TODO: add monorepo config key
 
@@ -237,6 +240,78 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	checkErr(t, err, "checking if master tag exists")
 
 	assert.Equal(true, exists, "master tag not found")
+}
+
+func TestReleaseCmd_ConfigurationPrecedence(t *testing.T) {
+	assert := assertion.New(t)
+
+	cfgContent := []byte(`
+git-name: ConfigFile
+git-email: config@example.com
+tag-prefix: cfg-
+branches:
+  - name: master
+`)
+
+	cfgFileDirectory, err := os.MkdirTemp("", "*")
+	checkErr(t, err, "creating configuration file directory")
+
+	defer func() {
+		err = os.RemoveAll(cfgFileDirectory)
+		checkErr(t, err, "removing configuration directory")
+	}()
+
+	cfgFilePath := filepath.Join(cfgFileDirectory, "config.yml")
+	err = os.WriteFile(cfgFilePath, cfgContent, 0o644)
+	checkErr(t, err, "writing configuration file")
+
+	envValue := "EnvValue"
+	err = os.Setenv("GO_SEMVER_RELEASE_GIT_NAME", envValue)
+	checkErr(t, err, "setting environment variable")
+	defer os.Unsetenv("GO_SEMVER_RELEASE_GIT_NAME")
+
+	testRepository := NewTestRepository(t, []string{})
+
+	th := NewTestHelper(t)
+	flagValue := "FlagValue"
+	err = th.SetFlags(map[string]string{
+		"config":   cfgFilePath,
+		"git-name": flagValue,
+	})
+	checkErr(t, err, "setting flags")
+
+	_, err = th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
+
+	// 1. Flag value should take precedence over everything
+	assert.Equal(flagValue, th.Ctx.GitName, "Flag value should override environment and config file values")
+
+	// 2. For values not set via flag, env should be used
+	envEmailValue := "env@example.com"
+	err = os.Setenv("GO_SEMVER_RELEASE_GIT_EMAIL", envEmailValue)
+	checkErr(t, err, "setting email environment variable")
+	defer os.Unsetenv("GO_SEMVER_RELEASE_GIT_EMAIL")
+
+	th = NewTestHelper(t)
+	err = th.SetFlag("config", cfgFilePath)
+	checkErr(t, err, "setting config flag")
+
+	_, err = th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
+
+	assert.Equal(envEmailValue, th.Ctx.GitEmail, "Environment value should override config file value")
+
+	os.Unsetenv("GO_SEMVER_RELEASE_GIT_EMAIL")
+
+	th = NewTestHelper(t)
+	err = th.SetFlag("config", cfgFilePath)
+	checkErr(t, err, "setting config flag")
+
+	_, err = th.ExecuteCommand("release", testRepository.Path)
+	checkErr(t, err, "executing command")
+
+	assert.Equal("config@example.com", th.Ctx.GitEmail, "Config file value should be used when no flag or env is set")
+	assert.Equal("cfg-", th.Ctx.TagPrefix, "Config file value should be used when no flag or env is set")
 }
 
 func TestReleaseCmd_LocalRelease(t *testing.T) {
@@ -934,8 +1009,7 @@ func TestReleaseCmd_Monorepo_ExclusivePathAndPaths(t *testing.T) {
 		MonorepoConfiguration: `[{"name": "bar", "path": "bar", "paths": ["./bar/", "./bar2/"]}]`,
 	})
 
-	// TODO: refine to target specific monorepo.ErrExlusive...
-	assert.Error(err, "should have failed trying to set exclusive path and paths")
+	assert.ErrorIs(err, monorepo.ErrExclusiveFlag, "should have failed trying to set exclusive path and paths")
 }
 
 func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
@@ -946,7 +1020,7 @@ func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
 
 	_, err := configureGPGKey(ctx)
 
-	assert.ErrorContains(err, "reading armored key", "should have failed trying to open non existing armored GPG key")
+	assert.ErrorIs(err, os.ErrNotExist, "should have failed trying to read armored key ring from non-existing file")
 }
 
 func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
