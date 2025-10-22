@@ -122,9 +122,12 @@ Each project will then be versioned separately meaning that each project will ha
 
 **How does it work?**
 
-The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key (e.g. `foo-1.0.0`). Then, for each project, the program will parse the commits older than the latest found tag and for each commit, will check if one of the changes made in that commit belongs to the path of that project, if so, the latest SemVer is incremented according to the type of that commit.
+The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key (e.g. `foo-1.0.0`).
+For each project, the program parses commits newer than the latest tag, checks if they affect that project's path, and increments the SemVer accordingly.
 
 This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have their SemVer bumped according to the commit type.
+
+A monorepo project can be configured to have a single path using `path` or a list of paths using `paths`, these are mutually exclusive.
 
 Examples:
 ```bash
@@ -135,7 +138,9 @@ monorepo:
   - name: foo
     path: ./foo/
   - name: bar
-    path: ./xyz/bar/
+    paths: 
+    - ./lib-a/bar/
+    - ./lib-b/bar/
 ```
 
 ### Tag prefix
