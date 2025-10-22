@@ -934,7 +934,7 @@ func TestReleaseCmd_Monorepo_ExclusivePathAndPaths(t *testing.T) {
 		MonorepoConfiguration: `[{"name": "bar", "path": "bar", "paths": ["./bar/", "./bar2/"]}]`,
 	})
 
-	// TODO: refine to target specific monorepo.ErrExlusive...
+	// TODO: refine to target specific monorepo.ErrExclusive...
 	assert.Error(err, "should have failed trying to set exclusive path and paths")
 }
 
