@@ -12,7 +12,7 @@ Releases are available for various OS and architectures and come with generated 
 
 ### Go
 
-If [Go](https://go.dev) is installed on your machine, you can install from source:
+If [Go](https://go.dev) is installed on your machine, the project can be installed from its source code:
 
 ```bash
 $ go install github.com/s0ders/go-semver-release/v6@latest
