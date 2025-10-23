@@ -6,7 +6,7 @@ All you need to get started is:
 * A commit history following the [Conventional Commits](https://www.conventionalcommits.org/en/) convention
 * Optionally, a configuration file inside the Git repository to version
 
-&#x20;The following example configuration file suites most use cases:
+The following example configuration file suites most use cases:
 
 ```yaml
 # <REPOSITORY_ROOT>/.semver.yaml
@@ -27,7 +27,7 @@ branches:
     prerelease: true
 ```
 
-Once the configuration file is saved inside the Git repository to version, the tool can be ran from inside a local environment or a CI runner as below:
+Once the configuration file is saved inside the Git repository to version, the tool can be executed from inside a local environment or a CI runner as below:
 
 ```bash
 $ go-semver-release release <REPOSITORY_PATH_OR_URL> --config <PATH_TO_CONFIG_FILE> [--dry-run, --verbose]
