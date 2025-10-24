@@ -26,6 +26,18 @@ import (
 	"github.com/s0ders/go-semver-release/v6/internal/semver"
 )
 
+type BumpType int
+
+const (
+	BumpNone BumpType = iota
+	BumpPrerelease
+	BumpPatch
+	BumpMinor
+	BumpMajor
+)
+
+// TODO: sort branches before processing them
+
 var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([\w\-.\\\/]+\))?(!)?: ([\w ]+[\s\S]*)`)
 
 type Parser struct {
@@ -49,15 +61,11 @@ type ComputeNewSemverOutput struct {
 
 // Run execute a parser on a repository and analyze the given branches and projects contained inside the given
 // AppContext.
+// TODO: simplify this function
 func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	var output []ComputeNewSemverOutput
 
 	for _, gitBranch := range p.ctx.BranchesCfg {
-		err := p.checkoutBranch(repository, gitBranch.Name)
-		if err != nil {
-			return output, fmt.Errorf("checking out to gitBranch %q: %w", gitBranch.Name, err)
-		}
-
 		if len(p.ctx.MonorepositoryCfg) == 0 {
 			computerNewSemverOutput, err := p.ComputeNewSemver(repository, monorepo.Item{}, gitBranch)
 			if err != nil {
@@ -96,12 +104,22 @@ func (p *Parser) Run(ctx context.Context, repository *git.Repository) ([]Compute
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
 func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.Item, branch branch.Item) (ComputeNewSemverOutput, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	output := ComputeNewSemverOutput{}
+
+	// Get branch reference without checking out
+	ref, err := p.getBranchReference(repository, branch.Name)
+	if err != nil {
+		return output, fmt.Errorf("getting reference for branch %q: %w", branch.Name, err)
+	}
 
 	if project.Name != "" {
 		output.Project = project
 	}
 
+	// TODO: fetch latest REACHABLE tag from the current branch ref
 	latestSemverTag, err := p.FetchLatestSemverTag(repository, project)
 	if err != nil {
 		return output, fmt.Errorf("fetching latest semver tag: %w", err)
@@ -112,6 +130,8 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 		history      []*object.Commit
 		logOptions   git.LogOptions
 	)
+
+	logOptions.From = ref.Hash()
 
 	if latestSemverTag == nil {
 		p.ctx.Logger.Debug().Msg("no previous tag, creating one")
@@ -125,27 +145,22 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 			return output, fmt.Errorf("building semver from git tag: %w", err)
 		}
 
-		p.mu.Lock()
 		latestSemverTagCommit, err := latestSemverTag.Commit()
 		if err != nil {
 			return output, fmt.Errorf("fetching latest semver tag commit: %w", err)
 		}
-		p.mu.Unlock()
 
 		// Show all commits that are at least one second older than the latest one pointed by SemVer tag
 		since := latestSemverTagCommit.Committer.When.Add(time.Second)
 		logOptions.Since = &since
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	repositoryLogs, err := repository.Log(&logOptions)
 	if err != nil {
 		return output, fmt.Errorf("fetching commit history: %w", err)
 	}
 
-	// Create commit history
+	// Create the commit history
 	_ = repositoryLogs.ForEach(func(c *object.Commit) error {
 		history = append(history, c)
 		return nil
@@ -159,16 +174,30 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 	var newRelease bool
 	var commitHash plumbing.Hash
 
+	var maxBumpType BumpType
+
 	for _, commit := range history {
-		newReleaseFound, hash, err := p.ProcessCommit(commit, latestSemver, project)
+		processCommitOutput, err := p.ProcessCommit(commit, project)
 		if err != nil {
 			return output, fmt.Errorf("parsing commit history: %w", err)
 		}
 
-		if newReleaseFound {
+		if processCommitOutput.NewRelease {
 			newRelease = true
-			commitHash = hash
+			commitHash = processCommitOutput.CommitHash
+			maxBumpType = max(maxBumpType, processCommitOutput.BumpType)
 		}
+	}
+
+	// Single bump per release
+	// TODO: handle prerelease bump
+	switch maxBumpType {
+	case BumpMajor:
+		latestSemver.BumpMajor()
+	case BumpMinor:
+		latestSemver.BumpMinor()
+	case BumpPatch:
+		latestSemver.BumpPatch()
 	}
 
 	if branch.Prerelease {
@@ -185,54 +214,69 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 	return output, nil
 }
 
+type ProcessCommitOutput struct {
+	NewRelease bool
+	CommitHash plumbing.Hash
+	BumpType   BumpType
+}
+
 // ProcessCommit parse a commit message and bump the latest semantic version accordingly.
-func (p *Parser) ProcessCommit(commit *object.Commit, latestSemver *semver.Version, project monorepo.Item) (bool, plumbing.Hash, error) {
-	if !conventionalCommitRegex.MatchString(commit.Message) {
-		return false, plumbing.ZeroHash, nil
+func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Item) (ProcessCommitOutput, error) {
+	output := ProcessCommitOutput{
+		NewRelease: false,
+		CommitHash: plumbing.ZeroHash,
+		BumpType:   BumpNone,
+	}
+
+	match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
+	if match == nil {
+		return output, nil
 	}
 
 	if project.Name != "" {
 		containsProjectFiles, err := commitContainsProjectFiles(commit, project)
 		if err != nil {
-			return false, plumbing.ZeroHash, fmt.Errorf("checking if commit contains project files: %w", err)
+			return output, fmt.Errorf("checking if commit contains project files: %w", err)
 		}
 		if !containsProjectFiles {
-			return false, plumbing.ZeroHash, nil
+			return output, nil
 		}
 	}
 
-	match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
 	breakingChange := match[3] == "!" || strings.HasPrefix(commit.Message, "BREAKING CHANGE")
 	commitType := match[1]
 
 	if breakingChange {
-		latestSemver.BumpMajor()
-		return true, commit.Hash, nil
+		output.BumpType = BumpMajor
+		output.NewRelease = true
+		output.CommitHash = commit.Hash
+
+		return output, nil
 	}
 
 	releaseType, ok := p.ctx.RulesCfg[commitType]
 	if !ok {
-		return false, plumbing.ZeroHash, nil
+		return output, nil
 	}
+
+	output.NewRelease = true
+	output.CommitHash = commit.Hash
 
 	switch releaseType {
 	case "patch":
-		latestSemver.BumpPatch()
+		output.BumpType = BumpPatch
 	case "minor":
-		latestSemver.BumpMinor()
+		output.BumpType = BumpMinor
 	default:
-		return false, plumbing.ZeroHash, fmt.Errorf("unknown release type %q", releaseType)
+		return output, fmt.Errorf("unknown release type %q", releaseType)
 	}
 
-	return true, commit.Hash, nil
+	return output, nil
 }
 
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags.
 func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Item) (*object.Tag, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	tags, err := repository.TagObjects()
 	if err != nil {
 		return nil, fmt.Errorf("fetching tag objects: %w", err)
@@ -270,45 +314,43 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	return latestTag, nil
 }
 
-// checkoutBranch moves the HEAD pointer of the given repository to the given branch. This function expects the
-// repository to be a clone and have a remote to which it will set the branch being checkout to a remote reference to
-// the corresponding remote branch.
-func (p *Parser) checkoutBranch(repository *git.Repository, branchName string) error {
+// getBranchReference attempts to get a reference to a branch, trying remote-tracking branches first,
+// then falling back to local branches if the remote reference is not found.
+func (p *Parser) getBranchReference(repository *git.Repository, branchName string) (*plumbing.Reference, error) {
+	// Try remote-tracking branch first (refs/remotes/origin/branchName)
 	remoteBranchRef := plumbing.NewRemoteReferenceName(p.ctx.RemoteName, branchName)
-	_, err := repository.Reference(remoteBranchRef, true)
-	if err != nil {
-		return fmt.Errorf("remote branch %q not found: %w", remoteBranchRef, err)
+	ref, err := repository.Reference(remoteBranchRef, true)
+	if err == nil {
+		p.ctx.Logger.Debug().
+			Str("branch", branchName).
+			Str("ref", remoteBranchRef.String()).
+			Msg("using remote-tracking branch reference")
+		return ref, nil
 	}
 
-	localBranchRef := plumbing.NewBranchReferenceName(branchName)
-	ref := plumbing.NewSymbolicReference(localBranchRef, remoteBranchRef)
-	err = repository.Storer.SetReference(ref)
-	if err != nil {
-		return fmt.Errorf("error creating local branch %q: %w", localBranchRef, err)
-	}
-
-	// Checkout the new local branch
-	w, err := repository.Worktree()
-	if err != nil {
-		return fmt.Errorf("error getting worktree: %w", err)
-	}
-
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: localBranchRef,
-		Force:  true,
-	})
-	if err != nil {
-		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return fmt.Errorf("branch %q does not exist: %w", branchName, err)
+	// If remote reference not found, try local branch (refs/heads/branchName)
+	if errors.Is(err, plumbing.ErrReferenceNotFound) {
+		localBranchRef := plumbing.NewBranchReferenceName(branchName)
+		ref, err = repository.Reference(localBranchRef, true)
+		if err == nil {
+			p.ctx.Logger.Debug().
+				Str("branch", branchName).
+				Str("ref", localBranchRef.String()).
+				Msg("using local branch reference")
+			return ref, nil
 		}
-		return fmt.Errorf("checking out to release branch: %w", err)
+
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return nil, fmt.Errorf("branch %q not found in remote or local references: %w", branchName, err)
+		}
 	}
 
-	return nil
+	return nil, fmt.Errorf("getting reference for branch %q: %w", branchName, err)
 }
 
-// commitContainsProjectFiles checks if a given commit changes contain at least one file whose path belongs to the
+// commitContainsProjectFiles checks if a given commit change contains at least one file whose path belongs to the
 // given project's path.
+// TODO: optimize this function
 func commitContainsProjectFiles(commit *object.Commit, project monorepo.Item) (bool, error) {
 	commitTree, err := commit.Tree()
 	if err != nil {

@@ -282,7 +282,8 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 
 	_, err = testRepository.AddCommit("feat") // 1.1.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix") // 1.1.1
+	_, err = testRepository.AddCommit("fix") // Still at "1.1.0" as "feat" causes a "minor" bump which supplants the "patch" bump of "fix"
+	checkErr(t, "adding commit", err)
 	checkErr(t, "adding commit", err)
 
 	th := NewTestHelper(t)
@@ -291,7 +292,7 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver ", err)
 
-	want := "1.1.1"
+	want := "1.1.0"
 
 	assert.Equal(want, output.Semver.String(), "version should be equal")
 	assert.Equal(true, output.NewRelease, "boolean should be equal")
@@ -557,8 +558,8 @@ func TestParser_Run_Monorepo(t *testing.T) {
 
 	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
 
-	assert.Contains(gotSemver, "1.0.1")
-	assert.Contains(gotSemver, "0.1.2")
+	assert.Contains(gotSemver, "1.0.0")
+	assert.Contains(gotSemver, "0.1.0")
 }
 
 func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
@@ -582,21 +583,21 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 	barCommit, err := testRepository.AddCommitWithSpecificFile("chore!", "./bar/foo.txt")
 	checkErr(t, "adding commit", err)
 
-	err = testRepository.AddTag("bar-1.0.0", barCommit) // bar-1.0.0
+	err = testRepository.AddTag("bar-1.0.0", barCommit)
 	checkErr(t, "adding bar tag", err)
 
 	// Adding "foo" project commits
 	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt") // foo-2.0.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt") // foo-2.0.1
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt") // foo-2.0.0
 	checkErr(t, "adding commit", err)
 
 	// Adding "bar" project commits
 	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/foo.txt") // bar-1.1.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt") // bar-1.1.1
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt") // bar-1.1.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt") // bar-1.1.2
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt") // bar-1.1.0
 	checkErr(t, "adding commit", err)
 
 	// Adding unrelated commits
@@ -622,8 +623,8 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 
 	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
 
-	assert.Contains(gotSemver, "2.0.1")
-	assert.Contains(gotSemver, "1.1.2")
+	assert.Contains(gotSemver, "2.0.0")
+	assert.Contains(gotSemver, "1.1.0")
 }
 
 func TestParser_Run_InvalidBranch(t *testing.T) {
