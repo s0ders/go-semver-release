@@ -59,7 +59,7 @@ func (f *Flag) GetItems() []Item {
 	if f == nil {
 		return nil
 	}
-	return []Item(*f)
+	return *f
 }
 
 var _ pflag.Value = (*Flag)(nil)
