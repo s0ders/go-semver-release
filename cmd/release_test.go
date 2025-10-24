@@ -86,26 +86,6 @@ rules:
 	checkErr(t, err, "writing configuration file")
 
 	// Create a test repository
-	masterCommits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
-	}
-
-	alphaCommits := []string{
-		"fix",  // 1.2.3-alpha
-		"feat", // 1.3.0-alpha
-	}
 
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
@@ -115,12 +95,27 @@ rules:
 		checkErr(t, err, "removing repository")
 	}()
 
+	masterCommits := []string{
+		"fix",
+		"feat",
+		"feat!", // 1.0.0
+		"fix",
+	}
+
+	alphaCommits := []string{
+		"fix",
+		"feat",
+		// TODO: process and tag each branch individually before processing the next one, this way, prerelease branch see "main" tags, the correct version below should be 2.0.0-alpha not 1.0.0-alpha because alpha should have seen the 1.0.0 tag
+		"feat!", // 1.0.0-alpha
+		"fix",
+	}
+
 	for _, commit := range masterCommits {
 		_, err = testRepository.AddCommit(commit)
 		checkErr(t, err, "creating sample commit")
 	}
 
-	// Creating alpha branch and associated commits
+	// Creating the alpha branch and associated commits
 	err = testRepository.CheckoutBranch("alpha")
 	checkErr(t, err, "checking out alpha branch")
 
@@ -136,9 +131,9 @@ rules:
 	releaseOutput, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "running release command")
 
-	expectedMasterVersion := "1.2.2"
+	expectedMasterVersion := "1.0.0"
 	expectedMasterTag := "v" + expectedMasterVersion
-	expectedAlphaVersion := "1.3.0-alpha"
+	expectedAlphaVersion := "1.0.0-alpha"
 	expectedAlphaTag := "v" + expectedAlphaVersion
 
 	expectedOutputs := []cmdOutput{
@@ -202,8 +197,8 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	commits := []string{
 		"fix",   // 0.1.0
 		"feat!", // 1.0.0 (breaking change)
-		"feat",  // 1.1.0
-		"fix",   // 1.2.0
+		"feat",
+		"fix",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -218,7 +213,7 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 	output, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.2.0"
+	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
@@ -243,19 +238,19 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
+		"fix",   // 0.0.1
+		"feat!", // 1.0.0 (breaking change)
+		"feat",
+		"fix",
+		"fix",
+		"chores",
+		"refactor",
+		"test",
+		"ci",
+		"feat",
+		"perf",
+		"revert",
+		"style",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -272,7 +267,7 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.2.2"
+	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
@@ -297,19 +292,19 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	assert := assertion.New(t)
 
 	commits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
+		"fix",   // 0.0.1
+		"feat!", // 1.0.0 (breaking change)
+		"feat",
+		"fix",
+		"fix",
+		"chores",
+		"refactor",
+		"test",
+		"ci",
+		"feat",
+		"perf",
+		"revert",
+		"style",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -325,7 +320,7 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.2.2"
+	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
@@ -352,21 +347,28 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	testRepository, err := gittest.NewRepository()
 	checkErr(t, err, "creating sample repository")
 
+	hash, err := testRepository.AddCommit("feat!")
+	checkErr(t, err, "creating sample commit on master")
+
+	err = testRepository.AddTag("1.0.0", hash)
+	checkErr(t, err, "creating sample tag")
+
+	// TODO: add tag 1.0.0 on master
 	// Create commits on master
 	masterCommits := []string{
-		"fix",      // 0.0.1
-		"feat!",    // 1.0.0 (breaking change)
-		"feat",     // 1.1.0
-		"fix",      // 1.1.1
-		"fix",      // 1.1.2
-		"chores",   // 1.1.2
-		"refactor", // 1.1.2
-		"test",     // 1.1.2
-		"ci",       // 1.1.2
-		"feat",     // 1.2.0
-		"perf",     // 1.2.1
-		"revert",   // 1.2.2
-		"style",    // 1.2.2
+		"fix",   // 1.0.1
+		"feat!", // 2.0.0 (breaking change)
+		"feat",
+		"fix",
+		"fix",
+		"chores",
+		"refactor",
+		"test",
+		"ci",
+		"feat",
+		"perf",
+		"revert",
+		"style",
 	}
 
 	if len(masterCommits) != 0 {
@@ -397,9 +399,9 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	checkErr(t, err, "checking out to branch rc")
 
 	rcCommits := []string{
-		"feat!", // 2.0.0
-		"feat",  // 2.1.0
-		"perf",  // 2.1.1
+		"feat",
+		"feat!", // 2.0.0-rc
+		"perf",
 	}
 
 	for _, commit := range rcCommits {
@@ -418,13 +420,13 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	expectedOutputs := []cmdOutput{
 		{
 			Message:    "new release found",
-			Version:    "1.2.2",
+			Version:    "2.0.0",
 			NewRelease: true,
 			Branch:     "master",
 		},
 		{
 			Message:    "new release found",
-			Version:    "2.1.1-rc",
+			Version:    "2.0.0-rc",
 			NewRelease: true,
 			Branch:     "rc",
 		},
@@ -455,8 +457,8 @@ func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
 	commits := []string{
 		"fix",   // 0.0.1
 		"feat!", // 1.0.0 (breaking change)
-		"feat",  // 1.1.0
-		"fix",   // 1.1.1
+		"feat",
+		"fix",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -471,7 +473,7 @@ func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.1.1" + "+" + metadata
+	expectedVersion := "1.0.0" + "+" + metadata
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
@@ -498,8 +500,8 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	commits := []string{
 		"fix",   // 0.0.1
 		"feat!", // 1.0.0 (breaking change)
-		"feat",  // 1.1.0
-		"fix",   // 1.1.1
+		"feat",
+		"fix",
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -510,7 +512,7 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.1.1-master"
+	expectedVersion := "1.0.0-master"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
@@ -682,7 +684,7 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 
 	commits := []string{
 		"fix",  // 0.1.0 (with custom rule)
-		"feat", // 0.2.0
+		"feat", // 0.1.0 -> single bump per release
 	}
 
 	testRepository := NewTestRepository(t, commits)
@@ -697,7 +699,7 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "0.2.0"
+	expectedVersion := "0.1.0"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
@@ -759,14 +761,14 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	expectedOutputs := []cmdOutput{
 		{
 			Message:    "new release found",
-			Version:    "0.1.1",
+			Version:    "0.1.0",
 			NewRelease: true,
 			Branch:     "master",
 			Project:    "foo",
 		},
 		{
 			Message:    "new release found",
-			Version:    "1.0.2",
+			Version:    "1.0.0",
 			NewRelease: true,
 			Branch:     "master",
 			Project:    "bar",
@@ -830,7 +832,7 @@ func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
 		},
 		{
 			Message:    "new release found",
-			Version:    "1.0.2",
+			Version:    "1.0.0",
 			NewRelease: true,
 			Branch:     "master",
 			Project:    "bar",
@@ -888,7 +890,7 @@ func TestReleaseCmd_Monorepo_ProjectWithPaths(t *testing.T) {
 	expectedOutputs := []cmdOutput{
 		{
 			Message:    "new release found",
-			Version:    "1.0.2",
+			Version:    "1.0.0",
 			NewRelease: true,
 			Branch:     "master",
 			Project:    "bar",

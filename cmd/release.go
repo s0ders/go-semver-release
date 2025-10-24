@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -63,7 +62,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("cloning Git repository: %w", err)
 			}
 
-			outputs, err := parser.New(ctx).Run(context.Background(), repository)
+			outputs, err := parser.New(ctx).Run(repository)
 			if err != nil {
 				return fmt.Errorf("computing new semver: %w", err)
 			}

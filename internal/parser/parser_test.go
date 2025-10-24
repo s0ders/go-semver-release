@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,11 +76,17 @@ func TestParser_FetchLatestSemverTag_NoTag(t *testing.T) {
 		_ = testRepository.Remove()
 	})
 
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building reachable commits", err)
+
 	th := NewTestHelper(t)
 
 	parser := New(th.Ctx)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{})
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Nil(latest, "latest semver tag should be nil")
@@ -105,10 +110,16 @@ func TestParser_FetchLatestSemverTag_OneTag(t *testing.T) {
 	err = testRepository.AddTag(tagName, head.Hash())
 	checkErr(t, "creating tag", err)
 
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building reachable commits", err)
+
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{})
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Equal(tagName, latest.Name, "latest semver tagName should be equal")
@@ -136,10 +147,16 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 		checkErr(t, "creating tag", err)
 	}
 
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building reachable commits", err)
+
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{})
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
 	checkErr(t, "fetching latest semver tag", err)
 
 	want := "3.0.0"
@@ -282,7 +299,8 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 
 	_, err = testRepository.AddCommit("feat") // 1.1.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix") // 1.1.1
+	_, err = testRepository.AddCommit("fix") // Still at "1.1.0" as "feat" causes a "minor" bump which supplants the "patch" bump of "fix"
+	checkErr(t, "adding commit", err)
 	checkErr(t, "adding commit", err)
 
 	th := NewTestHelper(t)
@@ -291,7 +309,7 @@ func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
 	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
 	checkErr(t, "computing new semver ", err)
 
-	want := "1.1.1"
+	want := "1.1.0"
 
 	assert.Equal(want, output.Semver.String(), "version should be equal")
 	assert.Equal(true, output.NewRelease, "boolean should be equal")
@@ -401,7 +419,7 @@ func TestParser_Run_NoMonorepoOutputLength(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.Run(context.Background(), clonedTestRepository.Repository)
+	output, err := parser.Run( clonedTestRepository.Repository)
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Version{
@@ -443,6 +461,12 @@ func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
 	err = testRepository.AddTag(wantTag, head.Hash())
 	checkErr(t, fmt.Sprintf("creating tag %q", wantTag), err)
 
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building reachable commits", err)
+
 	th := NewTestHelper(t)
 	th.Ctx.MonorepositoryCfg = []monorepo.Item{
 		{Name: "foo", Path: "foo"},
@@ -450,7 +474,7 @@ func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
 	}
 	parser := New(th.Ctx)
 
-	gotTag, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.MonorepositoryCfg[0])
+	gotTag, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.MonorepositoryCfg[0], reachable.HashSet)
 	checkErr(t, "fetching latest semver tag", err)
 
 	assert.Equal(gotTag.Name, wantTag, "should have found tag")
@@ -550,15 +574,15 @@ func TestParser_Run_Monorepo(t *testing.T) {
 	clonedTestRepository, err := testRepository.Clone()
 	checkErr(t, "cloning test repository", err)
 
-	output, err := parser.Run(context.Background(), clonedTestRepository.Repository)
+	output, err := parser.Run( clonedTestRepository.Repository)
 	checkErr(t, "computing projects new semver", err)
 
 	assert.Len(output, 2, "parser run output should contain two elements")
 
 	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
 
-	assert.Contains(gotSemver, "1.0.1")
-	assert.Contains(gotSemver, "0.1.2")
+	assert.Contains(gotSemver, "1.0.0")
+	assert.Contains(gotSemver, "0.1.0")
 }
 
 func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
@@ -582,21 +606,21 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 	barCommit, err := testRepository.AddCommitWithSpecificFile("chore!", "./bar/foo.txt")
 	checkErr(t, "adding commit", err)
 
-	err = testRepository.AddTag("bar-1.0.0", barCommit) // bar-1.0.0
+	err = testRepository.AddTag("bar-1.0.0", barCommit)
 	checkErr(t, "adding bar tag", err)
 
 	// Adding "foo" project commits
 	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt") // foo-2.0.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt") // foo-2.0.1
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt") // foo-2.0.0
 	checkErr(t, "adding commit", err)
 
 	// Adding "bar" project commits
 	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/foo.txt") // bar-1.1.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt") // bar-1.1.1
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt") // bar-1.1.0
 	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt") // bar-1.1.2
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt") // bar-1.1.0
 	checkErr(t, "adding commit", err)
 
 	// Adding unrelated commits
@@ -615,15 +639,15 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 	clonedTestRepository, err := testRepository.Clone()
 	checkErr(t, "cloning test repository", err)
 
-	output, err := parser.Run(context.Background(), clonedTestRepository.Repository)
+	output, err := parser.Run( clonedTestRepository.Repository)
 	checkErr(t, "computing projects new semver", err)
 
 	assert.Len(output, 2, "parser run output should contain two elements")
 
 	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
 
-	assert.Contains(gotSemver, "2.0.1")
-	assert.Contains(gotSemver, "1.1.2")
+	assert.Contains(gotSemver, "2.0.0")
+	assert.Contains(gotSemver, "1.1.0")
 }
 
 func TestParser_Run_InvalidBranch(t *testing.T) {
@@ -641,7 +665,7 @@ func TestParser_Run_InvalidBranch(t *testing.T) {
 
 	parser := New(th.Ctx)
 
-	_, err = parser.Run(context.Background(), testRepository.Repository)
+	_, err = parser.Run( testRepository.Repository)
 	assert.ErrorIs(err, plumbing.ErrReferenceNotFound, "parser run should have failed since branch does not exist")
 }
 
@@ -678,6 +702,179 @@ func BenchmarkParser_ComputeNewSemver(b *testing.B) {
 		}
 	}
 */
+
+func TestParser_FetchLatestSemverTag_DivergentBranches(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create initial commits on master
+	commit1, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+	err = testRepository.AddTag("1.0.0", commit1)
+	checkErr(t, "adding tag 1.0.0", err)
+
+	commit2, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+	err = testRepository.AddTag("1.1.0", commit2)
+	checkErr(t, "adding tag 1.1.0", err)
+
+	// Create release branch from 1.1.0
+	err = testRepository.CheckoutBranch("release-1.x")
+	checkErr(t, "creating release branch", err)
+
+	// Add commits and tags on release branch
+	releaseCommit, err := testRepository.AddCommit("fix")
+	checkErr(t, "adding release commit", err)
+	err = testRepository.AddTag("1.1.1", releaseCommit)
+	checkErr(t, "adding tag 1.1.1", err)
+
+	// Switch back to master and add more commits/tags
+	worktree, err := testRepository.Worktree()
+	checkErr(t, "getting worktree", err)
+	err = worktree.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("master")})
+	checkErr(t, "checkout master", err)
+
+	commit3, err := testRepository.AddCommit("feat!")
+	checkErr(t, "adding breaking change commit", err)
+	err = testRepository.AddTag("2.0.0", commit3)
+	checkErr(t, "adding tag 2.0.0", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+
+	// Test: from master, should see 2.0.0 as latest
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	masterReachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building master reachable commits", err)
+
+	latestFromMaster, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, masterReachable.HashSet)
+	checkErr(t, "fetching latest tag from master", err)
+	assert.Equal("2.0.0", latestFromMaster.Name, "master should see 2.0.0")
+
+	// Test: from release-1.x, should see 1.1.1 as latest (NOT 2.0.0)
+	releaseRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("release-1.x"), true)
+	checkErr(t, "getting release reference", err)
+
+	releaseReachable, err := BuildReachableCommits(testRepository.Repository, releaseRef)
+	checkErr(t, "building release reachable commits", err)
+
+	latestFromRelease, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, releaseReachable.HashSet)
+	checkErr(t, "fetching latest tag from release", err)
+	assert.Equal("1.1.1", latestFromRelease.Name, "release-1.x should see 1.1.1, not 2.0.0")
+}
+
+func TestParser_FetchLatestSemverTag_UnreachableTag(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create a commit and tag on master
+	commit1, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+	err = testRepository.AddTag("1.0.0", commit1)
+	checkErr(t, "adding tag 1.0.0", err)
+
+	// Create a second branch from initial commit
+	err = testRepository.CheckoutBranch("other")
+	checkErr(t, "creating other branch", err)
+
+	otherCommit, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding other commit", err)
+	err = testRepository.AddTag("9.9.9", otherCommit)
+	checkErr(t, "adding unreachable tag 9.9.9", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+
+	// From master, should see 1.0.0 (not 9.9.9 from other branch)
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building reachable commits", err)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
+	checkErr(t, "fetching latest tag", err)
+	assert.Equal("1.0.0", latest.Name, "should only see reachable tag 1.0.0, not 9.9.9")
+}
+
+func TestParser_FetchLatestSemverTag_MonorepoDivergentBranches(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Initial foo project commit and tag
+	fooCommit, err := testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt")
+	checkErr(t, "adding foo commit", err)
+	err = testRepository.AddTag("foo-1.0.0", fooCommit)
+	checkErr(t, "adding foo-1.0.0 tag", err)
+
+	// Create release branch
+	err = testRepository.CheckoutBranch("release-1.x")
+	checkErr(t, "creating release branch", err)
+
+	// Add patch on release
+	releaseFooCommit, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/bar.txt")
+	checkErr(t, "adding release foo commit", err)
+	err = testRepository.AddTag("foo-1.0.1", releaseFooCommit)
+	checkErr(t, "adding foo-1.0.1 tag", err)
+
+	// Back to master, add major version
+	worktree, err := testRepository.Worktree()
+	checkErr(t, "getting worktree", err)
+	err = worktree.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("master")})
+	checkErr(t, "checkout master", err)
+
+	masterFooCommit, err := testRepository.AddCommitWithSpecificFile("feat!", "./foo/baz.txt")
+	checkErr(t, "adding master foo commit", err)
+	err = testRepository.AddTag("foo-2.0.0", masterFooCommit)
+	checkErr(t, "adding foo-2.0.0 tag", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+	fooProject := monorepo.Item{Name: "foo", Path: "foo"}
+
+	// From release-1.x, should see foo-1.0.1
+	releaseRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("release-1.x"), true)
+	checkErr(t, "getting release reference", err)
+
+	releaseReachable, err := BuildReachableCommits(testRepository.Repository, releaseRef)
+	checkErr(t, "building release reachable commits", err)
+
+	latestFromRelease, err := parser.FetchLatestSemverTag(testRepository.Repository, fooProject, releaseReachable.HashSet)
+	checkErr(t, "fetching latest tag from release", err)
+	assert.Equal("foo-1.0.1", latestFromRelease.Name, "release-1.x should see foo-1.0.1")
+
+	// From master, should see foo-2.0.0
+	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	checkErr(t, "getting master reference", err)
+
+	masterReachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
+	checkErr(t, "building master reachable commits", err)
+
+	latestFromMaster, err := parser.FetchLatestSemverTag(testRepository.Repository, fooProject, masterReachable.HashSet)
+	checkErr(t, "fetching latest tag from master", err)
+	assert.Equal("foo-2.0.0", latestFromMaster.Name, "master should see foo-2.0.0")
+}
+
 type TestHelper struct {
 	Ctx *appcontext.AppContext
 }
