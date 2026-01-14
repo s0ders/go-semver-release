@@ -220,21 +220,21 @@ func suggestCommitType(input string) string {
 }
 
 func printValidationResult(cmd *cobra.Command, path string, result *ValidationResult) {
-	fmt.Fprintf(cmd.OutOrStdout(), "Validating %s...\n\n", path)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Validating %s...\n\n", path)
 
 	if !result.HasErrors() && len(result.Warnings) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "\u2713 Configuration valid")
-		fmt.Fprintf(cmd.OutOrStdout(), "\n0 errors, 0 warnings\n")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\u2713 Configuration valid")
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\n0 errors, 0 warnings\n")
 		return
 	}
 
 	for _, err := range result.Errors {
-		fmt.Fprintf(cmd.OutOrStdout(), "\u2717 %s\n", err)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\u2717 %s\n", err)
 	}
 
 	for _, warn := range result.Warnings {
-		fmt.Fprintf(cmd.OutOrStdout(), "\u26a0 %s\n", warn)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\u26a0 %s\n", warn)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "\n%d error(s), %d warning(s)\n", len(result.Errors), len(result.Warnings))
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\n%d error(s), %d warning(s)\n", len(result.Errors), len(result.Warnings))
 }

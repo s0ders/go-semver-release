@@ -30,13 +30,13 @@ func NewVersionCmd() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Version: %s\n", versionStr)
+			_, _ = fmt.Fprintf(out, "Version: %s\n", versionStr)
 
 			if buildNumber != "" {
-				fmt.Fprintf(out, "Build: %s\n", buildNumber)
+				_, _ = fmt.Fprintf(out, "Build: %s\n", buildNumber)
 			}
 
-			fmt.Fprintf(out, "Commit: %s\n", commit)
+			_, _ = fmt.Fprintf(out, "Commit: %s\n", commit)
 
 			return nil
 		},

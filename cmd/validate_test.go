@@ -21,7 +21,9 @@ rules:
     - fix
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -36,7 +38,9 @@ branches:
   - name: [invalid
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	_, err := validateConfigFile(path)
 
@@ -51,7 +55,9 @@ branches:
   - prerelease: true
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -67,7 +73,9 @@ branches:
   - name: main
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -83,7 +91,9 @@ branches:
     prerelease: true
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -102,7 +112,9 @@ monorepo:
       - ./lib/
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -117,7 +129,9 @@ monorepo:
   - path: ./api/
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -134,7 +148,9 @@ monorepo:
   - name: api
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -153,7 +169,9 @@ rules:
     - feature
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -173,7 +191,9 @@ rules:
     - feat
 `
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
@@ -185,7 +205,9 @@ rules:
 func TestValidateConfigFile_EmptyConfig(t *testing.T) {
 	content := ``
 	path := createTempConfig(t, content)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	result, err := validateConfigFile(path)
 
