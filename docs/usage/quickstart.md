@@ -6,14 +6,10 @@ All you need to get started is:
 * A commit history following the [Conventional Commits](https://www.conventionalcommits.org/en/) convention
 * Optionally, a configuration file inside the Git repository to version
 
-The following example configuration file suites most use cases:
+The following configuration file suits most use cases:
 
 ```yaml
 # <REPOSITORY_ROOT>/.semver.yaml
-remote-name: "origin"
-git-name: "My Custom Robot Name"
-git-email: "custom-robot@acme.com"
-tag-prefix: "v"
 rules:
   minor:
     - feat
@@ -22,7 +18,7 @@ rules:
     - perf
     - revert
 branches:
-  - name: "master"
+  - name: "main"
   - name: "alpha"
     prerelease: true
 ```

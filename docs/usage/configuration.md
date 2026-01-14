@@ -73,7 +73,41 @@ CLI flag: `--branches`
 
 Branches set in configuration are the one Go Semver Release will read commit history from to compute the next SemVer release. In the configuration file, `branches` is a list of branch, which can have two attributes `name`, mandatory, and `prerelease` optional.
 
-A prerelease branch will have its tag suffixed by its own name. For instance, for a branch named `rc` a set to `prerelease`, a new release will look like `1.2.3-rc`.
+#### Stable Branches
+
+Stable branches (where `prerelease` is `false` or omitted) produce standard semantic versions like `1.0.0`, `1.1.0`, `2.0.0`.
+
+#### Prerelease Branches
+
+A prerelease branch (where `prerelease: true`) produces versions with numbered suffixes following SemVer 2.0:
+
+```
+<version>-<branch>.<number>
+```
+
+**Examples:**
+| Scenario | Version |
+|----------|---------|
+| First prerelease on `rc` branch | `1.0.0-rc.1` |
+| Second commit on `rc` branch | `1.0.0-rc.2` |
+| Breaking change on `rc` branch | `2.0.0-rc.1` |
+| Feature on `alpha` branch | `1.1.0-alpha.1` |
+
+#### Prerelease Promotion
+
+When a prerelease branch is merged into a stable branch, the prerelease is automatically **promoted** to a stable release. This enables a standard release workflow:
+
+1. **Develop on prerelease branch**: Create release candidates
+   - `1.0.0-rc.1` → `1.0.0-rc.2` → `1.0.0-rc.3`
+
+2. **Merge to stable branch**: Prerelease is promoted
+   - `1.0.0-rc.3` becomes `1.0.0`
+
+3. **Continue development**: Normal versioning resumes
+   - Next feature → `1.1.0`
+
+> [!NOTE]
+> Stable branches are processed before prerelease branches. This ensures prerelease branches can see stable releases when computing their versions.
 
 Examples:
 
@@ -89,6 +123,25 @@ branches:
   - name: "alpha"
     prerelease: true
 ```
+
+#### Example Workflow
+
+Given the configuration above and the following Git history:
+
+```
+main:   A---B---C---D---E (merge rc)---F
+             \         /
+rc:           X---Y---Z
+```
+
+| Commit | Branch | Version |
+|--------|--------|---------|
+| C | main | `1.0.0` (feat!) |
+| X | rc | `1.1.0-rc.1` (feat) |
+| Y | rc | `1.1.0-rc.2` (fix) |
+| Z | rc | `1.1.0-rc.3` (fix) |
+| E | main | `1.1.0` (promotion) |
+| F | main | `1.1.1` (fix) |
 
 ### Remote and access token
 

@@ -5,7 +5,7 @@ on:
     types: [opened, reopened, edited, synchronize]
 
 env:
-  GO_VERSION: 1.24.9
+  GO_VERSION: 1.25.3
 
 permissions: read-all
 
@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -30,7 +30,7 @@ jobs:
         run: go test -shuffle=on -tags testing -race -v -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           codecov_yml_path: .github/codecov.yml
         env:

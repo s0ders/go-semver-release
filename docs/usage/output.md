@@ -23,7 +23,7 @@ Here is an example of an output where two branches were parsed, please note that
 
 ```json
 {"new-release":true,"version":"1.2.2","branch":"main","message":"new release found"}
-{"new-release":true,"version":"2.1.1-rc","branch":"rc","message":"new release found"}
+{"new-release":true,"version":"2.1.1-rc.1","branch":"rc","message":"new release found"}
 ```
 
 ## GitHub Action output

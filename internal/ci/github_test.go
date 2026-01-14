@@ -8,7 +8,7 @@ import (
 
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v6/internal/semver"
+	"github.com/s0ders/go-semver-release/v7/internal/semver"
 )
 
 func TestCI_GenerateGitHub_HappyScenario(t *testing.T) {
