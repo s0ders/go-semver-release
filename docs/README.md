@@ -1,5 +1,3 @@
-# Go Semver Release
-
 <p align="center">
   <img src=".gitbook/assets/gop.png" alt="Go Semver Release Logo" width="230">
   <br><br>
