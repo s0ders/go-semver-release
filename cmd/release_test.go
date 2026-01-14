@@ -14,9 +14,9 @@ import (
 	"github.com/spf13/viper"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/gittest"
-	"github.com/s0ders/go-semver-release/v6/internal/tag"
+	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v7/internal/gittest"
+	"github.com/s0ders/go-semver-release/v7/internal/tag"
 )
 
 type cmdOutput struct {

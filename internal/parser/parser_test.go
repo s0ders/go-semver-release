@@ -13,12 +13,12 @@ import (
 	"github.com/rs/zerolog"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/branch"
-	"github.com/s0ders/go-semver-release/v6/internal/gittest"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v6/internal/rule"
-	"github.com/s0ders/go-semver-release/v6/internal/semver"
+	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v7/internal/branch"
+	"github.com/s0ders/go-semver-release/v7/internal/gittest"
+	"github.com/s0ders/go-semver-release/v7/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v7/internal/rule"
+	"github.com/s0ders/go-semver-release/v7/internal/semver"
 )
 
 func TestParser_CommitTypeRegex(t *testing.T) {
@@ -586,7 +586,7 @@ func TestParser_Run_NoMonorepoOutputLength(t *testing.T) {
 	th := NewTestHelper(t)
 	parser := New(th.Ctx)
 
-	output, err := parser.Run( clonedTestRepository.Repository)
+	output, err := parser.Run(clonedTestRepository.Repository)
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Version{
@@ -741,7 +741,7 @@ func TestParser_Run_Monorepo(t *testing.T) {
 	clonedTestRepository, err := testRepository.Clone()
 	checkErr(t, "cloning test repository", err)
 
-	output, err := parser.Run( clonedTestRepository.Repository)
+	output, err := parser.Run(clonedTestRepository.Repository)
 	checkErr(t, "computing projects new semver", err)
 
 	assert.Len(output, 2, "parser run output should contain two elements")
@@ -806,7 +806,7 @@ func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
 	clonedTestRepository, err := testRepository.Clone()
 	checkErr(t, "cloning test repository", err)
 
-	output, err := parser.Run( clonedTestRepository.Repository)
+	output, err := parser.Run(clonedTestRepository.Repository)
 	checkErr(t, "computing projects new semver", err)
 
 	assert.Len(output, 2, "parser run output should contain two elements")
@@ -832,7 +832,7 @@ func TestParser_Run_InvalidBranch(t *testing.T) {
 
 	parser := New(th.Ctx)
 
-	_, err = parser.Run( testRepository.Repository)
+	_, err = parser.Run(testRepository.Repository)
 	assert.ErrorIs(err, plumbing.ErrReferenceNotFound, "parser run should have failed since branch does not exist")
 }
 

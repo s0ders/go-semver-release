@@ -10,13 +10,13 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/ci"
-	"github.com/s0ders/go-semver-release/v6/internal/gpg"
-	"github.com/s0ders/go-semver-release/v6/internal/parser"
-	"github.com/s0ders/go-semver-release/v6/internal/remote"
-	"github.com/s0ders/go-semver-release/v6/internal/rule"
-	"github.com/s0ders/go-semver-release/v6/internal/tag"
+	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v7/internal/ci"
+	"github.com/s0ders/go-semver-release/v7/internal/gpg"
+	"github.com/s0ders/go-semver-release/v7/internal/parser"
+	"github.com/s0ders/go-semver-release/v7/internal/remote"
+	"github.com/s0ders/go-semver-release/v7/internal/rule"
+	"github.com/s0ders/go-semver-release/v7/internal/tag"
 )
 
 const (

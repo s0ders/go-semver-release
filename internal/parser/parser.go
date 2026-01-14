@@ -16,10 +16,10 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/branch"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v6/internal/semver"
+	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v7/internal/branch"
+	"github.com/s0ders/go-semver-release/v7/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v7/internal/semver"
 )
 
 type BumpType int
