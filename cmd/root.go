@@ -68,9 +68,11 @@ func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {
 	rootCmd.PersistentFlags().BoolVarP(&ctx.Verbose, "verbose", "v", false, "Verbose output")
 
 	releaseCmd := NewReleaseCmd(ctx)
+	validateCmd := NewValidateCmd()
 	versionCmd := NewVersionCmd()
 
 	rootCmd.AddCommand(releaseCmd)
+	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	return rootCmd

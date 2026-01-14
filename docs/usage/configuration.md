@@ -1,283 +1,164 @@
 # Configuration
 
-### How to read this page
-
-Configuration option can be set either via flag or configuration file. The same option shares the same name for its flag and configuration key counterpart. Each paragraph about an option will have an example for how to use it via flag or a YAML configuration file.
-
-Default values are not specified here since they are available when running the following command:
+> [!TIP]
+> Validate your configuration file before running:
 
 ```bash
+go-semver-release validate .semver.yaml
+```
+
+## Basics
+
+Configuration can be set via **flags**, **environment variables** (`GO_SEMVER_RELEASE_*`), or a **YAML file** (default: `.semver.yaml`).
+
+**Precedence:** flags > environment variables > configuration file > defaults
+
+```bash
+# See all options and defaults
 $ go-semver-release release --help
 ```
 
-### Configuration precedence
+## Minimal Configuration
 
-The order of precedence for the configuration, from highest to lowest, is:
-
-1. Flag values
-2. Environment variable (prefixed by `GO_SEMVER_RELEASE`) values
-3. Configuration file values
-4. Flag default value
-
-### Configuration file
-
-CLI flag: `--config`
-
-The tool expects a configuration file for configuration options such as branches or release rules, the default path, which can be overridden, is `<REPOSITORY_ROOT>/.semver.yaml`
-
-Example:
-
-```bash
-$ go-semver-release release <PATH> --config <CONFIG_PATH>
+```yaml
+# .semver.yaml
+branches:
+  - name: main
 ```
 
-### Release rules
+That's it. sensible defaults will be used for everything else.
 
-CLI flag: `--rules`
+## Options Reference
 
-Release rules define which commit type will trigger a release, and which type of release (i.e., `minor` or `patch`).
+### branches
+
+Branches to read commit history from.
+
+```yaml
+branches:
+  - name: main
+  - name: rc
+    prerelease: true
+```
+
+**Prerelease branches** produce versions like `1.0.0-rc.1`. When merged to a stable branch, they're automatically promoted to stable releases (e.g., `1.0.0`).
+
+### rules
+
+Which commit types trigger releases. Defaults:
+
+| Release | Commit types |
+|---------|--------------|
+| minor | `feat` |
+| patch | `fix`, `perf`, `revert` |
 
 > [!NOTE]
-> Release types can only be `minor` or `patch`. `major` is reserved for breaking changes only which are indicated either using an exclamation mark after the commit type (e.g. `feat!`) or by stating `BREAKING CHANGE` in the commit message footer.
+> `major` releases are triggered by a `!` (such as `feat(api)!: ...`, `fix!: ...`), or `BREAKING CHANGE` in the commit message.
 
-The following release rules are applied by default, they can be overridden by adding or removing commit types in the `minor` and `patch` list.
-
-| Release type | Commit type             |
-|--------------|-------------------------|
-| `minor`      | `feat`                  |
-| `patch`      | `fix`, `perf`, `revert` |
-
-
-
-The following `type` are supported for release rules: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
-
-Examples:
-
-```bash
-$ go-semver-release release <PATH> --rules='{"minor": ["feat"], "patch": ["fix", "perf"]}'
-```
-
-<pre class="language-yaml"><code class="lang-yaml"><strong>rules:
-</strong>  minor:
+```yaml
+rules:
+  minor:
     - feat
   patch:
     - fix
     - perf
     - refactor
-    - revert
-</code></pre>
-
-### Branches
-
-CLI flag: `--branches`
-
-Branches set in configuration are the one Go Semver Release will read commit history from to compute the next SemVer release. In the configuration file, `branches` is a list of branch, which can have two attributes `name`, mandatory, and `prerelease` optional.
-
-#### Stable Branches
-
-Stable branches (where `prerelease` is `false` or omitted) produce standard semantic versions like `1.0.0`, `1.1.0`, `2.0.0`.
-
-#### Prerelease Branches
-
-A prerelease branch (where `prerelease: true`) produces versions with numbered suffixes following SemVer 2.0:
-
-```
-<version>-<branch>.<number>
 ```
 
-**Examples:**
-| Scenario | Version |
-|----------|---------|
-| First prerelease on `rc` branch | `1.0.0-rc.1` |
-| Second commit on `rc` branch | `1.0.0-rc.2` |
-| Breaking change on `rc` branch | `2.0.0-rc.1` |
-| Feature on `alpha` branch | `1.1.0-alpha.1` |
+Valid types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`
 
-#### Prerelease Promotion
+### monorepo
 
-When a prerelease branch is merged into a stable branch, the prerelease is automatically **promoted** to a stable release. This enables a standard release workflow:
+Version multiple projects in a single repository separately.
 
-1. **Develop on prerelease branch**: Create release candidates
-   - `1.0.0-rc.1` → `1.0.0-rc.2` → `1.0.0-rc.3`
-
-2. **Merge to stable branch**: Prerelease is promoted
-   - `1.0.0-rc.3` becomes `1.0.0`
-
-3. **Continue development**: Normal versioning resumes
-   - Next feature → `1.1.0`
-
-> [!NOTE]
-> Stable branches are processed before prerelease branches. This ensures prerelease branches can see stable releases when computing their versions.
-
-Examples:
-
-```bash
-$ go-semver-release release <PATH> --branches='[{"name": "master"}, {"name": "rc", "prerelease": true}]'
-```
-
-```yaml
-branches:
-  - name: "master"
-  - name: "rc"
-    prerelease: true
-  - name: "alpha"
-    prerelease: true
-```
-
-#### Example Workflow
-
-Given the configuration above and the following Git history:
-
-```
-main:   A---B---C---D---E (merge rc)---F
-             \         /
-rc:           X---Y---Z
-```
-
-| Commit | Branch | Version |
-|--------|--------|---------|
-| C | main | `1.0.0` (feat!) |
-| X | rc | `1.1.0-rc.1` (feat) |
-| Y | rc | `1.1.0-rc.2` (fix) |
-| Z | rc | `1.1.0-rc.3` (fix) |
-| E | main | `1.1.0` (promotion) |
-| F | main | `1.1.1` (fix) |
-
-### Remote and access token
-
-CLI flags: `--remote-name`, `--access-token`
-
-If the path to the Git repository supplied to Go Semver Release is a local path, it will operate in local mode which offers the benefits of avoiding the use of access token. However, it can be easier to simply let Go Semver Release clone a repository, parse it and push the newly found SemVer tag, if any.
-
-To enable the remote mode, provide a URL to the Git repository when invoking the `release`command. The name of the remote can be set if it's not the default `origin`.
-
-An access token is required so that Go Semver Release can clone the Git repository and push tags to it. All modern Git remote providers offer this feature (e.g., [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [GitLab](https://docs.gitlab.com/ee/user/project/settings/project\_access\_tokens.html), [Bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/)).
-
-Please do not set the access token directly in the configuration file. A much safer alternative it to set the access token as a secret on the remote repository and, in your CI workflow, pass it to Go Semver Release either via the `--access-token` flag or via the `GO_SEMVER_RELEASE_ACCESS_TOKEN` environment variable.
-
-Examples:
-```bash
-$ export GO_SEMVER_RELEASE_ACCESS_TOKEN="secret"
-$ go-semver-release release <PATH> --remote-name "origin"
-```
-```yaml
-remote-name: "origin"
-```
-
-
-### Monorepo
-
-CLI flag: `--monorepo`
-
-The program can also version separately multiple projects stored in a single repository also called "monorepo" or "mono repository." To do so, the configuration file must include a `monorepo` section stating the name and path of the various projects inside that repository.
-
-Each project will then be versioned separately meaning that each project will have its SemVer tag in the form `<project>-<semver>` for instance `foo-1.2.3` or `bar-v0.0.1`
-
-**How does it work?**
-
-The program will first fetch the latest, if any, SemVer tag for each project configured inside the `monorepo` key (e.g. `foo-1.0.0`).
-For each project, the program parses commits newer than the latest tag, checks if they affect that project's path, and increments the SemVer accordingly.
-
-This means that if a commit has changes belonging to multiple projects of a monorepo, all projects concerned will have their SemVer bumped according to the commit type.
-
-A monorepo project can be configured to have a single path using `path` or a list of paths using `paths`, these are mutually exclusive.
-
-Examples:
-```bash
-$ go-semver-release release <PATH> --monorepo='[{"name": "foo", "path": "./foo/"}, {"name": "bar", "path": "./bar/"}]'
-```
 ```yaml
 monorepo:
-  - name: foo
-    path: ./foo/
-  - name: bar
-    paths: 
-    - ./lib-a/bar/
-    - ./lib-b/bar/
+  - name: api
+    path: ./api/
+  - name: web
+    paths:        # Use 'paths' for multiple directories
+      - ./web/
+      - ./shared/
 ```
 
-### Tag prefix
+Tags are created as `<project>-<version>` (e.g., `api-v1.2.0`).
 
-CLI flag: `--tag-prefix`
+### tag-prefix
 
-A tag prefix is used to custom the tag format of a SemVer applied to a Git repository. A classic, and the default, value is `v`. For instance, if the release version found is `1.2.3`, the Git tag will be `v1.2.3`.
+Prefix for version tags. Default: `v`
 
-> [!NOTE]
-> Tag prefix can be changed during the lifetime of a repository (e.g., going from no prefix to `v`), this will not affect the SemVer tag history, the program will still be able to recognize previous SemVer tags as long as they are annotated tags.
-
-Example:
-
-```bash
-$ go-semver-release release <PATH> --tag-prefix v
+```yaml
+tag-prefix: v    # Creates tags like v1.2.3
 ```
 
-### Build metadata
+### build-metadata
 
-CLI flags: `--build-metadata`
+Append build metadata to versions (e.g., `1.2.3+build.123`).
 
-The Semantic Version convention states that your SemVer number can include build metadata in the form `1.2.3+<build_metadata>`. 
-Usually, these metadata represent a unique build number or build-specific information so that a version can be linked to the build that created it.
-
-The option allows passing a string containing metadata that will be appended to the semantic version number in the form stated above.
-
-Example:
-
-```bash
-$ go-semver-release release <PATH> --build-metadata $CI_JOB_ID
+```yaml
+build-metadata: $CI_JOB_ID
 ```
 
-### GPG signed tags
+### gpg-key-path
 
-CLI flag: `--gpg-key-path`
+Sign tags with a GPG key.
 
-Path to an armored GPG signing key used to sign the produced tags.
+```yaml
+gpg-key-path: /path/to/key.asc
+```
 
 > [!CAUTION]
-> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key specifically generated to sign tags. Do not use your personal key, that way you can easily revoke the key if any action in your workflow came to be compromised.
+> Use a dedicated key for CI, not your personal key. Ensure the file has restricted permissions (`chmod 600`).
+
+### remote-name / access-token
+
+For remote repositories. Default remote: `origin`
+
+```bash
+GO_SEMVER_RELEASE_ACCESS_TOKEN="secret" go-semver-release release https://github.com/user/repo.git
+```
 
 > [!WARNING]
-> As stated above, the GPG private key needs to be written on disk before being read. Store it outside the repository being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since it has not been committed) and will not be found by the program.
+> Never put access tokens in the config file. Use environment variables, flags or CI secrets.
 
-Example:
+### dry-run
+
+Compute version without creating tags.
 
 ```bash
-$ go-semver-release release <PATH> --gpg-key-path ./path/to/key.asc
+go-semver-release release --dry-run
 ```
 
-### Dry-run
+### git-name / git-email
 
-CLI flag: `--dry-run`
+Author for annotated tags. Defaults: `Go Semver Release` / `go-semver@release.ci`
 
-Controls if the repository is actually tagged after computing the next semantic version.&#x20;
+### verbose
 
-Example:
+Enable detailed logging.
 
 ```bash
-$ go-semver-release release <PATH> --dry-run
+go-semver-release release --verbose
 ```
 
-### Git name and email
+## Full Example
 
-CLI flags: `--git-name`, `--git-email`
+```yaml
+# .semver.yaml
+branches:
+  - name: main
+  - name: rc
+    prerelease: true
 
-The program creates a new tag whenever a new release is found. These tags are annotated and, as such, require a Git signature by an author. By default, the tag will be created by an author with the name "Go Semver Release" and email "go-semver@release.ci".
+rules:
+  minor:
+    - feat
+  patch:
+    - fix
+    - perf
+    - revert
 
-Example:
-
-```bash
-$ go-semver-release release <PATH> --git-name <NAME> --git-email <EMAIL>
-```
-
-### Verbose
-
-CLI flag: `--verbose`
-
-Defines the level of verbosity that will be printed out by the command. By default, the command is not verbose and will only print an output informing if a new release was found along with its value.
-
-If enabled, the command will print whenever it finds a commit that triggers a bump in the semantic version with information about each commit (e.g., hash, message) and other detailed information about the steps the program is performing.
-
-Example:
-
-```bash
-$ go-semver-release release <PATH> --verbose
+tag-prefix: v
+git-name: Release Bot
+git-email: release@example.com
 ```
