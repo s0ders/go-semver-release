@@ -5,42 +5,32 @@
   <br><br>
   <a href="https://github.com/avelino/awesome-go"><img alt="Mentioned in Awesome Go" src="https://awesome.re/mentioned-badge.svg"></a>
   <a href="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff"><img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff"></a>
-  <a href="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"><img alt="GitHub go.mod Go version" src="https://img.shields.io/github/go-mod/go-version/s0ders/go-semver-release"></a>
-  <a href="https://pkg.go.dev/github.com/s0ders/go-semver-release/v7"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/s0ders/go-semver-release.svg"></a>
   <a href="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"></a>
   <a href="https://goreportcard.com/report/github.com/s0ders/go-semver-release/v7"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v7"></a>
   <a href="https://app.codecov.io/github/s0ders/go-semver-release"><img alt="Codecov" src="https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage"></a>
-  <a href="https://github.com/s0ders/go-semver-release/blob/main/LICENSE.md"><img alt="GitHub License" src="https://img.shields.io/github/license/s0ders/go-semver-release?label=License"></a>
-  <a href="https://www.bestpractices.dev/projects/8877"><img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/8877/badge"></a>
 </p>
 
-Go Semver Release is a CLI program designed to automate versioning of Git repository by analyzing their [formatted commit history](https://www.conventionalcommits.org) and tagging them with the right [SemVer](https://semver.org/spec/v2.0.0.html) number.
+Analyzes your commit history and creates the next [SemVer](https://semver.org) tag automatically.
 
 ## Features
 
-* 🏷️ Automatic semantic versioning of your Git repository via annotated Git tags
-* 🌐 Local or remote mode of execution (local removes the need for secret token)
-* 🌴 Support for multiple release branches, prerelease and build metadata
-* 🗂️ Support for monorepo (i.e., multiple projects inside a single repository, all versioned separately)
-* ⚙️ Custom tag prefix
-* 📝 Tag signature using GPG
+* **Zero configuration** — works out of the box with sensible defaults
+* **Support for monorepo** — version multiple projects independently in the same repository
+* **Prerelease branches** — `1.0.0-rc.1`, `1.0.0-beta.2`
+* **GPG signing** — sign produced tags
+* **CI-agnostic** — works with GitHub, GitLab or locally
 
-## Motivation
+## Quickstart 
 
-This tool automates semantic versioning for Git repositories in a language and CI-agnostic way by following Semantic Versioning and Conventional Commits conventions.
+```bash
+# If Go is installed on your machine, else, download the latest release
+$ go install github.com/s0ders/go-semver-release/v7@latest
 
-Following the UNIX philosophy of doing one thing well, it only publishes SemVer tags to your Git repository—no package publishing or other features.
+$ cd ~/my/git/repository
 
-Requirements: an initialized Git repository, a release branch (e.g. main), and commit history following the Conventional Commits specification. Many IDEs offer plugins to help format commit messages (e.g., VSCode, IntelliJ).
-
-> [!NOTE]
-> This program can only read annotated Git tags. If you need to manually add a SemVer tag to your repository, make sure it is annotated; otherwise the program will not detect it.
-
-## How is this different from \<insert\_another\_tool> ?
-
-Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). Go Semver Release focuses on versioning only, no package publishing, release log generation or other features.
-
-If you want a simple tool that handles the generation of the next semantic version tag for your project, you are in the right place. This allows the program to work faster and with minimal dependencies.
+# Run (dry-run to see what would happen)
+$ go-semver-release release --dry-run
+```
 
 ## Documentation
 
@@ -51,19 +41,21 @@ If you want a simple tool that handles the generation of the next semantic versi
 * [Configuration](usage/configuration.md)
 * [Output](usage/output.md)
 
-### Recipes
-
-* [Workflow examples](recipes/workflow-examples.md)
-
 ### Miscellaneous
 
-* [Benchmark](miscellaneous/benchmark.md)
+* [Workflow examples](recipes/workflow-examples.md)
 * [How it works](miscellaneous/how-it-works.md)
+* [Benchmark](miscellaneous/benchmark.md)
 
-## Support
+## How is this different from \<insert\_another\_tool> ?
 
-If you are using this project and find it useful, consider giving it a star.
-<br>
+Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). 
+
+Go Semver Release focuses on versioning only. No package publishing or other feature requiring extra configuration. 
+
+To each tool its responsibilities and these are best left to programs such as [Go Releaser](https://goreleaser.com/) 
+which you may use in combination with Go Semver Release.
+
 <hr>
 
 Project's illustration designed by [@TristanDacross](https://github.com/TristanDacross)
