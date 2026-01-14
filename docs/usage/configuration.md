@@ -2,7 +2,7 @@
 
 ### How to read this page
 
-Configuration option can be set either via flag or configuration file. The same option share the same name for its flag and configuration key counterpart. Each paragraph about an option will have an example for how to use it via flag or a YAML configuration file.
+Configuration option can be set either via flag or configuration file. The same option shares the same name for its flag and configuration key counterpart. Each paragraph about an option will have an example for how to use it via flag or a YAML configuration file.
 
 Default values are not specified here since they are available when running the following command:
 
@@ -38,12 +38,12 @@ CLI flag: `--rules`
 Release rules define which commit type will trigger a release, and which type of release (i.e., `minor` or `patch`).
 
 > [!NOTE]
-> Release type can only be `minor` or `patch`, `major` is reserved for breaking change only which are indicated either using an exclamation mark after the commit type (e.g. `feat!`) or by stating `BREAKING CHANGE` in the commit message footer.
+> Release types can only be `minor` or `patch`. `major` is reserved for breaking changes only which are indicated either using an exclamation mark after the commit type (e.g. `feat!`) or by stating `BREAKING CHANGE` in the commit message footer.
 
 The following release rules are applied by default, they can be overridden by adding or removing commit types in the `minor` and `patch` list.
 
 | Release type | Commit type             |
-| ------------ | ----------------------- |
+|--------------|-------------------------|
 | `minor`      | `feat`                  |
 | `patch`      | `fix`, `perf`, `revert` |
 
@@ -71,7 +71,7 @@ $ go-semver-release release <PATH> --rules='{"minor": ["feat"], "patch": ["fix",
 
 CLI flag: `--branches`
 
-Branches set in configuration are the one Go Semver Release will read commit history from in order to compute the next SemVer release. In the configuration file, `branches` is a list of branch, which can have two attributes `name`, mandatory, and `prerelease` optional.
+Branches set in configuration are the one Go Semver Release will read commit history from to compute the next SemVer release. In the configuration file, `branches` is a list of branch, which can have two attributes `name`, mandatory, and `prerelease` optional.
 
 #### Stable Branches
 
@@ -149,7 +149,7 @@ CLI flags: `--remote-name`, `--access-token`
 
 If the path to the Git repository supplied to Go Semver Release is a local path, it will operate in local mode which offers the benefits of avoiding the use of access token. However, it can be easier to simply let Go Semver Release clone a repository, parse it and push the newly found SemVer tag, if any.
 
-To enable the remote mode, simply provide a URL to the Git repository when invoking the `release`command. The name of the remote can be set if it's not the default `origin`.
+To enable the remote mode, provide a URL to the Git repository when invoking the `release`command. The name of the remote can be set if it's not the default `origin`.
 
 An access token is required so that Go Semver Release can clone the Git repository and push tags to it. All modern Git remote providers offer this feature (e.g., [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [GitLab](https://docs.gitlab.com/ee/user/project/settings/project\_access\_tokens.html), [Bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/)).
 
@@ -169,7 +169,7 @@ remote-name: "origin"
 
 CLI flag: `--monorepo`
 
-The program can also version separately multiple projects stored in a single repository also called "monorepo" or "mono repository". To do so, the configuration file must include a `monorepo` section stating the name and path of the various projects inside that repository.
+The program can also version separately multiple projects stored in a single repository also called "monorepo" or "mono repository." To do so, the configuration file must include a `monorepo` section stating the name and path of the various projects inside that repository.
 
 Each project will then be versioned separately meaning that each project will have its SemVer tag in the form `<project>-<semver>` for instance `foo-1.2.3` or `bar-v0.0.1`
 
@@ -215,9 +215,10 @@ $ go-semver-release release <PATH> --tag-prefix v
 
 CLI flags: `--build-metadata`
 
-The Semantic Version convention states that your SemVer number can include build metadata in the form `1.2.3+<build_metadata>`. Usually, these metadata represent a unique build number or build specific information so that a version can be linked to the build that created it.
+The Semantic Version convention states that your SemVer number can include build metadata in the form `1.2.3+<build_metadata>`. 
+Usually, these metadata represent a unique build number or build-specific information so that a version can be linked to the build that created it.
 
-The option allows to pass a string containing metadata that will be appended to the semantic version number in the form stated above.
+The option allows passing a string containing metadata that will be appended to the semantic version number in the form stated above.
 
 Example:
 
@@ -232,10 +233,10 @@ CLI flag: `--gpg-key-path`
 Path to an armored GPG signing key used to sign the produced tags.
 
 > [!CAUTION]
-> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key specifically generated for the purpose of signing tags. Do not use your personal key, that way you can easily revoke the key if any action in your workflow came to be compromised.
+> Using this flag in your CI/CD workflow means you will have to write a GPG private key to a file. Please ensure that this file has read and write permissions for its owner only. Furthermore, the GPG key used should be a key specifically generated to sign tags. Do not use your personal key, that way you can easily revoke the key if any action in your workflow came to be compromised.
 
 > [!WARNING]
-> As stated above, the GPG private key need to be written on disk before being read. Store it outside the repository being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since it has not been committed) and will not be found by the program.
+> As stated above, the GPG private key needs to be written on disk before being read. Store it outside the repository being versioned. Because the tool first checks out to the release branch you configured, the key will disappear (since it has not been committed) and will not be found by the program.
 
 Example:
 
@@ -259,7 +260,7 @@ $ go-semver-release release <PATH> --dry-run
 
 CLI flags: `--git-name`, `--git-email`
 
-The program creates new tag whenever a new release is found. These tags are annotated and, as such, require a Git signature by an author. By default, the tag will be created by an author with the name "Go Semver Release" and email "go-semver@release.ci".
+The program creates a new tag whenever a new release is found. These tags are annotated and, as such, require a Git signature by an author. By default, the tag will be created by an author with the name "Go Semver Release" and email "go-semver@release.ci".
 
 Example:
 

@@ -4,7 +4,7 @@
 
 The `release` command output is JSON formatted so that it can easily be parsed.
 
-If executed in non-verbose mode, the output, will always have the following keys (values are given for example), and the program will produce one of these output per branch and per project, if executed in monorepo mode:
+If executed in non-verbose mode, the output will always have the following keys (values are given for example), and the program will produce one of these outputs per branch and per project, if executed in monorepo mode:
 
 ```json
 {

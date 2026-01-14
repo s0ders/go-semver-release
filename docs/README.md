@@ -20,27 +20,27 @@ Go Semver Release is a CLI program designed to automate versioning of Git reposi
 
 * 🏷️ Automatic semantic versioning of your Git repository via annotated Git tags
 * 🌐 Local or remote mode of execution (local removes the need for secret token)
-* 🌴 Support for multiple release branch, prerelease and build metadata
+* 🌴 Support for multiple release branches, prerelease and build metadata
 * 🗂️ Support for monorepo (i.e., multiple projects inside a single repository, all versioned separately)
 * ⚙️ Custom tag prefix
 * 📝 Tag signature using GPG
 
 ## Motivation
 
-This project was built to create a lightweight and simple tool to automate the semantic versioning on your Git repository in a language and CI agnostic way by strictly following the Semantic Versioning and Conventional Commit convention.
+This tool automates semantic versioning for Git repositories in a language and CI-agnostic way by following Semantic Versioning and Conventional Commits conventions.
 
-Following the UNIX philosophy of "make each program do one thing well", it only handles publishing SemVer tags to your Git repository, no package publishing or any other features.
+Following the UNIX philosophy of doing one thing well, it only publishes SemVer tags to your Git repository—no package publishing or other features.
 
-All you need to have is an initialized Git repository, a release branch (e.g. `main`) and a formatted commit history on that branch following the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) specification. Many IDEs support plugins that help formatting messages (e.g. [VSCode](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits), [IntelliJ](https://plugins.jetbrains.com/plugin/13389-conventional-commit)).
+Requirements: an initialized Git repository, a release branch (e.g. main), and commit history following the Conventional Commits specification. Many IDEs offer plugins to help format commit messages (e.g., VSCode, IntelliJ).
 
 > [!NOTE]
-> This program can only read annotated Git tags. If at some point you need to manually add a SemVer tag to your repository, make sure it is annotated, otherwise the program will not be able to detect it.
+> This program can only read annotated Git tags. If you need to manually add a SemVer tag to your repository, make sure it is annotated; otherwise the program will not detect it.
 
 ## How is this different from \<insert\_another\_tool> ?
 
 Other tools exist to version software using semantic versions such as [semantic-release](https://github.com/semantic-release/semantic-release). Go Semver Release focuses on versioning only, no package publishing, release log generation or other features.
 
-If you want a simple tool that handles the generation of the next semantic version tag for your project, you are at the right place. This allows the program to work faster and with minimal dependencies.
+If you want a simple tool that handles the generation of the next semantic version tag for your project, you are in the right place. This allows the program to work faster and with minimal dependencies.
 
 ## Documentation
 
@@ -62,7 +62,7 @@ If you want a simple tool that handles the generation of the next semantic versi
 
 ## Support
 
-If you are using this project and find it useful, please consider giving it a star!
+If you are using this project and find it useful, consider giving it a star.
 <br>
 <hr>
 
