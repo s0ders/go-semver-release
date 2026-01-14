@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
 )
 
 func TestCmd_Version(t *testing.T) {

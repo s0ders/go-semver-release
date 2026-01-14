@@ -12,10 +12,10 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/s0ders/go-semver-release/v6/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v6/internal/branch"
-	"github.com/s0ders/go-semver-release/v6/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v6/internal/rule"
+	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v7/internal/branch"
+	"github.com/s0ders/go-semver-release/v7/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v7/internal/rule"
 )
 
 const (
