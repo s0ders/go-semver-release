@@ -12,6 +12,9 @@ type Config struct {
 type Item struct {
 	Name       string `yaml:"name" json:"name" mapstructure:"name"`
 	Prerelease bool   `yaml:"prerelease" json:"prerelease" mapstructure:"prerelease"`
+	// PrereleaseBase specifies the branch to compare against for prerelease versions.
+	// If empty, defaults to the first non-prerelease branch in the configuration.
+	PrereleaseBase string `yaml:"prereleaseBase,omitempty" json:"prereleaseBase,omitempty" mapstructure:"prereleaseBase"`
 }
 
 var (
