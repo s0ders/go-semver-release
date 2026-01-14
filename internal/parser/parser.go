@@ -26,7 +26,6 @@ type BumpType int
 
 const (
 	BumpNone BumpType = iota
-	BumpPrerelease
 	BumpPatch
 	BumpMinor
 	BumpMajor
@@ -359,7 +358,7 @@ func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Item) (Pr
 		}
 	}
 
-	breakingChange := match[3] == "!" || strings.HasPrefix(commit.Message, "BREAKING CHANGE")
+	breakingChange := match[3] == "!" || strings.Contains(commit.Message, "BREAKING CHANGE")
 	commitType := match[1]
 
 	if breakingChange {
