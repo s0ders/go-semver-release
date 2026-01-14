@@ -379,8 +379,6 @@ func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
 	_, err = testRepository.AddCommit("feat")
 	checkErr(t, "adding commit", err)
 
-	prereleaseID := "master"
-
 	th := NewTestHelper(t)
 	th.Ctx.BranchesCfg[0].Prerelease = true
 	parser := New(th.Ctx)
@@ -389,14 +387,183 @@ func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
 	checkErr(t, "computing new semver", err)
 
 	want := semver.Version{
-		Major:      0,
-		Minor:      1,
-		Patch:      0,
-		Prerelease: prereleaseID,
+		Major:            0,
+		Minor:            1,
+		Patch:            0,
+		PrereleaseLabel:  "master",
+		PrereleaseNumber: 1,
 	}
 
 	assert.Equal(want.String(), output.Semver.String(), "version should be equal")
 	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemver_PrereleaseBump(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create initial prerelease tag
+	firstCommit, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("0.1.0-master.1", firstCommit)
+	checkErr(t, "adding tag", err)
+
+	// Add another commit
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	th := NewTestHelper(t)
+	th.Ctx.BranchesCfg[0].Prerelease = true
+	parser := New(th.Ctx)
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
+	checkErr(t, "computing new semver", err)
+
+	// Should bump prerelease number: 0.1.0-master.1 -> 0.1.0-master.2
+	want := "0.1.0-master.2"
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemver_PrereleaseAfterStable(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create stable tag
+	firstCommit, err := testRepository.AddCommit("feat!")
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("1.0.0", firstCommit)
+	checkErr(t, "adding tag", err)
+
+	// Add new feature commit
+	_, err = testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	th := NewTestHelper(t)
+	// Keep branch name as "master" since that's the actual branch in the repo
+	th.Ctx.BranchesCfg[0].Prerelease = true
+	parser := New(th.Ctx)
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
+	checkErr(t, "computing new semver", err)
+
+	// Should create new prerelease for next minor: 1.1.0-master.1
+	want := "1.1.0-master.1"
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemver_PrereleaseBreakingChange(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create stable tag
+	firstCommit, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("1.0.0", firstCommit)
+	checkErr(t, "adding tag", err)
+
+	// Add breaking change commit
+	_, err = testRepository.AddCommit("feat!")
+	checkErr(t, "adding commit", err)
+
+	th := NewTestHelper(t)
+	// Keep branch name as "master" since that's the actual branch in the repo
+	th.Ctx.BranchesCfg[0].Prerelease = true
+	parser := New(th.Ctx)
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
+	checkErr(t, "computing new semver", err)
+
+	// Should create new prerelease for next major: 2.0.0-master.1
+	want := "2.0.0-master.1"
+	assert.Equal(want, output.Semver.String(), "version should be equal")
+	assert.Equal(true, output.NewRelease, "boolean should be equal")
+}
+
+func TestParser_ComputeNewSemver_PrereleasePromotion(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create a prerelease tag (simulating a merge from a prerelease branch)
+	firstCommit, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("1.0.0-rc.3", firstCommit)
+	checkErr(t, "adding tag", err)
+
+	th := NewTestHelper(t)
+	// Stable branch (Prerelease = false)
+	parser := New(th.Ctx)
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
+	checkErr(t, "computing new semver", err)
+
+	// Should promote prerelease to stable: 1.0.0-rc.3 -> 1.0.0
+	want := "1.0.0"
+	assert.Equal(want, output.Semver.String(), "version should be promoted to stable")
+	assert.Equal(true, output.NewRelease, "should be marked as new release")
+}
+
+func TestParser_ComputeNewSemver_PrereleasePromotionWithNewCommits(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Create a prerelease tag
+	firstCommit, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	err = testRepository.AddTag("1.0.0-rc.3", firstCommit)
+	checkErr(t, "adding tag", err)
+
+	// Add a new patch commit after the prerelease tag
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	th := NewTestHelper(t)
+	// Stable branch (Prerelease = false)
+	parser := New(th.Ctx)
+
+	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
+	checkErr(t, "computing new semver", err)
+
+	// Should bump patch and clear prerelease: 1.0.0-rc.3 -> 1.0.1
+	want := "1.0.1"
+	assert.Equal(want, output.Semver.String(), "version should be bumped and promoted")
+	assert.Equal(true, output.NewRelease, "should be marked as new release")
 }
 
 // FIXME: the "origin" name is not set when calling parser.checkoutBranch leaving remoteRef like "ref/remote/<empty>/<branch>

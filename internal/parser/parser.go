@@ -57,7 +57,11 @@ type ComputeNewSemverOutput struct {
 func (p *Parser) Run(repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	var output []ComputeNewSemverOutput
 
-	for _, gitBranch := range p.ctx.BranchesCfg {
+	// Sort branches: stable branches first, then prerelease branches
+	// This ensures prerelease branches can see stable releases when computing versions
+	sortedBranches := sortBranches(p.ctx.BranchesCfg)
+
+	for _, gitBranch := range sortedBranches {
 		if len(p.ctx.MonorepositoryCfg) == 0 {
 			result, err := p.ComputeNewSemver(repository, monorepo.Item{}, gitBranch)
 			if err != nil {
@@ -77,6 +81,22 @@ func (p *Parser) Run(repository *git.Repository) ([]ComputeNewSemverOutput, erro
 	}
 
 	return output, nil
+}
+
+// sortBranches returns a copy of branches sorted with stable branches first, then prerelease branches.
+func sortBranches(branches []branch.Item) []branch.Item {
+	sorted := make([]branch.Item, len(branches))
+	copy(sorted, branches)
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		// Stable branches (Prerelease=false) come before prerelease branches
+		if !sorted[i].Prerelease && sorted[j].Prerelease {
+			return true
+		}
+		return false
+	})
+
+	return sorted
 }
 
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
@@ -161,19 +181,37 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 		}
 	}
 
-	// Single bump per release
-	// TODO: handle prerelease bump
-	switch maxBumpType {
-	case BumpMajor:
-		latestSemver.BumpMajor()
-	case BumpMinor:
-		latestSemver.BumpMinor()
-	case BumpPatch:
-		latestSemver.BumpPatch()
-	}
-
+	// Handle version computation based on branch type
 	if gitBranch.Prerelease {
-		latestSemver.Prerelease = gitBranch.Name
+		// For prerelease branches, compute the next prerelease version
+		newVersion, err := p.computePrereleaseVersion(repository, project, reachable.HashSet, latestSemver, maxBumpType, gitBranch, newRelease)
+		if err != nil {
+			return output, fmt.Errorf("computing prerelease version: %w", err)
+		}
+		latestSemver = newVersion
+	} else {
+		// For stable branches, apply the standard bump
+		switch maxBumpType {
+		case BumpMajor:
+			latestSemver.BumpMajor()
+		case BumpMinor:
+			latestSemver.BumpMinor()
+		case BumpPatch:
+			latestSemver.BumpPatch()
+		}
+
+		// Automatic promotion: if a stable branch has a prerelease tag as its latest,
+		// promote it to stable by clearing the prerelease suffix.
+		// This handles the case where a prerelease branch is merged into a stable branch.
+		if latestSemver.HasPrerelease() {
+			p.ctx.Logger.Debug().
+				Str("from", latestSemver.String()).
+				Msg("promoting prerelease to stable release")
+			latestSemver.ClearPrerelease()
+			if !newRelease {
+				newRelease = true
+			}
+		}
 	}
 
 	latestSemver.Metadata = p.ctx.BuildMetadata
@@ -184,6 +222,112 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 	output.NewRelease = newRelease
 
 	return output, nil
+}
+
+// computePrereleaseVersion computes the next prerelease version for a prerelease branch.
+// It follows the standard semver prerelease numbering scheme: X.Y.Z-label.N
+func (p *Parser) computePrereleaseVersion(
+	repository *git.Repository,
+	project monorepo.Item,
+	reachableHashSet map[plumbing.Hash]struct{},
+	latestSemver *semver.Version,
+	maxBumpType BumpType,
+	gitBranch branch.Item,
+	hasNewCommits bool,
+) (*semver.Version, error) {
+	prereleaseLabel := gitBranch.Name
+
+	// If the latest tag is already a prerelease for this branch
+	if latestSemver.HasPrerelease() && latestSemver.PrereleaseLabel == prereleaseLabel {
+		if hasNewCommits {
+			// Check if we need a new version series (breaking change or major/minor bump)
+			// or just bump the prerelease number
+			if maxBumpType == BumpMajor || maxBumpType == BumpMinor {
+				// New commits warrant a version bump - compute new core version
+				newVersion := &semver.Version{
+					Major: latestSemver.Major,
+					Minor: latestSemver.Minor,
+					Patch: latestSemver.Patch,
+				}
+				switch maxBumpType {
+				case BumpMajor:
+					newVersion.BumpMajor()
+				case BumpMinor:
+					newVersion.BumpMinor()
+				case BumpPatch:
+					newVersion.BumpPatch()
+				}
+				newVersion.SetPrerelease(prereleaseLabel)
+				return newVersion, nil
+			}
+
+			// For patch-level changes or just new commits, bump prerelease number
+			newVersion := &semver.Version{
+				Major:            latestSemver.Major,
+				Minor:            latestSemver.Minor,
+				Patch:            latestSemver.Patch,
+				PrereleaseLabel:  prereleaseLabel,
+				PrereleaseNumber: latestSemver.PrereleaseNumber,
+			}
+			newVersion.BumpPrerelease()
+			return newVersion, nil
+		}
+		// No new commits, return as-is
+		return latestSemver, nil
+	}
+
+	// Latest tag is not a prerelease (or is a different prerelease label)
+	// We need to compute the next version based on the stable version
+
+	// First, get the latest stable version
+	latestStable, err := p.FetchLatestStableTag(repository, project, reachableHashSet)
+	if err != nil {
+		return nil, fmt.Errorf("fetching latest stable tag: %w", err)
+	}
+
+	var baseVersion *semver.Version
+	if latestStable == nil {
+		// No stable version exists, start from 0.0.0
+		baseVersion = &semver.Version{Major: 0, Minor: 0, Patch: 0}
+	} else {
+		baseVersion = latestStable
+	}
+
+	// Compute what the next stable version would be
+	nextVersion := &semver.Version{
+		Major: baseVersion.Major,
+		Minor: baseVersion.Minor,
+		Patch: baseVersion.Patch,
+	}
+
+	if hasNewCommits {
+		switch maxBumpType {
+		case BumpMajor:
+			nextVersion.BumpMajor()
+		case BumpMinor:
+			nextVersion.BumpMinor()
+		case BumpPatch:
+			nextVersion.BumpPatch()
+		}
+	}
+
+	// Check if there's already a prerelease for this version
+	existingPrerelease, err := p.FetchLatestPrereleaseTag(repository, project, reachableHashSet, nextVersion, prereleaseLabel)
+	if err != nil {
+		return nil, fmt.Errorf("fetching existing prerelease: %w", err)
+	}
+
+	if existingPrerelease != nil {
+		// There's already a prerelease for this version, bump the number
+		if hasNewCommits {
+			existingPrerelease.BumpPrerelease()
+		}
+		return existingPrerelease, nil
+	}
+
+	// No existing prerelease, create a new one
+	nextVersion.SetPrerelease(prereleaseLabel)
+	return nextVersion, nil
 }
 
 type ProcessCommitOutput struct {
@@ -297,6 +441,110 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 	}
 
 	return latestTag, nil
+}
+
+// FetchLatestStableTag fetches the latest stable (non-prerelease) semver tag reachable from the branch.
+func (p *Parser) FetchLatestStableTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*semver.Version, error) {
+	tags, err := repository.TagObjects()
+	if err != nil {
+		return nil, fmt.Errorf("fetching tag objects: %w", err)
+	}
+
+	var latestStable *semver.Version
+
+	err = tags.ForEach(func(tag *object.Tag) error {
+		if !semver.Regex.MatchString(tag.Name) {
+			return nil
+		}
+
+		if project.Name != "" && !strings.HasPrefix(tag.Name, project.Name+"-") {
+			return nil
+		}
+
+		tagCommit, err := tag.Commit()
+		if err != nil {
+			return nil
+		}
+
+		if _, isReachable := reachableHashSet[tagCommit.Hash]; !isReachable {
+			return nil
+		}
+
+		currentSemver, err := semver.NewFromString(tag.Name)
+		if err != nil {
+			return fmt.Errorf("converting tag to semver: %w", err)
+		}
+
+		// Skip prerelease versions
+		if currentSemver.HasPrerelease() {
+			return nil
+		}
+
+		if latestStable == nil || semver.Compare(latestStable, currentSemver) == -1 {
+			latestStable = currentSemver
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("looping over tags: %w", err)
+	}
+
+	return latestStable, nil
+}
+
+// FetchLatestPrereleaseTag fetches the latest prerelease tag for a given core version and prerelease label.
+// For example, if coreVersion is 1.2.0 and label is "rc", it will find the highest rc.N tag for 1.2.0.
+func (p *Parser) FetchLatestPrereleaseTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}, coreVersion *semver.Version, label string) (*semver.Version, error) {
+	tags, err := repository.TagObjects()
+	if err != nil {
+		return nil, fmt.Errorf("fetching tag objects: %w", err)
+	}
+
+	var latestPrerelease *semver.Version
+
+	err = tags.ForEach(func(tag *object.Tag) error {
+		if !semver.Regex.MatchString(tag.Name) {
+			return nil
+		}
+
+		if project.Name != "" && !strings.HasPrefix(tag.Name, project.Name+"-") {
+			return nil
+		}
+
+		tagCommit, err := tag.Commit()
+		if err != nil {
+			return nil
+		}
+
+		if _, isReachable := reachableHashSet[tagCommit.Hash]; !isReachable {
+			return nil
+		}
+
+		currentSemver, err := semver.NewFromString(tag.Name)
+		if err != nil {
+			return fmt.Errorf("converting tag to semver: %w", err)
+		}
+
+		// Must be a prerelease with matching label
+		if !currentSemver.HasPrerelease() || currentSemver.PrereleaseLabel != label {
+			return nil
+		}
+
+		// Must have the same core version (major.minor.patch)
+		if !currentSemver.SameCoreVersion(coreVersion) {
+			return nil
+		}
+
+		if latestPrerelease == nil || semver.Compare(latestPrerelease, currentSemver) == -1 {
+			latestPrerelease = currentSemver
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("looping over tags: %w", err)
+	}
+
+	return latestPrerelease, nil
 }
 
 // ReachableCommits holds the results of walking reachable commits from a branch reference.

@@ -133,7 +133,7 @@ rules:
 
 	expectedMasterVersion := "1.0.0"
 	expectedMasterTag := "v" + expectedMasterVersion
-	expectedAlphaVersion := "1.0.0-alpha"
+	expectedAlphaVersion := "1.0.0-alpha.1"
 	expectedAlphaTag := "v" + expectedAlphaVersion
 
 	expectedOutputs := []cmdOutput{
@@ -426,7 +426,7 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 		},
 		{
 			Message:    "new release found",
-			Version:    "2.0.0-rc",
+			Version:    "2.0.0-rc.1",
 			NewRelease: true,
 			Branch:     "rc",
 		},
@@ -512,7 +512,7 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedVersion := "1.0.0-master"
+	expectedVersion := "1.0.0-master.1"
 	expectedTag := "v" + expectedVersion
 	expectedOut := cmdOutput{
 		Message:    "new release found",
