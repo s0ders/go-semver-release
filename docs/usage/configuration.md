@@ -1,11 +1,7 @@
 # Configuration
 
 > [!TIP]
-> Validate your configuration file before running:
-
-```bash
-go-semver-release validate .semver.yaml
-```
+> Validate your configuration file before running with `go-semver-release validate .semver.yaml`
 
 ## Basics
 
@@ -110,6 +106,21 @@ gpg-key-path: /path/to/key.asc
 > [!CAUTION]
 > Use a dedicated key for CI, not your personal key. Ensure the file has restricted permissions (`chmod 600`).
 
+### lightweight-tags
+
+Create lightweight tags instead of annotated tags. Default: `false`
+
+```bash
+go-semver-release release --lightweight-tags
+```
+
+**When to use:**
+- Migrating from tools like `semantic-release` that create lightweight tags
+- When you don't need tag metadata (author, date, message)
+
+> [!NOTE]
+> The tool can read both lightweight and annotated tags regardless of this setting. This flag only affects tag *creation*.
+
 ### remote-name / access-token
 
 For remote repositories. Default remote: `origin`
@@ -131,7 +142,7 @@ go-semver-release release --dry-run
 
 ### git-name / git-email
 
-Author for annotated tags. Defaults: `Go Semver Release` / `go-semver@release.ci`
+Author for annotated tags (ignored when `--lightweight-tags` is used). Defaults: `Go Semver Release` / `go-semver@release.ci`
 
 ### verbose
 

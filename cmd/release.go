@@ -15,15 +15,15 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v7/internal/branch"
-	"github.com/s0ders/go-semver-release/v7/internal/ci"
-	"github.com/s0ders/go-semver-release/v7/internal/gpg"
-	"github.com/s0ders/go-semver-release/v7/internal/monorepo"
-	"github.com/s0ders/go-semver-release/v7/internal/parser"
-	"github.com/s0ders/go-semver-release/v7/internal/remote"
-	"github.com/s0ders/go-semver-release/v7/internal/rule"
-	"github.com/s0ders/go-semver-release/v7/internal/tag"
+	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v8/internal/branch"
+	"github.com/s0ders/go-semver-release/v8/internal/ci"
+	"github.com/s0ders/go-semver-release/v8/internal/gpg"
+	"github.com/s0ders/go-semver-release/v8/internal/monorepo"
+	"github.com/s0ders/go-semver-release/v8/internal/parser"
+	"github.com/s0ders/go-semver-release/v8/internal/remote"
+	"github.com/s0ders/go-semver-release/v8/internal/rule"
+	"github.com/s0ders/go-semver-release/v8/internal/tag"
 )
 
 const (
@@ -105,6 +105,8 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				tag.WithLightweight(ctx.LightweightTags),
 			)
 
+			jsonOutput := ci.NewJSONOutput()
+
 			for _, output := range outputs {
 				semver := output.Semver
 				release := output.NewRelease
@@ -116,24 +118,24 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 					return fmt.Errorf("generating GitHub output: %w", err)
 				}
 
-				logEvent := ctx.Logger.Info()
-				logEvent.Bool("new-release", release)
-				logEvent.Str("version", semver.String())
-				logEvent.Str("branch", output.Branch)
-
-				if project != "" {
-					logEvent.Str("project", project)
-
-					tagger.SetProjectName(project)
-				}
-
+				// Determine the message
+				var message string
 				switch {
 				case !release:
-					logEvent.Msg(MessageNoNewRelease)
+					message = MessageNoNewRelease
 				case release && ctx.DryRun:
-					logEvent.Msg(MessageDryRun)
+					message = MessageDryRun
 				default:
-					logEvent.Msg(MessageNewRelease)
+					message = MessageNewRelease
+				}
+
+				jsonOutput.AddRelease(release, semver.String(), output.Branch, project, message)
+
+				// Tag and push if new release and not dry-run
+				if release && !ctx.DryRun {
+					if project != "" {
+						tagger.SetProjectName(project)
+					}
 
 					err = tagger.TagRepository(repository, semver, commitHash)
 					if err != nil {
@@ -147,6 +149,10 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 						return fmt.Errorf("pushing tag to remote: %w", err)
 					}
 				}
+			}
+
+			if err := jsonOutput.Write(cmd.OutOrStdout()); err != nil {
+				return fmt.Errorf("writing JSON output: %w", err)
 			}
 
 			return nil

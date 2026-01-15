@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/s0ders/go-semver-release/v7/internal/rule"
+	"github.com/s0ders/go-semver-release/v8/internal/rule"
 )
 
 type ValidationResult struct {

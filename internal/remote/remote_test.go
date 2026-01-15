@@ -8,8 +8,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v7/internal/gittest"
-	"github.com/s0ders/go-semver-release/v7/internal/tag"
+	"github.com/s0ders/go-semver-release/v8/internal/gittest"
+	"github.com/s0ders/go-semver-release/v8/internal/tag"
 )
 
 func TestRemote_Clone_HappyScenario(t *testing.T) {
