@@ -163,6 +163,98 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 	assert.Equal(want, latest.Name, "latest semver tag should be equal")
 }
 
+func TestParser_FetchLatestSemverTag_LightweightTags(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Add commits
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	hash1, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	hash2, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	// Add lightweight tags (not annotated)
+	err = testRepository.AddLightweightTag("v1.0.0", hash1)
+	checkErr(t, "adding lightweight tag", err)
+
+	err = testRepository.AddLightweightTag("v2.0.0", hash2)
+	checkErr(t, "adding lightweight tag", err)
+
+	ref, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, ref)
+	checkErr(t, "building reachable commits", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
+	checkErr(t, "fetching latest semver tag", err)
+
+	want := "v2.0.0"
+	assert.Equal(want, latest.Name, "should find latest lightweight tag")
+}
+
+func TestParser_FetchLatestSemverTag_MixedTags(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Add commits
+	hash1, err := testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	hash2, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	hash3, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	// Add mixed tags: v1.0.0 (lightweight), v2.0.0 (annotated), v3.0.0 (lightweight)
+	err = testRepository.AddLightweightTag("v1.0.0", hash1)
+	checkErr(t, "adding lightweight tag", err)
+
+	err = testRepository.AddTag("v2.0.0", hash2)
+	checkErr(t, "adding annotated tag", err)
+
+	err = testRepository.AddLightweightTag("v3.0.0", hash3)
+	checkErr(t, "adding lightweight tag", err)
+
+	ref, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, ref)
+	checkErr(t, "building reachable commits", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
+	checkErr(t, "fetching latest semver tag", err)
+
+	want := "v3.0.0"
+	assert.Equal(want, latest.Name, "should find latest tag regardless of type")
+}
+
 func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
 	assert := assertion.New(t)
 

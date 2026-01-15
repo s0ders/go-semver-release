@@ -32,17 +32,18 @@ const (
 )
 
 const (
-	AccessTokenConfiguration   = "access-token"
-	BranchesConfiguration      = "branches"
-	BuildMetadataConfiguration = "build-metadata"
-	DryRunConfiguration        = "dry-run"
-	GitEmailConfiguration      = "git-email"
-	GitNameConfiguration       = "git-name"
-	GPGPathConfiguration       = "gpg-key-path"
-	MonorepoConfiguration      = "monorepo"
-	RemoteNameConfiguration    = "remote-name"
-	RulesConfiguration         = "rules"
-	TagPrefixConfiguration     = "tag-prefix"
+	AccessTokenConfiguration     = "access-token"
+	BranchesConfiguration        = "branches"
+	BuildMetadataConfiguration   = "build-metadata"
+	DryRunConfiguration          = "dry-run"
+	GitEmailConfiguration        = "git-email"
+	GitNameConfiguration         = "git-name"
+	GPGPathConfiguration         = "gpg-key-path"
+	LightweightTagsConfiguration = "lightweight-tags"
+	MonorepoConfiguration        = "monorepo"
+	RemoteNameConfiguration      = "remote-name"
+	RulesConfiguration           = "rules"
+	TagPrefixConfiguration       = "tag-prefix"
 )
 
 const (
@@ -96,7 +97,13 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("computing new semver: %w", err)
 			}
 
-			tagger := tag.NewTagger(ctx.GitName, ctx.GitEmail, tag.WithTagPrefix(ctx.TagPrefix), tag.WithSignKey(entity))
+			tagger := tag.NewTagger(
+				ctx.GitName,
+				ctx.GitEmail,
+				tag.WithTagPrefix(ctx.TagPrefix),
+				tag.WithSignKey(entity),
+				tag.WithLightweight(ctx.LightweightTags),
+			)
 
 			for _, output := range outputs {
 				semver := output.Semver
@@ -155,6 +162,7 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 	releaseCmd.Flags().StringVar(&ctx.GitEmail, GitEmailConfiguration, "go-semver@release.ci", "Email used in semantic version tags")
 	releaseCmd.Flags().StringVar(&ctx.GitName, GitNameConfiguration, "Go Semver Release", "Name used in semantic version Git tags")
 	releaseCmd.Flags().StringVar(&ctx.GPGKeyPath, GPGPathConfiguration, "", "Path to an armored GPG key used to sign produced Git tags")
+	releaseCmd.Flags().BoolVar(&ctx.LightweightTags, LightweightTagsConfiguration, false, "Create lightweight tags instead of annotated tags")
 	releaseCmd.Flags().Var(&ctx.MonorepositoryCfg, MonorepoConfiguration, "An array of monorepository configuration such as [{\"name\": \"foo\", \"path\": \"./foo/\"}]")
 	releaseCmd.Flags().StringVar(&ctx.RemoteName, RemoteNameConfiguration, "origin", "Name of the Git repository remote")
 	releaseCmd.Flags().Var(&ctx.RulesCfg, RulesConfiguration, "A hashmap of array such as {\"minor\": [\"feat\"], \"patch\": [\"fix\", \"perf\"]} ]")

@@ -225,6 +225,48 @@ func TestTag_AddTagToRepositoryWithProject(t *testing.T) {
 	assert.Equal(tagExists, true, "tag should have been found")
 }
 
+func TestTag_LightweightTag(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	head, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	version := &semver.Version{Major: 1, Minor: 2, Patch: 3}
+	prefix := "v"
+
+	// Create a lightweight tag
+	tagger := NewTagger(taggerName, taggerEmail, WithTagPrefix(prefix), WithLightweight(true))
+
+	err = tagger.TagRepository(testRepository.Repository, version, head.Hash())
+	checkErr(t, "tagging repository", err)
+
+	wantTag := prefix + version.String()
+
+	// Verify tag exists
+	tagExists, err := Exists(testRepository.Repository, wantTag)
+	checkErr(t, "checking if tag exists", err)
+	assert.True(tagExists, "tag should have been found")
+
+	// Verify it's a lightweight tag (not an annotated tag)
+	reference, err := testRepository.Reference(plumbing.NewTagReferenceName(wantTag), true)
+	checkErr(t, "fetching tag reference", err)
+
+	// For lightweight tags, the reference points directly to a commit, not a tag object
+	// So TagObject should fail
+	_, err = testRepository.TagObject(reference.Hash())
+	assert.Error(err, "lightweight tag should not have a tag object")
+
+	// But the reference should point to the same commit as HEAD
+	assert.Equal(head.Hash(), reference.Hash(), "lightweight tag should point to HEAD commit")
+}
+
 func checkErr(t *testing.T, msg string, err error) {
 	t.Helper()
 	if err != nil {

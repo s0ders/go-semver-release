@@ -30,11 +30,18 @@ func WithSignKey(key *openpgp.Entity) OptionFunc {
 	}
 }
 
+func WithLightweight(lightweight bool) OptionFunc {
+	return func(t *Tagger) {
+		t.Lightweight = lightweight
+	}
+}
+
 type Tagger struct {
 	TagPrefix    string
 	ProjectName  string
 	GitSignature object.Signature
 	SignKey      *openpgp.Entity
+	Lightweight  bool
 }
 
 func NewTagger(name, email string, options ...OptionFunc) *Tagger {
@@ -83,29 +90,37 @@ func Exists(repository *git.Repository, tagName string) (bool, error) {
 	return exists, nil
 }
 
-// TagRepository AddTagToRepository create a new annotated tag on the repository with a name corresponding to the semver passed as a
-// parameter.
+// TagRepository creates a new tag on the repository with a name corresponding to the semver passed as a parameter.
+// By default, it creates an annotated tag. If Lightweight is set to true, it creates a lightweight tag instead.
 func (t *Tagger) TagRepository(repository *git.Repository, semver *semver.Version, commitHash plumbing.Hash) error {
 	if semver == nil {
 		return fmt.Errorf("semver is nil")
 	}
 
-	tagMessage := t.Format(semver)
+	tagName := t.Format(semver)
 
-	tagOpts := &git.CreateTagOptions{
-		Message: tagMessage,
-		SignKey: t.SignKey,
-		Tagger:  &t.GitSignature,
-	}
-
-	if exists, err := Exists(repository, tagOpts.Message); err != nil {
+	if exists, err := Exists(repository, tagName); err != nil {
 		return fmt.Errorf("checking if tag exists: %w", err)
 	} else if exists {
 		return ErrTagAlreadyExists
 	}
 
-	if _, err := repository.CreateTag(tagOpts.Message, commitHash, tagOpts); err != nil {
-		return fmt.Errorf("creating tag on repository: %w", err)
+	if t.Lightweight {
+		// Create lightweight tag (no options)
+		if _, err := repository.CreateTag(tagName, commitHash, nil); err != nil {
+			return fmt.Errorf("creating lightweight tag on repository: %w", err)
+		}
+	} else {
+		// Create annotated tag
+		tagOpts := &git.CreateTagOptions{
+			Message: tagName,
+			SignKey: t.SignKey,
+			Tagger:  &t.GitSignature,
+		}
+
+		if _, err := repository.CreateTag(tagName, commitHash, tagOpts); err != nil {
+			return fmt.Errorf("creating annotated tag on repository: %w", err)
+		}
 	}
 
 	return nil
