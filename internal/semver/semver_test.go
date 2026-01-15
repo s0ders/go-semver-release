@@ -205,6 +205,30 @@ func TestSemver_HasPrerelease(t *testing.T) {
 	assert.True(s3.HasPrerelease(), "should have prerelease")
 }
 
+func TestSemver_CoreVersion(t *testing.T) {
+	assert := assertion.New(t)
+
+	// Test that CoreVersion strips prerelease info
+	s := &Version{Major: 1, Minor: 2, Patch: 3, PrereleaseLabel: "rc", PrereleaseNumber: 5}
+	core := s.CoreVersion()
+
+	assert.Equal(1, core.Major)
+	assert.Equal(2, core.Minor)
+	assert.Equal(3, core.Patch)
+	assert.Empty(core.PrereleaseLabel)
+	assert.Equal(0, core.PrereleaseNumber)
+	assert.Empty(core.Metadata)
+
+	// Test version without prerelease
+	s2 := &Version{Major: 2, Minor: 0, Patch: 0, Metadata: "build123"}
+	core2 := s2.CoreVersion()
+
+	assert.Equal(2, core2.Major)
+	assert.Equal(0, core2.Minor)
+	assert.Equal(0, core2.Patch)
+	assert.Empty(core2.Metadata)
+}
+
 func TestSemver_SameCoreVersion(t *testing.T) {
 	assert := assertion.New(t)
 

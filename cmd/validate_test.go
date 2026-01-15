@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -258,6 +259,314 @@ func TestSuggestCommitType(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func TestValidateConfigFile_BranchesNotArray(t *testing.T) {
+	content := `
+branches: "not-an-array"
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "expected an array")
+}
+
+func TestValidateConfigFile_BranchNameNotString(t *testing.T) {
+	content := `
+branches:
+  - name: 123
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "must be a string")
+}
+
+func TestValidateConfigFile_BranchNameEmpty(t *testing.T) {
+	content := `
+branches:
+  - name: ""
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "cannot be empty")
+}
+
+func TestValidateConfigFile_MonorepoNotArray(t *testing.T) {
+	content := `
+monorepo: "not-an-array"
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "expected an array")
+}
+
+func TestValidateConfigFile_MonorepoAsStrings(t *testing.T) {
+	content := `
+monorepo:
+  - api
+  - web
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "expected object with \"name\" key")
+}
+
+func TestValidateConfigFile_MonorepoNameNotString(t *testing.T) {
+	content := `
+monorepo:
+  - name: 123
+    path: ./api/
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "must be a string")
+}
+
+func TestValidateConfigFile_MonorepoNameEmpty(t *testing.T) {
+	content := `
+monorepo:
+  - name: ""
+    path: ./api/
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "cannot be empty")
+}
+
+func TestValidateConfigFile_MonorepoDuplicateName(t *testing.T) {
+	content := `
+monorepo:
+  - name: api
+    path: ./api/
+  - name: api
+    path: ./api2/
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "duplicate project name")
+}
+
+func TestValidateConfigFile_RulesNotObject(t *testing.T) {
+	content := `
+rules:
+  - feat
+  - fix
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "expected an object")
+}
+
+func TestValidateConfigFile_RulesMinorNotArray(t *testing.T) {
+	content := `
+rules:
+  minor: feat
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "expected an array of commit types")
+}
+
+func TestValidateConfigFile_RulesCommitTypeNotString(t *testing.T) {
+	content := `
+rules:
+  minor:
+    - 123
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Contains(t, result.Errors[0], "expected string")
+}
+
+func TestValidateConfigFile_UnknownCommitTypeWithoutSuggestion(t *testing.T) {
+	content := `
+branches:
+  - name: main
+rules:
+  minor:
+    - xyz123
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.False(t, result.HasErrors())
+	assert.Len(t, result.Warnings, 1)
+	assert.Contains(t, result.Warnings[0], "unknown commit type")
+	assert.NotContains(t, result.Warnings[0], "did you mean")
+}
+
+func TestValidateConfigFile_FileNotFound(t *testing.T) {
+	_, err := validateConfigFile("/nonexistent/path/config.yaml")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reading config file")
+}
+
+func TestValidateCmd_Integration(t *testing.T) {
+	content := `
+branches:
+  - name: main
+rules:
+  minor:
+    - feat
+  patch:
+    - fix
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	cmd := NewValidateCmd()
+	cmd.SetArgs([]string{path})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
+}
+
+func TestPrintValidationResult_Valid(t *testing.T) {
+	cmd := NewValidateCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+
+	result := &ValidationResult{}
+	printValidationResult(cmd, "test.yaml", result)
+
+	output := buf.String()
+	assert.Contains(t, output, "Validating test.yaml...")
+	assert.Contains(t, output, "Configuration valid")
+	assert.Contains(t, output, "0 errors, 0 warnings")
+}
+
+func TestPrintValidationResult_WithErrors(t *testing.T) {
+	cmd := NewValidateCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+
+	result := &ValidationResult{
+		Errors: []string{"error 1", "error 2"},
+	}
+	printValidationResult(cmd, "test.yaml", result)
+
+	output := buf.String()
+	assert.Contains(t, output, "error 1")
+	assert.Contains(t, output, "error 2")
+	assert.Contains(t, output, "2 error(s), 0 warning(s)")
+}
+
+func TestPrintValidationResult_WithWarnings(t *testing.T) {
+	cmd := NewValidateCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+
+	result := &ValidationResult{
+		Warnings: []string{"warning 1"},
+	}
+	printValidationResult(cmd, "test.yaml", result)
+
+	output := buf.String()
+	assert.Contains(t, output, "warning 1")
+	assert.Contains(t, output, "0 error(s), 1 warning(s)")
+}
+
+func TestPrintValidationResult_WithErrorsAndWarnings(t *testing.T) {
+	cmd := NewValidateCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+
+	result := &ValidationResult{
+		Errors:   []string{"error 1"},
+		Warnings: []string{"warning 1", "warning 2"},
+	}
+	printValidationResult(cmd, "test.yaml", result)
+
+	output := buf.String()
+	assert.Contains(t, output, "error 1")
+	assert.Contains(t, output, "warning 1")
+	assert.Contains(t, output, "warning 2")
+	assert.Contains(t, output, "1 error(s), 2 warning(s)")
 }
 
 func createTempConfig(t *testing.T, content string) string {

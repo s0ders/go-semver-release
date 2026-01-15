@@ -1457,3 +1457,50 @@ func TestParser_FetchLatestPrereleaseTag_DifferentLabels(t *testing.T) {
 	assert.NotNil(latestBeta)
 	assert.Equal("1.0.0-beta.2", latestBeta.String())
 }
+
+func TestShortenMessage(t *testing.T) {
+	assert := assertion.New(t)
+
+	// Short message - no change
+	short := shortenMessage("fix: short message")
+	assert.Equal("fix: short message", short)
+
+	// Exactly 50 chars - no change
+	exact := shortenMessage("12345678901234567890123456789012345678901234567890")
+	assert.Equal("12345678901234567890123456789012345678901234567890", exact)
+
+	// Long message - truncated
+	long := shortenMessage("This is a very long commit message that exceeds fifty characters and should be truncated")
+	assert.Len(long, 50)
+	assert.True(strings.HasSuffix(long, "..."))
+}
+
+func TestFileMatchesProject(t *testing.T) {
+	assert := assertion.New(t)
+
+	// Project with single path (paths must match file path prefix)
+	projectSinglePath := monorepo.Item{
+		Name: "api",
+		Path: "api",
+	}
+	assert.True(fileMatchesProject("api/main.go", projectSinglePath))
+	assert.False(fileMatchesProject("web/main.go", projectSinglePath))
+
+	// Project with multiple paths
+	projectMultiPath := monorepo.Item{
+		Name:  "shared",
+		Paths: []string{"lib", "common"},
+	}
+	assert.True(fileMatchesProject("lib/utils.go", projectMultiPath))
+	assert.True(fileMatchesProject("common/types.go", projectMultiPath))
+	assert.False(fileMatchesProject("api/main.go", projectMultiPath))
+
+	// Project with no path (returns false - doesn't match everything)
+	projectNoPath := monorepo.Item{
+		Name: "root",
+	}
+	assert.False(fileMatchesProject("any/file.go", projectNoPath))
+
+	// Empty file path
+	assert.False(fileMatchesProject("", projectSinglePath))
+}

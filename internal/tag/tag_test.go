@@ -225,6 +225,26 @@ func TestTag_AddTagToRepositoryWithProject(t *testing.T) {
 	assert.Equal(tagExists, true, "tag should have been found")
 }
 
+func TestTag_NilSemver(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	head, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	tagger := NewTagger(taggerName, taggerEmail)
+
+	err = tagger.TagRepository(testRepository.Repository, nil, head.Hash())
+	assert.Error(err, "should fail with nil semver")
+	assert.Contains(err.Error(), "semver is nil")
+}
+
 func TestTag_LightweightTag(t *testing.T) {
 	assert := assertion.New(t)
 
