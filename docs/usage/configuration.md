@@ -1,7 +1,7 @@
 # Configuration
 
 > [!TIP]
-> Validate your configuration file before running with `go-semver-release validate .semver.yaml`
+> Validate your configuration file before running with `go-semver-release validate <CONFIG_FILE>`
 
 ## Basics
 
@@ -22,7 +22,7 @@ branches:
   - name: main
 ```
 
-That's it. sensible defaults will be used for everything else.
+That's it. Sensible defaults will be used for everything else.
 
 ## Options Reference
 
@@ -171,5 +171,5 @@ rules:
 
 tag-prefix: v
 git-name: Release Bot
-git-email: release@example.com
+git-email: release@example.com # If tag signing is enabled, this should match the email associated with the key
 ```

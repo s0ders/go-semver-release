@@ -19,7 +19,7 @@ Analyzes your commit history and creates the next [SemVer](https://semver.org) t
 * **GPG signing** — sign produced tags
 * **CI-agnostic** — works with GitHub, GitLab or locally
 
-## Quickstart 
+## Try it
 
 ```bash
 # If Go is installed on your machine, else, download the latest release
