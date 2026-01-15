@@ -4,7 +4,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
 )
 
 func NewRootCommand(ctx *appcontext.AppContext) *cobra.Command {

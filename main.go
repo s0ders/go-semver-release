@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/s0ders/go-semver-release/v7/cmd"
-	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v8/cmd"
+	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
 )
 
 func main() {

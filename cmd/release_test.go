@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"os"
@@ -14,17 +13,20 @@ import (
 	"github.com/spf13/viper"
 	assertion "github.com/stretchr/testify/assert"
 
-	"github.com/s0ders/go-semver-release/v7/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v7/internal/gittest"
-	"github.com/s0ders/go-semver-release/v7/internal/tag"
+	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
+	"github.com/s0ders/go-semver-release/v8/internal/ci"
+	"github.com/s0ders/go-semver-release/v8/internal/gittest"
+	"github.com/s0ders/go-semver-release/v8/internal/tag"
 )
 
-type cmdOutput struct {
-	Message    string `json:"message"`
-	Branch     string `json:"branch"`
-	Version    string `json:"version"`
-	Project    string `json:"project"`
-	NewRelease bool   `json:"new-release"`
+// parseJSONOutput parses the structured JSON output from the release command
+func parseJSONOutput(t *testing.T, output []byte) *ci.JSONOutput {
+	var result ci.JSONOutput
+	err := json.Unmarshal(output, &result)
+	if err != nil {
+		t.Fatalf("parsing JSON output: %v\noutput was: %s", err, string(output))
+	}
+	return &result
 }
 
 func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
@@ -136,38 +138,31 @@ rules:
 	expectedAlphaVersion := "1.0.0-alpha.1"
 	expectedAlphaTag := "v" + expectedAlphaVersion
 
-	expectedOutputs := []cmdOutput{
-		{
-			Message:    "new release found",
-			Version:    expectedAlphaVersion,
-			NewRelease: true,
-			Branch:     "alpha",
-		},
-		{
-			Message:    "new release found",
-			Version:    expectedMasterVersion,
-			NewRelease: true,
-			Branch:     "master",
-		},
-	}
-	actualOutput := cmdOutput{}
+	jsonOutput := parseJSONOutput(t, releaseOutput)
 
-	outputs := make([]string, 0, 2)
+	// Verify summary
+	assert.Equal(2, jsonOutput.Summary.TotalCount)
+	assert.Equal(2, jsonOutput.Summary.ReleaseCount)
+	assert.True(jsonOutput.Summary.HasReleases)
 
-	scanner := bufio.NewScanner(bytes.NewReader(releaseOutput))
-	for scanner.Scan() {
-		outputs = append(outputs, scanner.Text())
+	// Find releases by branch
+	var masterRelease, alphaRelease *ci.ReleaseOutput
+	for i := range jsonOutput.Releases {
+		switch jsonOutput.Releases[i].Branch {
+		case "master":
+			masterRelease = &jsonOutput.Releases[i]
+		case "alpha":
+			alphaRelease = &jsonOutput.Releases[i]
+		}
 	}
 
-	// Checking master
-	err = json.Unmarshal([]byte(outputs[0]), &actualOutput)
-	checkErr(t, err, "unmarshalling master output")
-
-	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
+	// Check master release
+	assert.NotNil(masterRelease, "master release not found in output")
+	assert.Equal(expectedMasterVersion, masterRelease.Version)
+	assert.True(masterRelease.NewRelease)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
 	checkErr(t, err, "checking if master tag exists")
-
 	assert.Equal(true, exists, "master tag not found")
 
 	expectedTagRef, err := testRepository.Tag(expectedMasterTag)
@@ -179,15 +174,13 @@ rules:
 	assert.Equal(taggerName, expectedTagObj.Tagger.Name)
 	assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
 
-	// Checking alpha
-	err = json.Unmarshal([]byte(outputs[1]), &actualOutput)
-	checkErr(t, err, "unmarshalling alpha output")
-
-	assert.Contains(expectedOutputs, actualOutput, "releaseCmd output should be equal")
+	// Check alpha release
+	assert.NotNil(alphaRelease, "alpha release not found in output")
+	assert.Equal(expectedAlphaVersion, alphaRelease.Version)
+	assert.True(alphaRelease.NewRelease)
 
 	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
 	checkErr(t, err, "checking if alpha tag exists")
-
 	assert.Equal(true, exists, "alpha tag not found")
 }
 
@@ -215,18 +208,17 @@ func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
 
 	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(output, &actualOut)
-	checkErr(t, err, "unmarshalling output")
+	jsonOutput := parseJSONOutput(t, output)
+	assert.Equal(1, jsonOutput.Summary.TotalCount)
+	assert.Equal(1, jsonOutput.Summary.ReleaseCount)
+	assert.True(jsonOutput.Summary.HasReleases)
+	assert.Len(jsonOutput.Releases, 1)
 
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if master tag exists")
@@ -269,18 +261,13 @@ func TestReleaseCmd_LocalRelease(t *testing.T) {
 
 	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(out, &actualOut)
-	checkErr(t, err, "unmarshalling output")
-
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -322,18 +309,13 @@ func TestReleaseCmd_RemoteRelease(t *testing.T) {
 
 	expectedVersion := "1.0.0"
 	expectedTag := "v" + expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(out, &actualOut)
-	checkErr(t, err, "unmarshalling output")
-
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -416,38 +398,28 @@ func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	i := 0
-	expectedOutputs := []cmdOutput{
-		{
-			Message:    "new release found",
-			Version:    "2.0.0",
-			NewRelease: true,
-			Branch:     "master",
-		},
-		{
-			Message:    "new release found",
-			Version:    "2.0.0-rc.1",
-			NewRelease: true,
-			Branch:     "rc",
-		},
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Equal(2, jsonOutput.Summary.TotalCount)
+	assert.Equal(2, jsonOutput.Summary.ReleaseCount)
+
+	// Find releases by branch
+	var masterRelease, rcRelease *ci.ReleaseOutput
+	for i := range jsonOutput.Releases {
+		switch jsonOutput.Releases[i].Branch {
+		case "master":
+			masterRelease = &jsonOutput.Releases[i]
+		case "rc":
+			rcRelease = &jsonOutput.Releases[i]
+		}
 	}
 
-	scanner := bufio.NewScanner(bytes.NewReader(out))
+	assert.NotNil(masterRelease)
+	assert.Equal("2.0.0", masterRelease.Version)
+	assert.True(masterRelease.NewRelease)
 
-	for scanner.Scan() {
-		rawOutput := scanner.Bytes()
-
-		actualOutput := cmdOutput{}
-
-		err = json.Unmarshal(rawOutput, &actualOutput)
-		checkErr(t, err, "unmarshalling output")
-
-		assert.Contains(expectedOutputs, actualOutput)
-		i++
-	}
-
-	err = scanner.Err()
-	checkErr(t, err, "scanning error")
+	assert.NotNil(rcRelease)
+	assert.Equal("2.0.0-rc.1", rcRelease.Version)
+	assert.True(rcRelease.NewRelease)
 }
 
 func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
@@ -475,18 +447,13 @@ func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
 
 	expectedVersion := "1.0.0" + "+" + metadata
 	expectedTag := "v" + expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(out, &actualOut)
-	checkErr(t, err, "unmarshalling output")
-
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -514,18 +481,13 @@ func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
 
 	expectedVersion := "1.0.0-master.1"
 	expectedTag := "v" + expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(out, &actualOut)
-	checkErr(t, err, "unmarshalling output")
-
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -554,18 +516,14 @@ func TestReleaseCmd_DryRunRelease(t *testing.T) {
 
 	expectedVersion := "1.0.0"
 	expectedTag := expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "dry-run enabled, next release found",
-		Branch:     "master",
-		Version:    expectedVersion,
-		NewRelease: true,
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(out, &actualOut)
-	checkErr(t, err, "unmarshalling output")
-
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
+	assert.Equal("dry-run enabled, next release found", release.Message)
 
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
 	checkErr(t, err, "checking if tag exists")
@@ -585,18 +543,13 @@ func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	expectedOut := cmdOutput{
-		Message:    "no new release",
-		NewRelease: false,
-		Branch:     "master",
-		Version:    "0.0.0",
-	}
-	actualOut := cmdOutput{}
-
-	err = json.Unmarshal(out, &actualOut)
-	checkErr(t, err, "removing temporary directory")
-
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal("0.0.0", release.Version)
+	assert.Equal("master", release.Branch)
+	assert.False(release.NewRelease)
+	assert.Equal("no new release", release.Message)
 }
 
 func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
@@ -701,19 +654,13 @@ func TestReleaseCmd_CustomRules(t *testing.T) {
 
 	expectedVersion := "0.1.0"
 	expectedTag := "v" + expectedVersion
-	expectedOut := cmdOutput{
-		Message:    "new release found",
-		Version:    expectedVersion,
-		NewRelease: true,
-		Branch:     "master",
-	}
-	actualOut := cmdOutput{}
 
-	err = json.Unmarshal(out, &actualOut)
-	assert.NoError(err, "failed to unmarshal json")
-
-	// Check that the JSON output is correct
-	assert.Equal(expectedOut, actualOut, "releaseCmd output should be equal")
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Len(jsonOutput.Releases, 1)
+	release := jsonOutput.Releases[0]
+	assert.Equal(expectedVersion, release.Version)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 
 	// Check that the tag was actually created on the repository
 	exists, err := tag.Exists(testRepository.Repository, expectedTag)
@@ -757,39 +704,30 @@ func TestReleaseCmd_Monorepo(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	i := 0
-	expectedOutputs := []cmdOutput{
-		{
-			Message:    "new release found",
-			Version:    "0.1.0",
-			NewRelease: true,
-			Branch:     "master",
-			Project:    "foo",
-		},
-		{
-			Message:    "new release found",
-			Version:    "1.0.0",
-			NewRelease: true,
-			Branch:     "master",
-			Project:    "bar",
-		},
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Equal(2, jsonOutput.Summary.TotalCount)
+	assert.Equal(2, jsonOutput.Summary.ReleaseCount)
+
+	// Find releases by project
+	var fooRelease, barRelease *ci.ReleaseOutput
+	for i := range jsonOutput.Releases {
+		switch jsonOutput.Releases[i].Project {
+		case "foo":
+			fooRelease = &jsonOutput.Releases[i]
+		case "bar":
+			barRelease = &jsonOutput.Releases[i]
+		}
 	}
 
-	scanner := bufio.NewScanner(bytes.NewReader(out))
+	assert.NotNil(fooRelease)
+	assert.Equal("0.1.0", fooRelease.Version)
+	assert.True(fooRelease.NewRelease)
+	assert.Equal("master", fooRelease.Branch)
 
-	for scanner.Scan() {
-		rawOutput := scanner.Bytes()
-
-		actualOutput := cmdOutput{}
-
-		err = json.Unmarshal(rawOutput, &actualOutput)
-		checkErr(t, err, "unmarshalling output")
-
-		assert.Equal(expectedOutputs[i], actualOutput)
-		i++
-	}
-	err = scanner.Err()
-	checkErr(t, err, "scanning error")
+	assert.NotNil(barRelease)
+	assert.Equal("1.0.0", barRelease.Version)
+	assert.True(barRelease.NewRelease)
+	assert.Equal("master", barRelease.Branch)
 }
 
 func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
@@ -821,40 +759,29 @@ func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	i := 0
-	expectedOutputs := []cmdOutput{
-		{
-			Message:    "no new release",
-			Version:    "0.0.0",
-			NewRelease: false,
-			Branch:     "master",
-			Project:    "foo",
-		},
-		{
-			Message:    "new release found",
-			Version:    "1.0.0",
-			NewRelease: true,
-			Branch:     "master",
-			Project:    "bar",
-		},
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Equal(2, jsonOutput.Summary.TotalCount)
+	assert.Equal(1, jsonOutput.Summary.ReleaseCount) // Only bar has a new release
+
+	// Find releases by project
+	var fooRelease, barRelease *ci.ReleaseOutput
+	for i := range jsonOutput.Releases {
+		switch jsonOutput.Releases[i].Project {
+		case "foo":
+			fooRelease = &jsonOutput.Releases[i]
+		case "bar":
+			barRelease = &jsonOutput.Releases[i]
+		}
 	}
 
-	scanner := bufio.NewScanner(bytes.NewReader(out))
+	assert.NotNil(fooRelease)
+	assert.Equal("0.0.0", fooRelease.Version)
+	assert.False(fooRelease.NewRelease)
+	assert.Equal("no new release", fooRelease.Message)
 
-	for scanner.Scan() {
-		rawOutput := scanner.Bytes()
-
-		actualOutput := cmdOutput{}
-
-		err = json.Unmarshal(rawOutput, &actualOutput)
-		checkErr(t, err, "unmarshalling output")
-
-		assert.Equal(expectedOutputs[i], actualOutput)
-		i++
-	}
-	err = scanner.Err()
-	checkErr(t, err, "scanning error")
-	assert.Equal(len(expectedOutputs), i)
+	assert.NotNil(barRelease)
+	assert.Equal("1.0.0", barRelease.Version)
+	assert.True(barRelease.NewRelease)
 }
 
 func TestReleaseCmd_Monorepo_ProjectWithPaths(t *testing.T) {
@@ -886,33 +813,16 @@ func TestReleaseCmd_Monorepo_ProjectWithPaths(t *testing.T) {
 	out, err := th.ExecuteCommand("release", testRepository.Path)
 	checkErr(t, err, "executing command")
 
-	i := 0
-	expectedOutputs := []cmdOutput{
-		{
-			Message:    "new release found",
-			Version:    "1.0.0",
-			NewRelease: true,
-			Branch:     "master",
-			Project:    "bar",
-		},
-	}
+	jsonOutput := parseJSONOutput(t, out)
+	assert.Equal(1, jsonOutput.Summary.TotalCount)
+	assert.Equal(1, jsonOutput.Summary.ReleaseCount)
+	assert.Len(jsonOutput.Releases, 1)
 
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-
-	for scanner.Scan() {
-		rawOutput := scanner.Bytes()
-
-		actualOutput := cmdOutput{}
-
-		err = json.Unmarshal(rawOutput, &actualOutput)
-		checkErr(t, err, "unmarshalling output")
-
-		assert.Equal(expectedOutputs[i], actualOutput)
-		i++
-	}
-	err = scanner.Err()
-	checkErr(t, err, "scanning error")
-	assert.Equal(len(expectedOutputs), i)
+	release := jsonOutput.Releases[0]
+	assert.Equal("1.0.0", release.Version)
+	assert.Equal("bar", release.Project)
+	assert.Equal("master", release.Branch)
+	assert.True(release.NewRelease)
 }
 
 func TestReleaseCmd_Monorepo_ExclusivePathAndPaths(t *testing.T) {

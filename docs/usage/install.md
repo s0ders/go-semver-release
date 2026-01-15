@@ -15,7 +15,7 @@ Releases are available for various OS and architectures and come with generated 
 If [Go](https://go.dev) is installed on your machine, the project can be installed from its source code:
 
 ```bash
-$ go install github.com/s0ders/go-semver-release/v7@latest
+$ go install github.com/s0ders/go-semver-release/v8@latest
 $ go-semver-release --help
 ```
 
