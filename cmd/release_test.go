@@ -1005,8 +1005,9 @@ func NewTestRepository(t *testing.T, commits []string) *gittest.TestRepository {
 }
 
 type TestHelper struct {
-	Ctx *appcontext.AppContext
-	Cmd *cobra.Command
+	Ctx        *appcontext.AppContext
+	Cmd        *cobra.Command
+	ReleaseCmd *cobra.Command
 }
 
 // NewTestHelper creates a new TestHelper with a fresh AppContext and Command
@@ -1015,15 +1016,26 @@ func NewTestHelper(t *testing.T) *TestHelper {
 		Viper: viper.New(),
 	}
 	cmd := NewRootCommand(ctx)
+
+	// Find the release subcommand
+	var releaseCmd *cobra.Command
+	for _, c := range cmd.Commands() {
+		if c.Use == "release <REPOSITORY_PATH_OR_URL>" {
+			releaseCmd = c
+			break
+		}
+	}
+
 	return &TestHelper{
-		Ctx: ctx,
-		Cmd: cmd,
+		Ctx:        ctx,
+		Cmd:        cmd,
+		ReleaseCmd: releaseCmd,
 	}
 }
 
-// SetFlag sets a flag value for the test
+// SetFlag sets a flag value for the test on the release subcommand
 func (th *TestHelper) SetFlag(name string, value string) error {
-	return th.Cmd.PersistentFlags().Set(name, value)
+	return th.ReleaseCmd.Flags().Set(name, value)
 }
 
 // SetFlags sets multiple flag values for the test

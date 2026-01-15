@@ -163,6 +163,98 @@ func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
 	assert.Equal(want, latest.Name, "latest semver tag should be equal")
 }
 
+func TestParser_FetchLatestSemverTag_LightweightTags(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Add commits
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	hash1, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	_, err = testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	hash2, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	// Add lightweight tags (not annotated)
+	err = testRepository.AddLightweightTag("v1.0.0", hash1)
+	checkErr(t, "adding lightweight tag", err)
+
+	err = testRepository.AddLightweightTag("v2.0.0", hash2)
+	checkErr(t, "adding lightweight tag", err)
+
+	ref, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, ref)
+	checkErr(t, "building reachable commits", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
+	checkErr(t, "fetching latest semver tag", err)
+
+	want := "v2.0.0"
+	assert.Equal(want, latest.Name, "should find latest lightweight tag")
+}
+
+func TestParser_FetchLatestSemverTag_MixedTags(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	// Add commits
+	hash1, err := testRepository.AddCommit("fix")
+	checkErr(t, "adding commit", err)
+
+	hash2, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	hash3, err := testRepository.AddCommit("feat")
+	checkErr(t, "adding commit", err)
+
+	// Add mixed tags: v1.0.0 (lightweight), v2.0.0 (annotated), v3.0.0 (lightweight)
+	err = testRepository.AddLightweightTag("v1.0.0", hash1)
+	checkErr(t, "adding lightweight tag", err)
+
+	err = testRepository.AddTag("v2.0.0", hash2)
+	checkErr(t, "adding annotated tag", err)
+
+	err = testRepository.AddLightweightTag("v3.0.0", hash3)
+	checkErr(t, "adding lightweight tag", err)
+
+	ref, err := testRepository.Head()
+	checkErr(t, "fetching head", err)
+
+	reachable, err := BuildReachableCommits(testRepository.Repository, ref)
+	checkErr(t, "building reachable commits", err)
+
+	th := NewTestHelper(t)
+	parser := New(th.Ctx)
+
+	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
+	checkErr(t, "fetching latest semver tag", err)
+
+	want := "v3.0.0"
+	assert.Equal(want, latest.Name, "should find latest tag regardless of type")
+}
+
 func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
 	assert := assertion.New(t)
 
@@ -1364,4 +1456,51 @@ func TestParser_FetchLatestPrereleaseTag_DifferentLabels(t *testing.T) {
 
 	assert.NotNil(latestBeta)
 	assert.Equal("1.0.0-beta.2", latestBeta.String())
+}
+
+func TestShortenMessage(t *testing.T) {
+	assert := assertion.New(t)
+
+	// Short message - no change
+	short := shortenMessage("fix: short message")
+	assert.Equal("fix: short message", short)
+
+	// Exactly 50 chars - no change
+	exact := shortenMessage("12345678901234567890123456789012345678901234567890")
+	assert.Equal("12345678901234567890123456789012345678901234567890", exact)
+
+	// Long message - truncated
+	long := shortenMessage("This is a very long commit message that exceeds fifty characters and should be truncated")
+	assert.Len(long, 50)
+	assert.True(strings.HasSuffix(long, "..."))
+}
+
+func TestFileMatchesProject(t *testing.T) {
+	assert := assertion.New(t)
+
+	// Project with single path (paths must match file path prefix)
+	projectSinglePath := monorepo.Item{
+		Name: "api",
+		Path: "api",
+	}
+	assert.True(fileMatchesProject("api/main.go", projectSinglePath))
+	assert.False(fileMatchesProject("web/main.go", projectSinglePath))
+
+	// Project with multiple paths
+	projectMultiPath := monorepo.Item{
+		Name:  "shared",
+		Paths: []string{"lib", "common"},
+	}
+	assert.True(fileMatchesProject("lib/utils.go", projectMultiPath))
+	assert.True(fileMatchesProject("common/types.go", projectMultiPath))
+	assert.False(fileMatchesProject("api/main.go", projectMultiPath))
+
+	// Project with no path (returns false - doesn't match everything)
+	projectNoPath := monorepo.Item{
+		Name: "root",
+	}
+	assert.False(fileMatchesProject("any/file.go", projectNoPath))
+
+	// Empty file path
+	assert.False(fileMatchesProject("", projectSinglePath))
 }

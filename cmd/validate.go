@@ -28,31 +28,16 @@ func (v *ValidationResult) HasErrors() bool {
 	return len(v.Errors) > 0
 }
 
-type configFile struct {
-	Branches []branchConfig   `yaml:"branches"`
-	Monorepo []monorepoConfig `yaml:"monorepo"`
-	Rules    rulesConfig      `yaml:"rules"`
-}
-
-type branchConfig struct {
-	Name       string `yaml:"name"`
-	Prerelease bool   `yaml:"prerelease"`
-}
-
-type monorepoConfig struct {
-	Name  string   `yaml:"name"`
-	Path  string   `yaml:"path"`
-	Paths []string `yaml:"paths"`
-}
-
-type rulesConfig struct {
-	Minor []string `yaml:"minor"`
-	Patch []string `yaml:"patch"`
+// rawConfig uses interface{} to accept any YAML structure for lenient validation
+type rawConfig struct {
+	Branches interface{} `yaml:"branches"`
+	Monorepo interface{} `yaml:"monorepo"`
+	Rules    interface{} `yaml:"rules"`
 }
 
 func NewValidateCmd() *cobra.Command {
 	validateCmd := &cobra.Command{
-		Use:   "validate <config-file>",
+		Use:   "validate <CONFIGURATION_FILE_PATH>",
 		Short: "Validate a configuration file",
 		Long:  "Validate a configuration file for syntax and semantic errors",
 		Args:  cobra.ExactArgs(1),
@@ -85,7 +70,7 @@ func validateConfigFile(path string) (*ValidationResult, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
-	var config configFile
+	var config rawConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("invalid YAML syntax: %w", err)
 	}
@@ -97,79 +82,189 @@ func validateConfigFile(path string) (*ValidationResult, error) {
 	return result, nil
 }
 
-func validateBranches(branches []branchConfig, result *ValidationResult) {
-	if len(branches) == 0 {
+func validateBranches(branches interface{}, result *ValidationResult) {
+	if branches == nil {
+		result.AddWarning("no branches configured")
+		return
+	}
+
+	branchList, ok := branches.([]interface{})
+	if !ok {
+		result.AddError("branches: expected an array, got %T", branches)
+		return
+	}
+
+	if len(branchList) == 0 {
 		result.AddWarning("no branches configured")
 		return
 	}
 
 	hasStable := false
-	hasPrerelease := false
+	hasPrereleaseFlag := false
 	seenNames := make(map[string]bool)
 
-	for i, b := range branches {
-		if b.Name == "" {
-			result.AddError("branches[%d]: name is required", i)
+	for i, item := range branchList {
+		branch, ok := item.(map[string]interface{})
+		if !ok {
+			// Check if it's a string (common mistake)
+			if str, isStr := item.(string); isStr {
+				result.AddError("branches[%d]: expected object with \"name\" key, got string %q (use \"- name: %s\" instead)", i, str, str)
+			} else {
+				result.AddError("branches[%d]: expected object with \"name\" key, got %T", i, item)
+			}
 			continue
 		}
 
-		if seenNames[b.Name] {
-			result.AddError("branches[%d]: duplicate branch name %q", i, b.Name)
+		name, hasName := branch["name"]
+		if !hasName {
+			result.AddError("branches[%d]: \"name\" key is required", i)
+			continue
 		}
-		seenNames[b.Name] = true
 
-		if b.Prerelease {
-			hasPrerelease = true
+		nameStr, ok := name.(string)
+		if !ok {
+			result.AddError("branches[%d]: \"name\" must be a string, got %T", i, name)
+			continue
+		}
+
+		if nameStr == "" {
+			result.AddError("branches[%d]: \"name\" cannot be empty", i)
+			continue
+		}
+
+		if seenNames[nameStr] {
+			result.AddError("branches[%d]: duplicate branch name %q", i, nameStr)
+		}
+		seenNames[nameStr] = true
+
+		// Check if prerelease is set to true
+		if pr, ok := branch["prerelease"].(bool); ok && pr {
+			hasPrereleaseFlag = true
 		} else {
 			hasStable = true
 		}
 	}
 
-	if hasPrerelease && !hasStable {
+	if hasPrereleaseFlag && !hasStable {
 		result.AddWarning("prerelease branches configured but no stable branch defined")
 	}
 }
 
-func validateMonorepo(monorepo []monorepoConfig, result *ValidationResult) {
-	if len(monorepo) == 0 {
+func validateMonorepo(monorepo interface{}, result *ValidationResult) {
+	if monorepo == nil {
+		return
+	}
+
+	monorepoList, ok := monorepo.([]interface{})
+	if !ok {
+		result.AddError("monorepo: expected an array, got %T", monorepo)
+		return
+	}
+
+	if len(monorepoList) == 0 {
 		return
 	}
 
 	seenNames := make(map[string]bool)
 
-	for i, m := range monorepo {
-		if m.Name == "" {
-			result.AddError("monorepo[%d]: name is required", i)
+	for i, item := range monorepoList {
+		project, ok := item.(map[string]interface{})
+		if !ok {
+			if str, isStr := item.(string); isStr {
+				result.AddError("monorepo[%d]: expected object with \"name\" key, got string %q", i, str)
+			} else {
+				result.AddError("monorepo[%d]: expected object with \"name\" and \"path\" keys, got %T", i, item)
+			}
 			continue
 		}
 
-		if seenNames[m.Name] {
-			result.AddError("monorepo[%d]: duplicate project name %q", i, m.Name)
-		}
-		seenNames[m.Name] = true
-
-		hasPath := m.Path != ""
-		hasPaths := len(m.Paths) > 0
-
-		if hasPath && hasPaths {
-			result.AddError("monorepo[%d]: project %q has both \"path\" and \"paths\" set (mutually exclusive)", i, m.Name)
+		name, hasName := project["name"]
+		if !hasName {
+			result.AddError("monorepo[%d]: \"name\" key is required", i)
+			continue
 		}
 
-		if !hasPath && !hasPaths {
-			result.AddWarning("monorepo[%d]: project %q has no path configured", i, m.Name)
+		nameStr, ok := name.(string)
+		if !ok {
+			result.AddError("monorepo[%d]: \"name\" must be a string, got %T", i, name)
+			continue
+		}
+
+		if nameStr == "" {
+			result.AddError("monorepo[%d]: \"name\" cannot be empty", i)
+			continue
+		}
+
+		if seenNames[nameStr] {
+			result.AddError("monorepo[%d]: duplicate project name %q", i, nameStr)
+		}
+		seenNames[nameStr] = true
+
+		path, hasPath := project["path"]
+		paths, hasPaths := project["paths"]
+
+		pathSet := hasPath && path != nil && path != ""
+		pathsSet := hasPaths && paths != nil
+
+		if pathsSet {
+			if pathsList, ok := paths.([]interface{}); ok {
+				pathsSet = len(pathsList) > 0
+			} else {
+				pathsSet = false
+			}
+		}
+
+		if pathSet && pathsSet {
+			result.AddError("monorepo[%d]: project %q has both \"path\" and \"paths\" set (mutually exclusive)", i, nameStr)
+		}
+
+		if !pathSet && !pathsSet {
+			result.AddWarning("monorepo[%d]: project %q has no path configured", i, nameStr)
 		}
 	}
 }
 
-func validateRules(rules rulesConfig, result *ValidationResult) {
-	seenCommitTypes := make(map[string]string)
-
-	for _, commitType := range rules.Minor {
-		validateCommitType(commitType, "minor", seenCommitTypes, result)
+func validateRules(rules interface{}, result *ValidationResult) {
+	if rules == nil {
+		return
 	}
 
-	for _, commitType := range rules.Patch {
-		validateCommitType(commitType, "patch", seenCommitTypes, result)
+	rulesMap, ok := rules.(map[string]interface{})
+	if !ok {
+		result.AddError("rules: expected an object with \"minor\" and \"patch\" keys, got %T", rules)
+		return
+	}
+
+	seenCommitTypes := make(map[string]string)
+
+	if minor, hasMinor := rulesMap["minor"]; hasMinor {
+		validateRulesList(minor, "minor", seenCommitTypes, result)
+	}
+
+	if patch, hasPatch := rulesMap["patch"]; hasPatch {
+		validateRulesList(patch, "patch", seenCommitTypes, result)
+	}
+}
+
+func validateRulesList(rulesList interface{}, releaseType string, seen map[string]string, result *ValidationResult) {
+	if rulesList == nil {
+		return
+	}
+
+	list, ok := rulesList.([]interface{})
+	if !ok {
+		result.AddError("rules.%s: expected an array of commit types, got %T", releaseType, rulesList)
+		return
+	}
+
+	for i, item := range list {
+		commitType, ok := item.(string)
+		if !ok {
+			result.AddError("rules.%s[%d]: expected string, got %T", releaseType, i, item)
+			continue
+		}
+
+		validateCommitType(commitType, releaseType, seen, result)
 	}
 }
 

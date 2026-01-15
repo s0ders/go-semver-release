@@ -29,6 +29,7 @@ type AppContext struct {
 	BuildMetadata     string
 	DryRun            bool
 	Verbose           bool
+	LightweightTags   bool
 }
 
 func New() *AppContext {

@@ -101,3 +101,38 @@ func TestCmd_Version_OutputFormat(t *testing.T) {
 	assert.Equal(t, "Build: 12345", lines[1])
 	assert.Equal(t, "Commit: deadbeef", lines[2])
 }
+
+func TestCmd_Version_NoBuildNumber(t *testing.T) {
+	// Save original values
+	origVersion := cmdVersion
+	origBuild := buildNumber
+	origCommit := buildCommitHash
+	defer func() {
+		cmdVersion = origVersion
+		buildNumber = origBuild
+		buildCommitHash = origCommit
+	}()
+
+	cmdVersion = "v3.0.0"
+	buildNumber = ""
+	buildCommitHash = "abc123"
+
+	actual := new(bytes.Buffer)
+	ctx := appcontext.New()
+
+	rootCmd := NewRootCommand(ctx)
+	rootCmd.SetOut(actual)
+	rootCmd.SetErr(actual)
+	rootCmd.SetArgs([]string{"version"})
+
+	err := rootCmd.Execute()
+	assert.NoError(t, err)
+
+	output := actual.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	// Should only have 2 lines (no Build line)
+	assert.Len(t, lines, 2)
+	assert.Equal(t, "Version: v3.0.0", lines[0])
+	assert.Equal(t, "Commit: abc123", lines[1])
+}

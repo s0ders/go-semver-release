@@ -37,6 +37,12 @@ type Parser struct {
 	ctx *appcontext.AppContext
 }
 
+// TagInfo holds information about a Git tag, supporting both annotated and lightweight tags.
+type TagInfo struct {
+	Name   string
+	Commit *object.Commit
+}
+
 func New(ctx *appcontext.AppContext) *Parser {
 	parser := &Parser{ctx: ctx}
 
@@ -143,13 +149,8 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 			return output, fmt.Errorf("building semver from git tag: %w", err)
 		}
 
-		latestSemverTagCommit, err := latestSemverTag.Commit()
-		if err != nil {
-			return output, fmt.Errorf("fetching latest semver tag commit: %w", err)
-		}
-
 		// Filter commits that are newer than the tagged commit
-		sinceTime := latestSemverTagCommit.Committer.When.Add(time.Second)
+		sinceTime := latestSemverTag.Commit.Committer.When.Add(time.Second)
 		for _, c := range reachable.Commits {
 			if c.Committer.When.After(sinceTime) || c.Committer.When.Equal(sinceTime) {
 				history = append(history, c)
@@ -389,31 +390,48 @@ func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Item) (Pr
 	return output, nil
 }
 
+// resolveTagToCommit resolves a tag reference to its commit, handling both annotated and lightweight tags.
+// For annotated tags, it dereferences the tag object to get the commit.
+// For lightweight tags, the reference points directly to the commit.
+func resolveTagToCommit(repository *git.Repository, ref *plumbing.Reference) (*object.Commit, error) {
+	// Try to get as annotated tag first
+	tagObject, err := repository.TagObject(ref.Hash())
+	if err == nil {
+		// It's an annotated tag, get the commit it points to
+		return tagObject.Commit()
+	}
+
+	// It's a lightweight tag, the reference points directly to a commit
+	return repository.CommitObject(ref.Hash())
+}
+
 // FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
 // among all tags reachable from the given branch. The reachableHashSet should contain all commit hashes reachable
-// from the branch reference.
-func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*object.Tag, error) {
-	tags, err := repository.TagObjects()
+// from the branch reference. Supports both annotated and lightweight tags.
+func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*TagInfo, error) {
+	tags, err := repository.Tags()
 	if err != nil {
-		return nil, fmt.Errorf("fetching tag objects: %w", err)
+		return nil, fmt.Errorf("fetching tags: %w", err)
 	}
 
 	var (
 		latestSemver *semver.Version
-		latestTag    *object.Tag
+		latestTag    *TagInfo
 	)
 
-	err = tags.ForEach(func(tag *object.Tag) error {
-		if !semver.Regex.MatchString(tag.Name) {
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		tagName := ref.Name().Short()
+
+		if !semver.Regex.MatchString(tagName) {
 			return nil
 		}
 
-		if project.Name != "" && !strings.HasPrefix(tag.Name, project.Name+"-") {
+		if project.Name != "" && !strings.HasPrefix(tagName, project.Name+"-") {
 			return nil
 		}
 
-		// Get the commit this tag points to
-		tagCommit, err := tag.Commit()
+		// Resolve tag to commit (works for both annotated and lightweight tags)
+		tagCommit, err := resolveTagToCommit(repository, ref)
 		if err != nil {
 			// Tag might point to a tree or blob; skip it
 			return nil
@@ -424,14 +442,14 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 			return nil
 		}
 
-		currentSemver, err := semver.NewFromString(tag.Name)
+		currentSemver, err := semver.NewFromString(tagName)
 		if err != nil {
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}
 
 		if latestSemver == nil || semver.Compare(latestSemver, currentSemver) == -1 {
 			latestSemver = currentSemver
-			latestTag = tag
+			latestTag = &TagInfo{Name: tagName, Commit: tagCommit}
 		}
 		return nil
 	})
@@ -443,24 +461,27 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 }
 
 // FetchLatestStableTag fetches the latest stable (non-prerelease) semver tag reachable from the branch.
+// Supports both annotated and lightweight tags.
 func (p *Parser) FetchLatestStableTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*semver.Version, error) {
-	tags, err := repository.TagObjects()
+	tags, err := repository.Tags()
 	if err != nil {
-		return nil, fmt.Errorf("fetching tag objects: %w", err)
+		return nil, fmt.Errorf("fetching tags: %w", err)
 	}
 
 	var latestStable *semver.Version
 
-	err = tags.ForEach(func(tag *object.Tag) error {
-		if !semver.Regex.MatchString(tag.Name) {
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		tagName := ref.Name().Short()
+
+		if !semver.Regex.MatchString(tagName) {
 			return nil
 		}
 
-		if project.Name != "" && !strings.HasPrefix(tag.Name, project.Name+"-") {
+		if project.Name != "" && !strings.HasPrefix(tagName, project.Name+"-") {
 			return nil
 		}
 
-		tagCommit, err := tag.Commit()
+		tagCommit, err := resolveTagToCommit(repository, ref)
 		if err != nil {
 			return nil
 		}
@@ -469,7 +490,7 @@ func (p *Parser) FetchLatestStableTag(repository *git.Repository, project monore
 			return nil
 		}
 
-		currentSemver, err := semver.NewFromString(tag.Name)
+		currentSemver, err := semver.NewFromString(tagName)
 		if err != nil {
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}
@@ -493,24 +514,27 @@ func (p *Parser) FetchLatestStableTag(repository *git.Repository, project monore
 
 // FetchLatestPrereleaseTag fetches the latest prerelease tag for a given core version and prerelease label.
 // For example, if coreVersion is 1.2.0 and label is "rc", it will find the highest rc.N tag for 1.2.0.
+// Supports both annotated and lightweight tags.
 func (p *Parser) FetchLatestPrereleaseTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}, coreVersion *semver.Version, label string) (*semver.Version, error) {
-	tags, err := repository.TagObjects()
+	tags, err := repository.Tags()
 	if err != nil {
-		return nil, fmt.Errorf("fetching tag objects: %w", err)
+		return nil, fmt.Errorf("fetching tags: %w", err)
 	}
 
 	var latestPrerelease *semver.Version
 
-	err = tags.ForEach(func(tag *object.Tag) error {
-		if !semver.Regex.MatchString(tag.Name) {
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		tagName := ref.Name().Short()
+
+		if !semver.Regex.MatchString(tagName) {
 			return nil
 		}
 
-		if project.Name != "" && !strings.HasPrefix(tag.Name, project.Name+"-") {
+		if project.Name != "" && !strings.HasPrefix(tagName, project.Name+"-") {
 			return nil
 		}
 
-		tagCommit, err := tag.Commit()
+		tagCommit, err := resolveTagToCommit(repository, ref)
 		if err != nil {
 			return nil
 		}
@@ -519,7 +543,7 @@ func (p *Parser) FetchLatestPrereleaseTag(repository *git.Repository, project mo
 			return nil
 		}
 
-		currentSemver, err := semver.NewFromString(tag.Name)
+		currentSemver, err := semver.NewFromString(tagName)
 		if err != nil {
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}

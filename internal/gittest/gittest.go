@@ -205,7 +205,7 @@ func (r *TestRepository) AddCommitWithSpecificFile(commitType, filePath string) 
 	return commitHash, nil
 }
 
-// AddTag adds a new tag to the underlying Git repository with a given name and pointing to a given hash.
+// AddTag adds a new annotated tag to the underlying Git repository with a given name and pointing to a given hash.
 func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 	commit, err := r.CommitObject(hash)
 	if err != nil {
@@ -223,6 +223,12 @@ func (r *TestRepository) AddTag(tagName string, hash plumbing.Hash) error {
 
 	_, err = r.CreateTag(tagName, hash, tagOpts)
 
+	return err
+}
+
+// AddLightweightTag adds a new lightweight tag to the underlying Git repository with a given name and pointing to a given hash.
+func (r *TestRepository) AddLightweightTag(tagName string, hash plumbing.Hash) error {
+	_, err := r.CreateTag(tagName, hash, nil)
 	return err
 }
 
