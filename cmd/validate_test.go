@@ -48,6 +48,26 @@ branches:
 	assert.Contains(t, err.Error(), "invalid YAML syntax")
 }
 
+func TestValidateConfigFile_BranchesAsStrings(t *testing.T) {
+	content := `
+branches:
+  - main
+  - rc
+`
+	path := createTempConfig(t, content)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	result, err := validateConfigFile(path)
+
+	assert.NoError(t, err)
+	assert.True(t, result.HasErrors())
+	assert.Len(t, result.Errors, 2)
+	assert.Contains(t, result.Errors[0], "expected object with \"name\" key")
+	assert.Contains(t, result.Errors[0], "use \"- name: main\" instead")
+}
+
 func TestValidateConfigFile_MissingBranchName(t *testing.T) {
 	content := `
 branches:
@@ -63,7 +83,7 @@ branches:
 
 	assert.NoError(t, err)
 	assert.True(t, result.HasErrors())
-	assert.Contains(t, result.Errors[0], "name is required")
+	assert.Contains(t, result.Errors[0], "\"name\" key is required")
 }
 
 func TestValidateConfigFile_DuplicateBranchName(t *testing.T) {
@@ -137,7 +157,7 @@ monorepo:
 
 	assert.NoError(t, err)
 	assert.True(t, result.HasErrors())
-	assert.Contains(t, result.Errors[0], "name is required")
+	assert.Contains(t, result.Errors[0], "\"name\" key is required")
 }
 
 func TestValidateConfigFile_MonorepoNoPath(t *testing.T) {
