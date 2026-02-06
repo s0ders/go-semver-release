@@ -3,6 +3,7 @@ package monorepo
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 
 	"github.com/spf13/pflag"
 )
@@ -40,13 +41,22 @@ func (f *Flag) Set(value string) error {
 		return fmt.Errorf("unmarshalling %s flag value: %w", FlagType, err)
 	}
 
-	for _, item := range items {
+	for i, item := range items {
 		if len(item.Paths) != 0 && item.Path != "" {
 			return fmt.Errorf("monorepo item %q has both \"path\" and \"paths\" set: %w", item.Name, ErrExclusiveFlag)
 		}
+
+		// Normalize paths to ensure consistent matching (e.g., "./services/a/" -> "services/a")
+		// Uses path.Clean (not filepath.Clean) since git always uses forward slashes
+		if item.Path != "" {
+			items[i].Path = path.Clean(item.Path)
+		}
+		for j, p := range item.Paths {
+			items[i].Paths[j] = path.Clean(p)
+		}
 	}
 
-	*f = Flag(items)
+	*f = items
 	return nil
 }
 
