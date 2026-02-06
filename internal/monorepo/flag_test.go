@@ -97,8 +97,9 @@ func TestMonorepoFlag_Set_MultiplePaths(t *testing.T) {
 	assert.Len(t, f, 1)
 	assert.Equal(t, "multi", f[0].Name)
 	assert.Len(t, f[0].Paths, 2)
-	assert.Equal(t, "./path1", f[0].Paths[0])
-	assert.Equal(t, "./path2", f[0].Paths[1])
+	// Paths should be cleaned (e.g., "./path1" -> "path1")
+	assert.Equal(t, "path1", f[0].Paths[0])
+	assert.Equal(t, "path2", f[0].Paths[1])
 }
 
 func TestMonorepoFlag_GetItems(t *testing.T) {
@@ -122,4 +123,42 @@ func TestMonorepoFlag_GetItems(t *testing.T) {
 func TestMonorepoFlag_String_NilPointer(t *testing.T) {
 	var nilFlag *Flag
 	assert.Equal(t, "[]", nilFlag.String())
+}
+
+func TestMonorepoFlag_Set_PathNormalization(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		expectedPath string
+	}{
+		{
+			name:         "leading dot-slash is removed",
+			input:        `[{"name":"test","path":"./services/a/"}]`,
+			expectedPath: "services/a",
+		},
+		{
+			name:         "trailing slash is removed",
+			input:        `[{"name":"test","path":"services/a/"}]`,
+			expectedPath: "services/a",
+		},
+		{
+			name:         "multiple leading dot-slash segments normalized",
+			input:        `[{"name":"test","path":"././services/a"}]`,
+			expectedPath: "services/a",
+		},
+		{
+			name:         "clean path stays clean",
+			input:        `[{"name":"test","path":"services/a"}]`,
+			expectedPath: "services/a",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var f Flag
+			err := f.Set(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedPath, f[0].Path)
+		})
+	}
 }
