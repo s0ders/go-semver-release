@@ -119,7 +119,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 		output.Project = project
 	}
 
-	// Build reachable commits once - used for both tag lookup and history
+	// Build reachable commits once, used for both tag lookup and history
 	reachable, err := BuildReachableCommits(repository, ref)
 	if err != nil {
 		return output, fmt.Errorf("building reachable commits: %w", err)

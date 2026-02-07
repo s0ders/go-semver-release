@@ -11,8 +11,9 @@ commitHash := "local"
 importPath := "github.com/s0ders/go-semver-release/v6/"
 ldFlags := "-X " + importPath + "cmd.cmdVersion=" + appVersion + " -X " + importPath + "cmd.buildNumber=" + buildNumber + " -X " + importPath + "cmd.buildCommitHash=" + commitHash + " -w -s"
 
+# gotestsum v1.13.0
 tests:
-	go test -shuffle=on -tags testing -failfast -race -v -covermode=atomic ./...
+	go run gotest.tools/gotestsum@c4a0df2e75a225d979a444342dd3db752b53619f --hide-summary=skipped -- -shuffle=on -race -covermode=atomic ./...
 
 test-coverage: clean-coverage
     go test -coverprofile cover.out ./...

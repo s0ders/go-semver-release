@@ -26,8 +26,9 @@ jobs:
       - name: Go Build
         run: go build -v -o go-semver-release main.go
 
+      # gotestsum v1.13.0
       - name: Go Test
-        run: go test -shuffle=on -tags testing -race -v -covermode=atomic -coverprofile=coverage.out ./...
+        run: go run gotest.tools/gotestsum@c4a0df2e75a225d979a444342dd3db752b53619f --hide-summary=skipped -- -shuffle=on -race -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
