@@ -288,8 +288,11 @@ func (p *Parser) computeNewSemver(
 				Str("from", latestSemver.String()).
 				Msg("promoting prerelease to stable release")
 			latestSemver.ClearPrerelease()
-			if !newRelease {
-				newRelease = true
+			newRelease = true
+
+			// Without any release commit since the prerelease, the promoted version tags the prerelease's commit.
+			if commitHash.IsZero() {
+				commitHash = latestSemverTag.commit.Hash
 			}
 		}
 	}
@@ -545,7 +548,7 @@ func candidateTags(tags []resolvedTag, project monorepo.Item, reachableHashSet m
 	for i := range tags {
 		t := &tags[i]
 
-		if project.Name != "" && !strings.HasPrefix(t.name, prefix) {
+		if project.Name != "" && !isProjectTag(t.name, prefix) {
 			continue
 		}
 
@@ -555,6 +558,20 @@ func candidateTags(tags []resolvedTag, project monorepo.Item, reachableHashSet m
 
 		yield(t)
 	}
+}
+
+// isProjectTag reports whether a tag, formatted as "<project>-<tag prefix><version>", belongs to the project whose
+// tags start with the given "<project>-" prefix. The tag prefix between the project and the version may not contain a
+// dash, so that project "api" does not claim the tags of project "api-gateway" (e.g., "api-gateway-1.0.0").
+func isProjectTag(tagName, projectPrefix string) bool {
+	rest, ok := strings.CutPrefix(tagName, projectPrefix)
+	if !ok {
+		return false
+	}
+
+	loc := semver.Regex.FindStringIndex(rest)
+
+	return loc != nil && !strings.Contains(rest[:loc[0]], "-")
 }
 
 // latestSemverTag returns the tag with the highest semver among the given project's tags reachable from the branch.
@@ -843,12 +860,4 @@ func lookupEntry(s storer.EncodedObjectStorer, rootTree plumbing.Hash, entryPath
 
 		entryPath = rest
 	}
-}
-
-func shortenMessage(message string) string {
-	if len(message) > 50 {
-		return message[0:47] + "..."
-	}
-
-	return message
 }

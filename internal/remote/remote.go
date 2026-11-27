@@ -51,11 +51,6 @@ func (r *Remote) Clone(url string) (*git.Repository, error) {
 	return r.repository, nil
 }
 
-// PushTag pushes a given tag to the previously cloned repository's remote.
-func (r *Remote) PushTag(tagName string) error {
-	return r.PushTags(tagName)
-}
-
 // PushTags pushes the given tags to the previously cloned repository's remote in a single push, avoiding one
 // network round trip (and reference negotiation) per tag.
 func (r *Remote) PushTags(tagNames ...string) error {

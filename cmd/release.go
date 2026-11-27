@@ -266,6 +266,7 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
 				jsonStr, jsonErr := json.Marshal(val)
 				if jsonErr != nil {
 					err = fmt.Errorf("marshaling %q value: %w", configName, jsonErr)
+					return
 				}
 
 				err = flagType.Set(string(jsonStr))

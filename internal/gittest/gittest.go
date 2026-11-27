@@ -46,20 +46,9 @@ func NewRepository() (*TestRepository, error) {
 
 	testRepository.Repository = repository
 
-	tempFilePath := filepath.Join(path, sampleFile)
-
-	commitFile, err := os.Create(tempFilePath)
+	err = os.WriteFile(filepath.Join(path, sampleFile), []byte("..."), 0o644)
 	if err != nil {
-		return testRepository, fmt.Errorf("creating first commit file: %s", err)
-	}
-
-	defer func() {
-		err = commitFile.Close()
-	}()
-
-	_, err = commitFile.WriteString("...")
-	if err != nil {
-		return testRepository, err
+		return testRepository, fmt.Errorf("creating first commit file: %w", err)
 	}
 
 	worktree, err := repository.Worktree()
@@ -83,7 +72,7 @@ func NewRepository() (*TestRepository, error) {
 		return testRepository, fmt.Errorf("creating commit: %w", err)
 	}
 
-	return testRepository, err
+	return testRepository, nil
 }
 
 // Clone clones the current TestRepository to a temporary directory and returns the clone of that repository. This
@@ -268,6 +257,16 @@ func (r *TestRepository) CheckoutBranch(name string) error {
 	}
 
 	return nil
+}
+
+// Checkout checks out an existing local branch.
+func (r *TestRepository) Checkout(name string) error {
+	worktree, err := r.Worktree()
+	if err != nil {
+		return fmt.Errorf("fetching worktree: %w", err)
+	}
+
+	return worktree.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName(name), Force: true})
 }
 
 // When returns a time.Time starting at 2000/01/01 00:00:00 and increasing of 10 second every new call.
