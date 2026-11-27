@@ -16,7 +16,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-X github.com/s0ders/go-semver-release/v8/cmd.cmdVersion=${APP_VERSION} -X github.com/s0ders/go-semver-release/v8/cmd.buildNumber=${APP_BUILD_NUMBER} -X github.com/s0ders/go-semver-release/v8/cmd.buildCommitHash=${APP_COMMIT_HASH} -w -s" -o /app/app .
 
 # alpine:3.22.2
-FROM alpine@sha256:85f2b723e106c34644cd5851d7e81ee87da98ac54672b29947c052a45d31dc2f
+FROM alpine@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 COPY --from=builder /app/app /app
 
