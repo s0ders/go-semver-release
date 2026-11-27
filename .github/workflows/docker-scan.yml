@@ -1,0 +1,39 @@
+name: Docker scan
+
+# Builds the Docker image and scans it for vulnerabilities. Called by the pull request workflow and, on the main branch,
+# before versioning: a vulnerable image must block the release before any tag is pushed, not after.
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  scan:
+    name: Image vulnerability scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Docker build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ./build/Dockerfile
+          load: true
+          tags: go-semver-release:scan
+
+      # The scanner is pinned by digest and reads an exported image, so it has no access to the Docker daemon.
+      # aquasec/trivy:0.76.2
+      - name: Vulnerability scan
+        run: |
+          docker save go-semver-release:scan -o "${RUNNER_TEMP}/image.tar"
+          docker run --rm -v "${RUNNER_TEMP}/image.tar:/image.tar:ro" \
+            aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
+            image --input /image.tar --severity MEDIUM,HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress

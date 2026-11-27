@@ -42,6 +42,8 @@ $ docker pull s0ders/go-semver-release:v8.0.3
 $ docker run --rm s0ders/go-semver-release:v8.0.3 --help
 ```
 
+The image is based on [distroless](https://github.com/GoogleContainerTools/distroless) and only contains the program: it has no shell, so it cannot be used as a CI job image running shell scripts. In that case, install the binary from the GitHub releases instead.
+
 Images are only published with their version tag: pin one (ideally by digest, e.g., `s0ders/go-semver-release@sha256:...`) rather than relying on `latest`. Each image comes with build provenance and SBOM attestations, which can be inspected with `docker buildx imagetools inspect s0ders/go-semver-release:<VERSION> --format '{{ json .Provenance }}'`.
 
 
