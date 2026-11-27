@@ -105,7 +105,7 @@ func (p *Parser) Run(repository *git.Repository) ([]ComputeNewSemverOutput, erro
 	// Tags are resolved a single time and shared by every branch and project.
 	tags, err := resolveSemverTags(repository)
 	if err != nil {
-		return nil, fmt.Errorf("computing new semver: %w", err)
+		return nil, fmt.Errorf("resolving tags: %w", err)
 	}
 
 	// Sort branches: stable branches first, then prerelease branches
@@ -114,12 +114,10 @@ func (p *Parser) Run(repository *git.Repository) ([]ComputeNewSemverOutput, erro
 
 	for _, gitBranch := range sortedBranches {
 		// Reachable commits only depend on the branch, compute them once for all projects.
+		// The error names the branch and does not depend on any project.
 		reachable, err := p.branchReachableCommits(repository, gitBranch)
 		if err != nil {
-			if len(p.ctx.MonorepositoryCfg) == 0 {
-				return nil, fmt.Errorf("computing new semver: %w", err)
-			}
-			return nil, fmt.Errorf("computing project %q new semver: %w", p.ctx.MonorepositoryCfg[0].Name, err)
+			return nil, err
 		}
 
 		if len(p.ctx.MonorepositoryCfg) == 0 {
@@ -703,38 +701,31 @@ func BuildReachableCommits(repository *git.Repository, fromRef *plumbing.Referen
 	return result, nil
 }
 
-// getBranchReference attempts to get a reference to a branch, trying remote-tracking branches first,
-// then falling back to local branches if the remote reference is not found.
+// getBranchReference returns the reference of a branch, looking for the local branch first and then for the
+// remote-tracking branch.
+//
+// In a fresh clone, both point to the same commit. In a repository opened in place, the local branch is the one being
+// versioned, while the remote-tracking branch still finds branches that only exist on the remote, such as the release
+// branches of a CI checkout, which only creates the checked out branch locally.
 func (p *Parser) getBranchReference(repository *git.Repository, branchName string) (*plumbing.Reference, error) {
-	// Try remote-tracking branch first (refs/remotes/origin/branchName)
-	remoteBranchRef := plumbing.NewRemoteReferenceName(p.ctx.RemoteName, branchName)
-	ref, err := repository.Reference(remoteBranchRef, true)
-	if err == nil {
-		p.ctx.Logger.Debug().
-			Str("branch", branchName).
-			Str("ref", remoteBranchRef.String()).
-			Msg("using remote-tracking branch reference")
-		return ref, nil
+	candidates := []plumbing.ReferenceName{
+		plumbing.NewBranchReferenceName(branchName),
+		plumbing.NewRemoteReferenceName(p.ctx.RemoteName, branchName),
 	}
 
-	// If remote reference not found, try local branch (refs/heads/branchName)
-	if errors.Is(err, plumbing.ErrReferenceNotFound) {
-		localBranchRef := plumbing.NewBranchReferenceName(branchName)
-		ref, err = repository.Reference(localBranchRef, true)
+	for _, name := range candidates {
+		ref, err := repository.Reference(name, true)
 		if err == nil {
-			p.ctx.Logger.Debug().
-				Str("branch", branchName).
-				Str("ref", localBranchRef.String()).
-				Msg("using local branch reference")
+			p.ctx.Logger.Debug().Str("branch", branchName).Str("ref", name.String()).Msg("using branch reference")
 			return ref, nil
 		}
 
-		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return nil, fmt.Errorf("branch %q not found in remote or local references: %w", branchName, err)
+		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return nil, fmt.Errorf("getting reference for branch %q: %w", branchName, err)
 		}
 	}
 
-	return nil, fmt.Errorf("getting reference for branch %q: %w", branchName, err)
+	return nil, fmt.Errorf("branch %q not found in local or remote references: %w", branchName, plumbing.ErrReferenceNotFound)
 }
 
 // commitContainsProjectFiles checks if a given commit change contains at least one file whose path belongs to the

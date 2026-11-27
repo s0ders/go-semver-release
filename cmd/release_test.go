@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -375,7 +376,7 @@ func TestReleaseCmd_Errors(t *testing.T) {
 			setup: func(t *testing.T, th *TestHelper) string {
 				return filepath.Join(t.TempDir(), "does-not-exist")
 			},
-			wantErr: "cloning Git repository",
+			wantErr: "opening Git repository",
 		},
 		{
 			name: "empty repository",
@@ -385,7 +386,7 @@ func TestReleaseCmd_Errors(t *testing.T) {
 				require.NoError(t, err)
 				return path
 			},
-			wantErr: "remote repository is empty",
+			wantErr: `branch "master" not found`,
 		},
 		{
 			name: "read-only GitHub output",
@@ -549,20 +550,66 @@ func writeFile(t *testing.T, name, content string) string {
 	return path
 }
 
-func TestReleaseCmd_RemovesLocalClone(t *testing.T) {
-	tempDir := t.TempDir()
-	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
-		t.Setenv(env, tempDir)
+func TestReleaseCmd_LocalClone(t *testing.T) {
+	tests := []struct {
+		name string
+		// url returns the repository argument given to the release command.
+		url func(repo *gittest.TestRepository) string
+	}{
+		// Local repositories are opened in place: no clone is ever made.
+		{name: "local repository", url: func(repo *gittest.TestRepository) string { return repo.Path }},
+		// Repository URLs are cloned: the clone must be removed once the release is done.
+		{name: "repository URL", url: func(repo *gittest.TestRepository) string { return fileURL(repo.Path) }},
 	}
 
-	repo := gittest.New(t)
-	repo.MustCommit(t, "feat")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
+				t.Setenv(env, tempDir)
+			}
+
+			repo := gittest.New(t)
+			repo.MustCommit(t, "feat")
+
+			th := NewTestHelper(t)
+			th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+			th.MustRelease(t, tc.url(repo))
+
+			assert.Equal(t, []string{"v0.1.0"}, tagNames(t, repo), "the tag should be in the released repository")
+
+			clones, err := filepath.Glob(filepath.Join(tempDir, "go-semver-release-*"))
+			require.NoError(t, err)
+			assert.Empty(t, clones, "no clone should be left behind")
+		})
+	}
+}
+
+// TestReleaseCmd_RemoteTrackingBranch checks that a branch that only exists as a remote-tracking branch, as release
+// branches of a CI checkout that only creates the checked out branch locally, can be released.
+func TestReleaseCmd_RemoteTrackingBranch(t *testing.T) {
+	upstream := gittest.New(t)
+	upstream.MustCommit(t, "feat")
+	upstream.MustCheckoutBranch(t, "rc")
+	upstream.MustCommit(t, "feat!")
+	upstream.MustCheckout(t, "master")
+
+	checkout := upstream.MustClone(t)
+	_, err := checkout.Reference(plumbing.NewBranchReferenceName("rc"), true)
+	require.ErrorIs(t, err, plumbing.ErrReferenceNotFound, "the checkout should only have rc as a remote-tracking branch")
 
 	th := NewTestHelper(t)
-	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
-	th.MustRelease(t, repo.Path)
+	th.MustSetFlags(t, map[string]string{
+		BranchesConfiguration: `[{"name": "master"}, {"name": "rc", "prerelease": true}]`,
+		DryRunConfiguration:   "true",
+	})
 
-	clones, err := filepath.Glob(filepath.Join(tempDir, "go-semver-release-*"))
-	require.NoError(t, err)
-	assert.Empty(t, clones, "the local clone should be removed once the release is done")
+	output := th.MustRelease(t, checkout.Path)
+
+	assert.Equal(t, map[string]string{"master": "0.1.0", "rc": "1.0.0-rc.1"}, versionsBy(output, func(r ci.ReleaseOutput) string { return r.Branch }))
+}
+
+// fileURL returns the file:// URL of a local path.
+func fileURL(path string) string {
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
 }
