@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - version
   - deploy
 
 build-job:
@@ -15,11 +16,25 @@ unit-test-job:
     - echo "Running unit tests... This will take about 60 seconds."
     # Insert your testing process here
 
+# Requires a masked and protected CI/CD variable named GO_SEMVER_RELEASE_ACCESS_TOKEN, read by the program from the
+# environment so that it never appears in a command line.
 versioning:
   stage: version
+  image: golang:1.26
+  variables:
+    VERSION: v8.0.3
+    ASSET: go-semver-release-linux-amd64
   script:
-    - curl -SL https://github.com/s0ders/go-semver-release/releases/latest/download/go-semver-release-linux-amd64 -o ./go-semver-release && chmod +x ./go-semver-release
-    - ./go-semver-release https://gitlab.com/my/repo --config .semver.yaml
+    # Install Go Semver Release, verifying its provenance before running it with an access token
+    - curl -fsSLO "https://github.com/s0ders/go-semver-release/releases/download/${VERSION}/${ASSET}"
+    - curl -fsSLO "https://github.com/s0ders/go-semver-release/releases/download/${VERSION}/${ASSET}.intoto.jsonl"
+    - >
+      go run github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier@v2.7.1 verify-artifact "${ASSET}"
+      --provenance-path "${ASSET}.intoto.jsonl"
+      --source-uri github.com/s0ders/go-semver-release
+      --source-branch main
+    - chmod +x "${ASSET}"
+    - ./"${ASSET}" release https://gitlab.com/my/repo --config .semver.yaml
 
 deploy-job:
   stage: deploy
