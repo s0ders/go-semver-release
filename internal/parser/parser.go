@@ -798,6 +798,17 @@ func (p *Parser) entryAtPath(s storer.EncodedObjectStorer, rootTree plumbing.Has
 	return entry, nil
 }
 
+// findTreeEntry returns the direct child entry of the given tree with the given name, or nil if there is none.
+func findTreeEntry(tree *object.Tree, name string) *object.TreeEntry {
+	for i := range tree.Entries {
+		if tree.Entries[i].Name == name {
+			return &tree.Entries[i]
+		}
+	}
+
+	return nil
+}
+
 // lookupEntry walks down the tree, one path component at a time, to find the entry at the given path.
 func lookupEntry(s storer.EncodedObjectStorer, rootTree plumbing.Hash, entryPath string) (pathEntry, error) {
 	tree, err := object.GetTree(s, rootTree)
@@ -808,12 +819,12 @@ func lookupEntry(s storer.EncodedObjectStorer, rootTree plumbing.Hash, entryPath
 	for {
 		name, rest, hasRest := strings.Cut(entryPath, "/")
 
-		entry, err := tree.FindEntry(name)
-		if err != nil {
-			if errors.Is(err, object.ErrEntryNotFound) {
-				return pathEntry{}, nil
-			}
-			return pathEntry{}, err
+		// Entries are scanned directly rather than through Tree.FindEntry, which rejects names that cannot exist in
+		// a valid tree (e.g., "." or ".git") with an error. Such names are simply never found here, so a project
+		// path made of them matches nothing.
+		entry := findTreeEntry(tree, name)
+		if entry == nil {
+			return pathEntry{}, nil
 		}
 
 		if !hasRest {
