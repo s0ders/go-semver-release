@@ -3,3 +3,13 @@
 cover.out
 cover.html
 .claude
+# Keys and secrets
+*.pem
+*.asc
+*.key
+*.gpg
+
+# Profiles and coverage
+*.profile
+*.prof
+coverage.out

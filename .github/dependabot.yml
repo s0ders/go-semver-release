@@ -8,3 +8,7 @@ updates:
     directory: ".github/workflows/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/build"
+    schedule:
+      interval: "weekly"
