@@ -120,3 +120,38 @@ func checkErr(t *testing.T, err error, msg string) {
 		t.Fatalf("%s: %s", msg, err)
 	}
 }
+
+func TestRemote_PushTags_Batched(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, err, "creating repository")
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	remote := New("origin", "")
+
+	clonedRepository, err := remote.Clone(testRepository.Path)
+	checkErr(t, err, "cloning repository")
+
+	head, err := clonedRepository.Head()
+	checkErr(t, err, "getting head")
+
+	tagNames := []string{"v1.0.0", "foo-v1.0.0", "bar-v1.0.0"}
+	for _, tagName := range tagNames {
+		_, err = clonedRepository.CreateTag(tagName, head.Hash(), nil)
+		checkErr(t, err, "creating tag")
+	}
+
+	err = remote.PushTags(tagNames...)
+	checkErr(t, err, "pushing tags")
+
+	for _, tagName := range tagNames {
+		_, err = testRepository.Tag(tagName)
+		assert.NoError(err, "tag %q should have been pushed to the remote", tagName)
+	}
+
+	assert.NoError(remote.PushTags(), "pushing no tag should be a no-op")
+}

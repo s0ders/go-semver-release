@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
 	assertion "github.com/stretchr/testify/assert"
 
@@ -760,7 +761,7 @@ func TestMonorepoParser_CommitContainsProjectFiles_True(t *testing.T) {
 		Path: "foo",
 	}
 
-	contains, err := commitContainsProjectFiles(commit, monorepoItem)
+	contains, err := New(nil).commitContainsProjectFiles(testRepository.Storer, commit, monorepoItem)
 	checkErr(t, "checking project files", err)
 
 	assert.True(contains, "commit contains project files")
@@ -787,7 +788,7 @@ func TestMonorepoParser_CommitContainsProjectFiles_False(t *testing.T) {
 		Path: "bar",
 	}
 
-	contains, err := commitContainsProjectFiles(commit, monorepoItem)
+	contains, err := New(nil).commitContainsProjectFiles(testRepository.Storer, commit, monorepoItem)
 	checkErr(t, "checking project files", err)
 
 	assert.False(contains, "commit does not contain project files")
@@ -1331,35 +1332,97 @@ func TestParser_ComputeNewSemver_SingleBumpPerRelease_BreakingChangeWins(t *test
 	assert.True(output.NewRelease)
 }
 
-func TestParser_PathBelongsTo(t *testing.T) {
+func TestParser_CommitContainsProjectFiles_PathBoundaries(t *testing.T) {
 	assert := assertion.New(t)
 
-	// Standard case: file in directory
-	assert.True(pathBelongsTo("api/handler.go", "api"))
-	assert.True(pathBelongsTo("api/v2/handler.go", "api"))
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
 
-	// Should NOT match similar prefixes
-	assert.False(pathBelongsTo("api-v2/handler.go", "api"))
-	assert.False(pathBelongsTo("api2/handler.go", "api"))
-	assert.False(pathBelongsTo("apiserver/handler.go", "api"))
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
 
-	// Exact match
-	assert.True(pathBelongsTo("api", "api"))
+	parser := New(nil)
 
-	// Nested paths
-	assert.True(pathBelongsTo("src/components/Button.tsx", "src/components"))
-	assert.True(pathBelongsTo("src/components/forms/Input.tsx", "src/components"))
-	assert.False(pathBelongsTo("src/componentsv2/Button.tsx", "src/components"))
+	tests := []struct {
+		file  string
+		paths []string
+		want  bool
+	}{
+		// Standard case: file in directory
+		{file: "api/handler.go", paths: []string{"api"}, want: true},
+		{file: "api/v2/handler.go", paths: []string{"api"}, want: true},
+		// Should NOT match similar prefixes
+		{file: "api-v2/handler.go", paths: []string{"api"}, want: false},
+		{file: "api2/handler.go", paths: []string{"api"}, want: false},
+		{file: "apiserver/handler.go", paths: []string{"api"}, want: false},
+		// Exact match on a file path
+		{file: "README.md", paths: []string{"README.md"}, want: true},
+		// Nested paths
+		{file: "src/components/Button.tsx", paths: []string{"src/components"}, want: true},
+		{file: "src/components/forms/Input.tsx", paths: []string{"src/components"}, want: true},
+		{file: "src/componentsv2/Button.tsx", paths: []string{"src/components"}, want: false},
+		// Path traversing a file cannot match
+		{file: "lib/other.go", paths: []string{"README.md/lib"}, want: false},
+		// Multiple paths, any of them matching is enough
+		{file: "shared/util.go", paths: []string{"api", "shared"}, want: true},
+		{file: "docs/index.md", paths: []string{"api", "shared"}, want: false},
+		// Repository root is not a project path
+		{file: "root.go", paths: []string{"."}, want: false},
+		// Project with no path does not match everything
+		{file: "any/file.go", paths: nil, want: false},
+	}
 
-	// Empty dir path does not match files (must have path boundary)
-	assert.False(pathBelongsTo("file.go", ""))
-	assert.False(pathBelongsTo("nested/file.go", ""))
+	for _, tc := range tests {
+		hash, err := testRepository.AddCommitWithSpecificFile("fix", tc.file)
+		checkErr(t, "adding commit", err)
 
-	// Empty file path
-	assert.False(pathBelongsTo("", "api"))
+		commit, err := testRepository.CommitObject(hash)
+		checkErr(t, "getting commit", err)
 
-	// Both empty
-	assert.True(pathBelongsTo("", ""))
+		contains, err := parser.commitContainsProjectFiles(testRepository.Storer, commit, monorepo.Item{Name: "p", Paths: tc.paths})
+		checkErr(t, "checking project files", err)
+
+		assert.Equal(tc.want, contains, "file %q, project paths %v", tc.file, tc.paths)
+	}
+}
+
+func TestParser_CommitContainsProjectFiles_Deletion(t *testing.T) {
+	assert := assertion.New(t)
+
+	testRepository, err := gittest.NewRepository()
+	checkErr(t, "creating repository", err)
+
+	t.Cleanup(func() {
+		_ = testRepository.Remove()
+	})
+
+	_, err = testRepository.AddCommitWithSpecificFile("fix", "foo/foo.txt")
+	checkErr(t, "adding commit", err)
+
+	worktree, err := testRepository.Worktree()
+	checkErr(t, "getting worktree", err)
+
+	_, err = worktree.Remove("foo/foo.txt")
+	checkErr(t, "removing file", err)
+
+	hash, err := worktree.Commit("fix: remove foo", &git.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@test.test", When: testRepository.When()},
+	})
+	checkErr(t, "committing deletion", err)
+
+	commit, err := testRepository.CommitObject(hash)
+	checkErr(t, "getting commit", err)
+
+	parser := New(nil)
+
+	contains, err := parser.commitContainsProjectFiles(testRepository.Storer, commit, monorepo.Item{Name: "foo", Path: "foo"})
+	checkErr(t, "checking project files", err)
+	assert.True(contains, "deleting a project file should count as a project change")
+
+	contains, err = parser.commitContainsProjectFiles(testRepository.Storer, commit, monorepo.Item{Name: "bar", Path: "bar"})
+	checkErr(t, "checking project files", err)
+	assert.False(contains, "deleting a file of another project should not count as a project change")
 }
 
 func TestParser_FetchLatestPrereleaseTag_MultipleNumbers(t *testing.T) {
@@ -1473,34 +1536,4 @@ func TestShortenMessage(t *testing.T) {
 	long := shortenMessage("This is a very long commit message that exceeds fifty characters and should be truncated")
 	assert.Len(long, 50)
 	assert.True(strings.HasSuffix(long, "..."))
-}
-
-func TestFileMatchesProject(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Project with single path (paths must match file path prefix)
-	projectSinglePath := monorepo.Item{
-		Name: "api",
-		Path: "api",
-	}
-	assert.True(fileMatchesProject("api/main.go", projectSinglePath))
-	assert.False(fileMatchesProject("web/main.go", projectSinglePath))
-
-	// Project with multiple paths
-	projectMultiPath := monorepo.Item{
-		Name:  "shared",
-		Paths: []string{"lib", "common"},
-	}
-	assert.True(fileMatchesProject("lib/utils.go", projectMultiPath))
-	assert.True(fileMatchesProject("common/types.go", projectMultiPath))
-	assert.False(fileMatchesProject("api/main.go", projectMultiPath))
-
-	// Project with no path (returns false - doesn't match everything)
-	projectNoPath := monorepo.Item{
-		Name: "root",
-	}
-	assert.False(fileMatchesProject("any/file.go", projectNoPath))
-
-	// Empty file path
-	assert.False(fileMatchesProject("", projectSinglePath))
 }
