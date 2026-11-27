@@ -87,9 +87,9 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 			origin = remote.New(ctx.RemoteName, ctx.AccessToken)
 
-			repository, err = origin.Clone(args[0])
+			repository, err = origin.Open(args[0])
 			if err != nil {
-				return fmt.Errorf("cloning Git repository: %w", err)
+				return fmt.Errorf("opening Git repository: %w", err)
 			}
 
 			defer func() {

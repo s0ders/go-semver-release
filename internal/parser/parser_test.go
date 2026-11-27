@@ -721,3 +721,28 @@ func TestParser_SortBranches(t *testing.T) {
 		})
 	}
 }
+
+func TestParser_GetBranchReference(t *testing.T) {
+	repo := gittest.New(t)
+	local := repo.MustCommit(t, "feat")
+	remote := repo.MustCommit(t, "fix")
+
+	// The local "master" and its remote-tracking branch point to different commits, and "rc" is only known as a
+	// remote-tracking branch.
+	require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("master"), local)))
+	require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewRemoteReferenceName("origin", "master"), remote)))
+	require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewRemoteReferenceName("origin", "rc"), remote)))
+
+	p := New(newTestContext(t))
+
+	ref, err := p.getBranchReference(repo.Repository, "master")
+	require.NoError(t, err)
+	assert.Equal(t, local, ref.Hash(), "the local branch should be preferred")
+
+	ref, err = p.getBranchReference(repo.Repository, "rc")
+	require.NoError(t, err)
+	assert.Equal(t, remote, ref.Hash(), "a branch only known as a remote-tracking branch should be found")
+
+	_, err = p.getBranchReference(repo.Repository, "missing")
+	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
+}

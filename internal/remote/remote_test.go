@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -146,4 +147,59 @@ func TestRemote_PushTags_UnavailableRemote(t *testing.T) {
 	require.NoError(t, source.Remove())
 
 	assert.ErrorContains(t, r.PushTags("v1.0.0"), `pushing tags ["v1.0.0"]`)
+}
+
+func TestRemote_Open_LocalRepository(t *testing.T) {
+	tempDir := isolateTempDir(t)
+	source := gittest.New(t)
+	head := source.MustCommit(t, "feat")
+
+	r := New("origin", "")
+
+	repository, err := r.Open(source.Path)
+	require.NoError(t, err)
+	assert.Empty(t, clones(t, tempDir), "a local repository should be opened in place, not cloned")
+
+	_, err = repository.CreateTag("v1.0.0", head, nil)
+	require.NoError(t, err)
+	assert.True(t, source.HasTag(t, "v1.0.0"), "tags should be created in the repository itself")
+	assert.NoError(t, r.PushTags("v1.0.0"), "tags of a repository opened in place need no push")
+
+	require.NoError(t, r.Close())
+	_, err = os.Stat(filepath.Join(source.Path, ".git"))
+	assert.NoError(t, err, "closing should never remove a repository opened in place")
+}
+
+func TestRemote_Open_BareRepository(t *testing.T) {
+	source := gittest.New(t)
+	head := source.MustCommit(t, "feat")
+
+	barePath := filepath.Join(t.TempDir(), "bare.git")
+	_, err := git.PlainClone(barePath, true, &git.CloneOptions{URL: source.Path})
+	require.NoError(t, err)
+
+	r := New("origin", "")
+	t.Cleanup(func() { _ = r.Close() })
+
+	repository, err := r.Open(barePath)
+	require.NoError(t, err)
+
+	ref, err := repository.Reference(plumbing.NewBranchReferenceName("master"), true)
+	require.NoError(t, err)
+	assert.Equal(t, head, ref.Hash())
+}
+
+func TestRemote_Open_URL(t *testing.T) {
+	tempDir := isolateTempDir(t)
+	source := gittest.New(t)
+	source.MustCommit(t, "feat")
+
+	r := New("origin", "")
+
+	_, err := r.Open((&url.URL{Scheme: "file", Path: filepath.ToSlash(source.Path)}).String())
+	require.NoError(t, err)
+	assert.Len(t, clones(t, tempDir), 1, "a repository URL should be cloned")
+
+	require.NoError(t, r.Close())
+	assert.Empty(t, clones(t, tempDir), "the clone should be removed on close")
 }
