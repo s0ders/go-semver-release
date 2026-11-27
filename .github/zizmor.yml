@@ -1,0 +1,8 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # The SLSA generator must be referenced by tag for its provenance to be verifiable
+        # (https://github.com/slsa-framework/slsa-github-generator#referencing-slsa-builders-and-generators).
+        "slsa-framework/slsa-github-generator/*": ref-pin
+        "*": hash-pin

@@ -548,3 +548,21 @@ func writeFile(t *testing.T, name, content string) string {
 
 	return path
 }
+
+func TestReleaseCmd_RemovesLocalClone(t *testing.T) {
+	tempDir := t.TempDir()
+	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(env, tempDir)
+	}
+
+	repo := gittest.New(t)
+	repo.MustCommit(t, "feat")
+
+	th := NewTestHelper(t)
+	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+	th.MustRelease(t, repo.Path)
+
+	clones, err := filepath.Glob(filepath.Join(tempDir, "go-semver-release-*"))
+	require.NoError(t, err)
+	assert.Empty(t, clones, "the local clone should be removed once the release is done")
+}

@@ -21,12 +21,58 @@ func mustClone(t *testing.T, url string) (*Remote, *git.Repository) {
 
 	repository, err := r.Clone(url)
 	require.NoError(t, err)
-
-	worktree, err := repository.Worktree()
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(worktree.Filesystem.Root()) })
+	t.Cleanup(func() { _ = r.Close() })
 
 	return r, repository
+}
+
+// isolateTempDir points the system temporary directory to an empty directory for the duration of the test, and
+// returns it.
+func isolateTempDir(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(env, dir)
+	}
+
+	return dir
+}
+
+// clones lists the local clones made by Remote in the given directory.
+func clones(t *testing.T, dir string) []string {
+	t.Helper()
+
+	matches, err := filepath.Glob(filepath.Join(dir, "go-semver-release-*"))
+	require.NoError(t, err)
+
+	return matches
+}
+
+func TestRemote_Close(t *testing.T) {
+	tempDir := isolateTempDir(t)
+	source := gittest.New(t)
+
+	r := New("origin", "")
+
+	_, err := r.Clone(source.Path)
+	require.NoError(t, err)
+
+	require.Len(t, clones(t, tempDir), 1, "the clone should be in the temporary directory")
+
+	require.NoError(t, r.Close())
+	require.NoError(t, r.Close(), "closing twice should be a no-op")
+
+	assert.Empty(t, clones(t, tempDir), "the clone should have been removed")
+}
+
+func TestRemote_Clone_FailureLeavesNothing(t *testing.T) {
+	tempDir := isolateTempDir(t)
+
+	_, err := New("origin", "").Clone(filepath.Join(t.TempDir(), "does-not-exist"))
+	require.Error(t, err)
+
+	assert.Empty(t, clones(t, tempDir), "a failed clone should not leave a directory behind")
 }
 
 func TestRemote_Clone(t *testing.T) {

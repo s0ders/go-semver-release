@@ -1,0 +1,3 @@
+[default.extend-words]
+# in-toto attestation files produced by the SLSA generator (*.intoto.jsonl)
+intoto = "intoto"
