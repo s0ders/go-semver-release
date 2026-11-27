@@ -92,6 +92,12 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 				return fmt.Errorf("cloning Git repository: %w", err)
 			}
 
+			defer func() {
+				if closeErr := origin.Close(); closeErr != nil {
+					err = errors.Join(err, closeErr)
+				}
+			}()
+
 			outputs, err := parser.New(ctx).Run(repository)
 			if err != nil {
 				return fmt.Errorf("computing new semver: %w", err)
