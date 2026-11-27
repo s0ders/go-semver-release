@@ -15,5 +15,5 @@
 
 ## Miscellaneous
 
-* [Benchmark](miscelaneous/benchmark.md)
-* [How it works](miscelaneous/how-it-works.md)
+* [Benchmark](miscellaneous/benchmark.md)
+* [How it works](miscellaneous/how-it-works.md)
