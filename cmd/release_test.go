@@ -5,913 +5,428 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	assertion "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
 	"github.com/s0ders/go-semver-release/v8/internal/ci"
 	"github.com/s0ders/go-semver-release/v8/internal/gittest"
-	"github.com/s0ders/go-semver-release/v8/internal/tag"
 )
 
-// parseJSONOutput parses the structured JSON output from the release command
-func parseJSONOutput(t *testing.T, output []byte) *ci.JSONOutput {
-	var result ci.JSONOutput
-	err := json.Unmarshal(output, &result)
-	if err != nil {
-		t.Fatalf("parsing JSON output: %v\noutput was: %s", err, string(output))
+func TestReleaseCmd_Release(t *testing.T) {
+	allCommitTypes := []string{"fix", "feat!", "feat", "fix", "fix", "chores", "refactor", "test", "ci", "feat", "perf", "revert", "style"}
+
+	tests := []struct {
+		name        string
+		commits     []string
+		flags       map[string]string
+		wantVersion string
+		wantRelease bool
+		wantMessage string
+		wantTags    []string
+	}{
+		{
+			name:        "default rules",
+			commits:     allCommitTypes,
+			wantVersion: "1.0.0", wantRelease: true, wantMessage: MessageNewRelease,
+			wantTags: []string{"v1.0.0"},
+		},
+		{
+			name:        "custom rules",
+			commits:     []string{"fix", "feat"},
+			flags:       map[string]string{RulesConfiguration: `{"minor": ["feat", "fix"]}`},
+			wantVersion: "0.1.0", wantRelease: true, wantMessage: MessageNewRelease,
+			wantTags: []string{"v0.1.0"},
+		},
+		{
+			name:        "build metadata",
+			commits:     []string{"fix", "feat!"},
+			flags:       map[string]string{BuildMetadataConfiguration: "foobarbaz"},
+			wantVersion: "1.0.0+foobarbaz", wantRelease: true, wantMessage: MessageNewRelease,
+			wantTags: []string{"v1.0.0+foobarbaz"},
+		},
+		{
+			name:        "custom tag prefix",
+			commits:     []string{"feat"},
+			flags:       map[string]string{TagPrefixConfiguration: "release-"},
+			wantVersion: "0.1.0", wantRelease: true, wantMessage: MessageNewRelease,
+			wantTags: []string{"release-0.1.0"},
+		},
+		{
+			name:        "prerelease branch",
+			commits:     []string{"fix", "feat!", "feat"},
+			flags:       map[string]string{BranchesConfiguration: `[{"name": "master", "prerelease": true}]`},
+			wantVersion: "1.0.0-master.1", wantRelease: true, wantMessage: MessageNewRelease,
+			wantTags: []string{"v1.0.0-master.1"},
+		},
+		{
+			name:        "dry-run does not tag",
+			commits:     []string{"fix", "feat!"},
+			flags:       map[string]string{DryRunConfiguration: "true"},
+			wantVersion: "1.0.0", wantRelease: true, wantMessage: MessageDryRun,
+		},
+		{
+			name:        "no new release",
+			wantVersion: "0.0.0", wantMessage: MessageNoNewRelease,
+		},
 	}
-	return &result
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			repo.MustCommits(t, tc.commits...)
+
+			th := NewTestHelper(t)
+			th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+			th.MustSetFlags(t, tc.flags)
+
+			output := th.MustRelease(t, repo.Path)
+
+			require.Len(t, output.Releases, 1)
+			release := output.Releases[0]
+			assert.Equal(t, tc.wantVersion, release.Version)
+			assert.Equal(t, "master", release.Branch)
+			assert.Equal(t, tc.wantRelease, release.NewRelease)
+			assert.Equal(t, tc.wantMessage, release.Message)
+
+			assert.Equal(t, sorted(tc.wantTags), tagNames(t, repo), "tags pushed to the remote")
+		})
+	}
 }
 
-func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
-	assert := assertion.New(t)
+func TestReleaseCmd_LightweightTags(t *testing.T) {
+	repo := gittest.New(t)
+	repo.MustCommit(t, "feat")
+
 	th := NewTestHelper(t)
+	th.MustSetFlags(t, map[string]string{
+		BranchesConfiguration:        `[{"name": "master"}]`,
+		LightweightTagsConfiguration: "true",
+	})
+	th.MustRelease(t, repo.Path)
 
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
-	checkErr(t, err, "setting branches configuration")
+	ref, err := repo.Tag("v0.1.0")
+	require.NoError(t, err)
 
-	testRepository := NewTestRepository(t, []string{})
-
-	accessToken := "secret"
-	err = os.Setenv("GO_SEMVER_RELEASE_ACCESS_TOKEN", accessToken)
-	checkErr(t, err, "setting environment variable")
-
-	_, err = th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	assert.Equal(accessToken, th.Ctx.AccessToken, "access token flag value should be equal to environment variable value")
+	_, err = repo.TagObject(ref.Hash())
+	assert.ErrorIs(t, err, plumbing.ErrObjectNotFound, "a lightweight tag has no tag object")
 }
 
-// TODO: add monorepo config key
+func TestReleaseCmd_GitHubOutput(t *testing.T) {
+	repo := gittest.New(t)
+	repo.MustCommit(t, "feat")
 
-func TestReleaseCmd_ConfigurationAsFile(t *testing.T) {
-	assert := assertion.New(t)
+	th := NewTestHelper(t)
+	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+	th.MustRelease(t, repo.Path)
 
-	taggerName := "My CI Robot"
-	taggerEmail := "my-robot@release.ci"
+	got, err := os.ReadFile(os.Getenv("GITHUB_OUTPUT"))
+	require.NoError(t, err)
+	assert.Equal(t, "\nMASTER_SEMVER=v0.1.0\nMASTER_NEW_RELEASE=true\n", string(got))
+}
 
-	// Create a configuration file
-	cfgContent := []byte(`
-git-name: ` + taggerName + `
-git-email: ` + taggerEmail + `
+func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
+	repo := gittest.New(t)
+
+	repo.MustTag(t, "1.0.0", repo.MustCommit(t, "feat!"))
+	repo.MustCommits(t, "fix", "feat!", "feat", "fix", "chores", "perf")
+
+	repo.MustCheckoutBranch(t, "rc")
+	repo.MustCommits(t, "feat", "feat!", "perf")
+
+	th := NewTestHelper(t)
+	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}, {"name": "rc", "prerelease": true}]`})
+
+	output := th.MustRelease(t, repo.Path)
+
+	assert.Equal(t, 2, output.Summary.ReleaseCount)
+	assert.Equal(t, map[string]string{"master": "2.0.0", "rc": "2.0.0-rc.1"}, versionsBy(output, func(r ci.ReleaseOutput) string { return r.Branch }))
+	assert.Equal(t, []string{"1.0.0", "v2.0.0", "v2.0.0-rc.1"}, tagNames(t, repo))
+}
+
+type fileCommit struct {
+	path       string
+	commitType string
+}
+
+func TestReleaseCmd_Monorepo(t *testing.T) {
+	tests := []struct {
+		name         string
+		monorepo     string
+		commits      []fileCommit
+		wantVersions map[string]string
+		wantTags     []string
+	}{
+		{
+			name:         "every project released in a single push",
+			monorepo:     `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
+			commits:      []fileCommit{{"foo/a.txt", "feat"}, {"foo/b.txt", "fix"}, {"bar/a.txt", "feat!"}, {"bar/b.txt", "fix"}},
+			wantVersions: map[string]string{"foo": "0.1.0", "bar": "1.0.0"},
+			wantTags:     []string{"bar-v1.0.0", "foo-v0.1.0"},
+		},
+		{
+			name:         "project without release",
+			monorepo:     `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
+			commits:      []fileCommit{{"bar/a.txt", "feat!"}, {"bar/b.txt", "fix"}},
+			wantVersions: map[string]string{"foo": "0.0.0", "bar": "1.0.0"},
+			wantTags:     []string{"bar-v1.0.0"},
+		},
+		{
+			name:         "project with several paths",
+			monorepo:     `[{"name": "bar", "paths": ["bar", "bar2"]}]`,
+			commits:      []fileCommit{{"bar/a.txt", "fix"}, {"bar2/b.txt", "feat"}},
+			wantVersions: map[string]string{"bar": "0.1.0"},
+			wantTags:     []string{"bar-v0.1.0"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			for _, c := range tc.commits {
+				repo.MustCommitFile(t, c.commitType, c.path)
+			}
+
+			th := NewTestHelper(t)
+			th.MustSetFlags(t, map[string]string{
+				BranchesConfiguration: `[{"name": "master"}]`,
+				MonorepoConfiguration: tc.monorepo,
+			})
+
+			output := th.MustRelease(t, repo.Path)
+
+			assert.Equal(t, tc.wantVersions, versionsBy(output, func(r ci.ReleaseOutput) string { return r.Project }))
+			assert.Equal(t, sorted(tc.wantTags), tagNames(t, repo), "tags pushed to the remote")
+		})
+	}
+}
+
+// TestReleaseCmd_PrereleasePromotion checks that a prerelease merged into a stable branch, without any new release
+// commit, is promoted by tagging the prerelease commit.
+func TestReleaseCmd_PrereleasePromotion(t *testing.T) {
+	repo := gittest.New(t)
+
+	rcCommit := repo.MustCommit(t, "feat")
+	repo.MustTag(t, "v1.0.0-rc.3", rcCommit)
+	repo.MustCommit(t, "chore")
+
+	th := NewTestHelper(t)
+	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+
+	output := th.MustRelease(t, repo.Path)
+
+	require.Len(t, output.Releases, 1)
+	assert.Equal(t, "1.0.0", output.Releases[0].Version)
+	assert.True(t, output.Releases[0].NewRelease)
+
+	tagObject := annotatedTag(t, repo, "v1.0.0")
+	assert.Equal(t, rcCommit, tagObject.Target, "promoted version should tag the prerelease commit")
+}
+
+func TestReleaseCmd_SecondRunIsNoop(t *testing.T) {
+	repo := gittest.New(t)
+	repo.MustCommit(t, "feat")
+
+	for i, wantRelease := range []bool{true, false} {
+		th := NewTestHelper(t)
+		th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+
+		output := th.MustRelease(t, repo.Path)
+
+		require.Len(t, output.Releases, 1)
+		assert.Equal(t, "0.1.0", output.Releases[0].Version, "run %d", i+1)
+		assert.Equal(t, wantRelease, output.Releases[0].NewRelease, "run %d", i+1)
+	}
+
+	assert.Equal(t, []string{"v0.1.0"}, tagNames(t, repo))
+}
+
+// TestReleaseCmd_ExistingTagIsNoop checks that a computed tag already existing on the remote, but not reachable from
+// the released branch, is left untouched instead of failing the release.
+func TestReleaseCmd_ExistingTagIsNoop(t *testing.T) {
+	repo := gittest.New(t)
+
+	repo.MustCheckoutBranch(t, "other")
+	otherCommit := repo.MustCommit(t, "feat")
+	repo.MustTag(t, "v0.1.0", otherCommit)
+
+	repo.MustCheckout(t, "master")
+	repo.MustCommit(t, "feat")
+
+	th := NewTestHelper(t)
+	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+
+	output := th.MustRelease(t, repo.Path)
+
+	require.Len(t, output.Releases, 1)
+	assert.Equal(t, "0.1.0", output.Releases[0].Version)
+	assert.Equal(t, otherCommit, annotatedTag(t, repo, "v0.1.0").Target, "existing tag should not be moved")
+}
+
+func TestReleaseCmd_ConfigurationFile(t *testing.T) {
+	cfgFilePath := writeFile(t, "config.yml", `
+git-name: My CI Robot
+git-email: my-robot@release.ci
 tag-prefix: v
 branches:
   - name: master
   - name: alpha
     prerelease: true
+monorepo:
+  - name: foo
+    path: ./foo/
 rules:
   minor:
     - feat
   patch:
     - fix
-    - perf
-    - revert
 `)
 
-	cfgFileDirectory, err := os.MkdirTemp("", "*")
-	checkErr(t, err, "creating configuration file")
-
-	defer func() {
-		err = os.RemoveAll(cfgFileDirectory)
-		checkErr(t, err, "removing configuration file")
-	}()
-
-	cfgFilePath := filepath.Join(cfgFileDirectory, "config.yml")
-
-	err = os.WriteFile(cfgFilePath, cfgContent, 0o644)
-	checkErr(t, err, "writing configuration file")
-
-	// Create a test repository
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = os.RemoveAll(testRepository.Path)
-		checkErr(t, err, "removing repository")
-	}()
-
-	masterCommits := []string{
-		"fix",
-		"feat",
-		"feat!", // 1.0.0
-		"fix",
-	}
-
-	alphaCommits := []string{
-		"fix",
-		"feat",
-		"feat!", // 1.0.0-alpha
-		"fix",
-	}
-
-	for _, commit := range masterCommits {
-		_, err = testRepository.AddCommit(commit)
-		checkErr(t, err, "creating sample commit")
-	}
-
-	// Creating the alpha branch and associated commits
-	err = testRepository.CheckoutBranch("alpha")
-	checkErr(t, err, "checking out alpha branch")
-
-	for _, commit := range alphaCommits {
-		_, err = testRepository.AddCommit(commit)
-		checkErr(t, err, "creating sample commit")
-	}
+	repo := gittest.New(t)
+	repo.MustCommitFile(t, "feat!", "foo/a.txt")
+	repo.MustCommitFile(t, "feat", "bar/a.txt")
+	repo.MustCheckoutBranch(t, "alpha")
+	repo.MustCommitFile(t, "feat", "foo/b.txt")
 
 	th := NewTestHelper(t)
-	err = th.SetFlag("config", cfgFilePath)
-	checkErr(t, err, "setting flags")
+	th.MustSetFlags(t, map[string]string{"config": cfgFilePath})
 
-	releaseOutput, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "running release command")
+	output := th.MustRelease(t, repo.Path)
 
-	expectedMasterVersion := "1.0.0"
-	expectedMasterTag := "v" + expectedMasterVersion
-	expectedAlphaVersion := "1.0.0-alpha.1"
-	expectedAlphaTag := "v" + expectedAlphaVersion
-
-	jsonOutput := parseJSONOutput(t, releaseOutput)
-
-	// Verify summary
-	assert.Equal(2, jsonOutput.Summary.TotalCount)
-	assert.Equal(2, jsonOutput.Summary.ReleaseCount)
-	assert.True(jsonOutput.Summary.HasReleases)
-
-	// Find releases by branch
-	var masterRelease, alphaRelease *ci.ReleaseOutput
-	for i := range jsonOutput.Releases {
-		switch jsonOutput.Releases[i].Branch {
-		case "master":
-			masterRelease = &jsonOutput.Releases[i]
-		case "alpha":
-			alphaRelease = &jsonOutput.Releases[i]
-		}
+	assert.Equal(t, map[string]string{"master": "1.0.0", "alpha": "1.0.0-alpha.1"}, versionsBy(output, func(r ci.ReleaseOutput) string { return r.Branch }))
+	for _, release := range output.Releases {
+		assert.Equal(t, "foo", release.Project)
 	}
 
-	// Check master release
-	assert.NotNil(masterRelease, "master release not found in output")
-	assert.Equal(expectedMasterVersion, masterRelease.Version)
-	assert.True(masterRelease.NewRelease)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedMasterTag)
-	checkErr(t, err, "checking if master tag exists")
-	assert.Equal(true, exists, "master tag not found")
-
-	expectedTagRef, err := testRepository.Tag(expectedMasterTag)
-	checkErr(t, err, "getting master tag ref")
-
-	expectedTagObj, err := testRepository.TagObject(expectedTagRef.Hash())
-	checkErr(t, err, "getting master tag object")
-
-	assert.Equal(taggerName, expectedTagObj.Tagger.Name)
-	assert.Equal(taggerEmail, expectedTagObj.Tagger.Email)
-
-	// Check alpha release
-	assert.NotNil(alphaRelease, "alpha release not found in output")
-	assert.Equal(expectedAlphaVersion, alphaRelease.Version)
-	assert.True(alphaRelease.NewRelease)
-
-	exists, err = tag.Exists(testRepository.Repository, expectedAlphaTag)
-	checkErr(t, err, "checking if alpha tag exists")
-	assert.Equal(true, exists, "alpha tag not found")
+	tagObject := annotatedTag(t, repo, "foo-v1.0.0")
+	assert.Equal(t, "My CI Robot", tagObject.Tagger.Name)
+	assert.Equal(t, "my-robot@release.ci", tagObject.Tagger.Email)
 }
 
-func TestReleaseCmd_ConfigurationAsFlags(t *testing.T) {
-	assert := assertion.New(t)
-
-	commits := []string{
-		"fix",   // 0.1.0
-		"feat!", // 1.0.0 (breaking change)
-		"feat",
-		"fix",
+// TestReleaseCmd_ConfigurationPrecedence checks the documented precedence: flags, then environment variables, then
+// the configuration file.
+func TestReleaseCmd_ConfigurationPrecedence(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    bool
+		env     bool
+		flag    bool
+		wantTag string
+	}{
+		{name: "default", wantTag: "v0.1.0"},
+		{name: "file", file: true, wantTag: "file-0.1.0"},
+		{name: "environment over file", file: true, env: true, wantTag: "env-0.1.0"},
+		{name: "flag over environment and file", file: true, env: true, flag: true, wantTag: "flag-0.1.0"},
 	}
 
-	testRepository := NewTestRepository(t, commits)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			repo.MustCommit(t, "feat")
+
+			th := NewTestHelper(t)
+			th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+
+			if tc.file {
+				th.MustSetFlags(t, map[string]string{"config": writeFile(t, "config.yml", "tag-prefix: file-\n")})
+			}
+			if tc.env {
+				t.Setenv("GO_SEMVER_RELEASE_TAG_PREFIX", "env-")
+			}
+			if tc.flag {
+				th.MustSetFlags(t, map[string]string{TagPrefixConfiguration: "flag-"})
+			}
+
+			th.MustRelease(t, repo.Path)
+
+			assert.Equal(t, []string{tc.wantTag}, tagNames(t, repo))
+		})
+	}
+}
+
+func TestReleaseCmd_ConfigurationAsEnvironmentVariable(t *testing.T) {
+	t.Setenv("GO_SEMVER_RELEASE_ACCESS_TOKEN", "secret")
+
+	repo := gittest.New(t)
 
 	th := NewTestHelper(t)
-	err := th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		RulesConfiguration:    `{"minor": ["feat", "fix"]}`,
-	})
-	checkErr(t, err, "setting flags")
+	th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+	th.MustRelease(t, repo.Path)
 
-	output, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "1.0.0"
-	expectedTag := "v" + expectedVersion
-
-	jsonOutput := parseJSONOutput(t, output)
-	assert.Equal(1, jsonOutput.Summary.TotalCount)
-	assert.Equal(1, jsonOutput.Summary.ReleaseCount)
-	assert.True(jsonOutput.Summary.HasReleases)
-	assert.Len(jsonOutput.Releases, 1)
-
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if master tag exists")
-
-	assert.Equal(true, exists, "master tag not found")
+	assert.Equal(t, "secret", th.Ctx.AccessToken)
 }
 
-func TestReleaseCmd_LocalRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-		"feat",
-		"fix",
-		"fix",
-		"chores",
-		"refactor",
-		"test",
-		"ci",
-		"feat",
-		"perf",
-		"revert",
-		"style",
+func TestReleaseCmd_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T, th *TestHelper) (repositoryPath string)
+		wantErr string
+	}{
+		{
+			name: "invalid repository path",
+			setup: func(t *testing.T, th *TestHelper) string {
+				return filepath.Join(t.TempDir(), "does-not-exist")
+			},
+			wantErr: "cloning Git repository",
+		},
+		{
+			name: "empty repository",
+			setup: func(t *testing.T, th *TestHelper) string {
+				path := t.TempDir()
+				_, err := git.PlainInit(path, false)
+				require.NoError(t, err)
+				return path
+			},
+			wantErr: "remote repository is empty",
+		},
+		{
+			name: "read-only GitHub output",
+			setup: func(t *testing.T, th *TestHelper) string {
+				path := filepath.Join(t.TempDir(), "output")
+				require.NoError(t, os.WriteFile(path, nil, 0o444))
+				t.Setenv("GITHUB_OUTPUT", path)
+				return gittest.New(t).Path
+			},
+			wantErr: "opening ci file",
+		},
+		{
+			name: "missing GPG key",
+			setup: func(t *testing.T, th *TestHelper) string {
+				th.MustSetFlags(t, map[string]string{GPGPathConfiguration: filepath.Join(t.TempDir(), "missing.asc")})
+				return gittest.New(t).Path
+			},
+			wantErr: "reading armored key",
+		},
+		{
+			name: "invalid GPG key",
+			setup: func(t *testing.T, th *TestHelper) string {
+				th.MustSetFlags(t, map[string]string{GPGPathConfiguration: writeFile(t, "key.asc", "")})
+				return gittest.New(t).Path
+			},
+			wantErr: "loading armored key",
+		},
 	}
 
-	testRepository := NewTestRepository(t, commits)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			th := NewTestHelper(t)
+			th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
 
-	defer func() {
-		err := os.RemoveAll(testRepository.Path)
-		checkErr(t, err, "removing repository")
-	}()
-
-	th := NewTestHelper(t)
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "1.0.0"
-	expectedTag := "v" + expectedVersion
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if tag exists")
-
-	assert.Equal(true, exists, "tag not found")
-}
-
-func TestReleaseCmd_RemoteRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-		"feat",
-		"fix",
-		"fix",
-		"chores",
-		"refactor",
-		"test",
-		"ci",
-		"feat",
-		"perf",
-		"revert",
-		"style",
+			_, err := th.ExecuteCommand("release", tc.setup(t, th))
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
 	}
-
-	testRepository := NewTestRepository(t, commits)
-
-	th := NewTestHelper(t)
-	err := th.SetFlags(map[string]string{
-		BranchesConfiguration:    `[{"name": "master"}]`,
-		RemoteNameConfiguration:  "origin",
-		AccessTokenConfiguration: "",
-	})
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "1.0.0"
-	expectedTag := "v" + expectedVersion
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if tag exists")
-
-	assert.Equal(true, exists, "tag not found")
-}
-
-func TestReleaseCmd_MultiBranchRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	hash, err := testRepository.AddCommit("feat!")
-	checkErr(t, err, "creating sample commit on master")
-
-	err = testRepository.AddTag("1.0.0", hash)
-	checkErr(t, err, "creating sample tag")
-
-	// TODO: add tag 1.0.0 on master
-	// Create commits on master
-	masterCommits := []string{
-		"fix",   // 1.0.1
-		"feat!", // 2.0.0 (breaking change)
-		"feat",
-		"fix",
-		"fix",
-		"chores",
-		"refactor",
-		"test",
-		"ci",
-		"feat",
-		"perf",
-		"revert",
-		"style",
-	}
-
-	if len(masterCommits) != 0 {
-		for _, commit := range masterCommits {
-			_, err = testRepository.AddCommit(commit)
-			checkErr(t, err, "creating sample commit on master")
-		}
-	}
-
-	// Create branch rc and its commits
-	head, err := testRepository.Head()
-	checkErr(t, err, "fetching head")
-
-	rcRef := plumbing.NewHashReference("refs/heads/rc", head.Hash())
-
-	err = testRepository.Storer.SetReference(rcRef)
-	checkErr(t, err, "creating branch rc")
-
-	worktree, err := testRepository.Worktree()
-	checkErr(t, err, "fetching worktree")
-
-	branchCoOpts := git.CheckoutOptions{
-		Branch: rcRef.Name(),
-		Force:  true,
-	}
-
-	err = worktree.Checkout(&branchCoOpts)
-	checkErr(t, err, "checking out to branch rc")
-
-	rcCommits := []string{
-		"feat",
-		"feat!", // 2.0.0-rc
-		"perf",
-	}
-
-	for _, commit := range rcCommits {
-		_, err = testRepository.AddCommit(commit)
-		checkErr(t, err, "creating sample commit on rc")
-	}
-
-	th := NewTestHelper(t)
-	err = th.SetFlag(BranchesConfiguration, `[{"name": "master"}, {"name": "rc", "prerelease": true}]`)
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Equal(2, jsonOutput.Summary.TotalCount)
-	assert.Equal(2, jsonOutput.Summary.ReleaseCount)
-
-	// Find releases by branch
-	var masterRelease, rcRelease *ci.ReleaseOutput
-	for i := range jsonOutput.Releases {
-		switch jsonOutput.Releases[i].Branch {
-		case "master":
-			masterRelease = &jsonOutput.Releases[i]
-		case "rc":
-			rcRelease = &jsonOutput.Releases[i]
-		}
-	}
-
-	assert.NotNil(masterRelease)
-	assert.Equal("2.0.0", masterRelease.Version)
-	assert.True(masterRelease.NewRelease)
-
-	assert.NotNil(rcRelease)
-	assert.Equal("2.0.0-rc.1", rcRelease.Version)
-	assert.True(rcRelease.NewRelease)
-}
-
-func TestReleaseCmd_ReleaseWithMetadata(t *testing.T) {
-	assert := assertion.New(t)
-	metadata := "foobarbaz"
-
-	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-		"feat",
-		"fix",
-	}
-
-	testRepository := NewTestRepository(t, commits)
-
-	th := NewTestHelper(t)
-	err := th.SetFlags(map[string]string{
-		BuildMetadataConfiguration: metadata,
-		BranchesConfiguration:      `[{"name": "master"}]`,
-	})
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "1.0.0" + "+" + metadata
-	expectedTag := "v" + expectedVersion
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if tag exists")
-
-	assert.Equal(true, exists)
-}
-
-func TestReleaseCmd_PrereleaseBranch(t *testing.T) {
-	assert := assertion.New(t)
-
-	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-		"feat",
-		"fix",
-	}
-
-	testRepository := NewTestRepository(t, commits)
-
-	th := NewTestHelper(t)
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master", "prerelease": true}]`)
-	checkErr(t, err, "setting flags")
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "1.0.0-master.1"
-	expectedTag := "v" + expectedVersion
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if tag exists")
-
-	assert.Equal(true, exists)
-}
-
-func TestReleaseCmd_DryRunRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	commits := []string{
-		"fix",   // 0.0.1
-		"feat!", // 1.0.0 (breaking change)
-	}
-
-	testRepository := NewTestRepository(t, commits)
-
-	th := NewTestHelper(t)
-	err := th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		DryRunConfiguration:   `true`,
-	})
-	checkErr(t, err, "setting flags")
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "1.0.0"
-	expectedTag := expectedVersion
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-	assert.Equal("dry-run enabled, next release found", release.Message)
-
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	checkErr(t, err, "checking if tag exists")
-
-	assert.Equal(false, exists, "tag should not exist, running in dry-run mode")
-}
-
-func TestReleaseCmd_ReleaseNoNewVersion(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository := NewTestRepository(t, []string{})
-
-	th := NewTestHelper(t)
-	err := th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal("0.0.0", release.Version)
-	assert.Equal("master", release.Branch)
-	assert.False(release.NewRelease)
-	assert.Equal("no new release", release.Message)
-}
-
-func TestReleaseCmd_ReadOnlyGitHubOutput(t *testing.T) {
-	assert := assertion.New(t)
-
-	outputDir, err := os.MkdirTemp("./", "output-*")
-	checkErr(t, err, "creating output directory")
-
-	defer func() {
-		err = os.RemoveAll(outputDir)
-		checkErr(t, err, "removing output directory")
-	}()
-
-	outputFilePath := filepath.Join(outputDir, "output")
-
-	outputFile, err := os.OpenFile(outputFilePath, os.O_RDONLY|os.O_CREATE, 0o444)
-	checkErr(t, err, "creating output file")
-
-	defer func() {
-		err = outputFile.Close()
-		checkErr(t, err, "closing output file")
-	}()
-
-	outputPath := filepath.Join(outputDir, "output")
-
-	err = os.Setenv("GITHUB_OUTPUT", outputPath)
-	checkErr(t, err, "setting GITHUB_OUTPUT environment variable")
-
-	defer func() {
-		err = os.Unsetenv("GITHUB_OUTPUT")
-		checkErr(t, err, "unsetting GITHUB_OUTPUT environment variable")
-	}()
-
-	testRepository := NewTestRepository(t, []string{})
-
-	th := NewTestHelper(t)
-	err = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
-	checkErr(t, err, "setting flags")
-
-	_, err = th.ExecuteCommand("release", testRepository.Path)
-	assert.ErrorContains(err, "opening ci file", "should have failed trying to write GitHub output to read-only file")
-}
-
-func TestReleaseCmd_InvalidRepositoryPath(t *testing.T) {
-	assert := assertion.New(t)
-
-	th := NewTestHelper(t)
-	_ = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
-	_, err := th.ExecuteCommand("release", "./does/not/exist")
-
-	assert.ErrorContains(err, "cloning Git repository", "should have failed trying to open inexisting Git repository")
-}
-
-func TestReleaseCmd_RepositoryWithNoHead(t *testing.T) {
-	assert := assertion.New(t)
-
-	tempDirPath, err := os.MkdirTemp("", "tag-*")
-	if err != nil {
-		t.Fatalf("creating temp dir: %v", err)
-	}
-
-	defer func() {
-		err = os.RemoveAll(tempDirPath)
-		if err != nil {
-			t.Fatalf("removing temp dir: %v", err)
-		}
-	}()
-
-	_, err = git.PlainInit(tempDirPath, false)
-	if err != nil {
-		t.Fatalf("initializing repository: %v", err)
-	}
-
-	th := NewTestHelper(t)
-	err = th.SetFlag(BranchesConfiguration, `[{"name": "master"}]`)
-	checkErr(t, err, "setting flags")
-
-	_, err = th.ExecuteCommand("release", tempDirPath)
-
-	assert.Error(err, "should have failed trying to compute new semver of repository with no HEAD")
-}
-
-func TestReleaseCmd_CustomRules(t *testing.T) {
-	assert := assertion.New(t)
-
-	commits := []string{
-		"fix",  // 0.1.0 (with custom rule)
-		"feat", // 0.1.0 -> single bump per release
-	}
-
-	testRepository := NewTestRepository(t, commits)
-
-	th := NewTestHelper(t)
-	err := th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		RulesConfiguration:    `{"minor": ["feat", "fix"]}`,
-	})
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	expectedVersion := "0.1.0"
-	expectedTag := "v" + expectedVersion
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Len(jsonOutput.Releases, 1)
-	release := jsonOutput.Releases[0]
-	assert.Equal(expectedVersion, release.Version)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-
-	// Check that the tag was actually created on the repository
-	exists, err := tag.Exists(testRepository.Repository, expectedTag)
-	assert.NoError(err, "failed to check if tag exists")
-
-	assert.Equal(true, exists, "tag should exist")
-}
-
-func TestReleaseCmd_Monorepo(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = testRepository.Remove()
-		checkErr(t, err, "removing repository")
-	}()
-
-	// "foo" commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat", "./foo/foo.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/foo2.txt")
-	checkErr(t, err, "adding commit")
-
-	// "bar" commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
-	checkErr(t, err, "adding commit")
-
-	th := NewTestHelper(t)
-	err = th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		MonorepoConfiguration: `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
-	})
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Equal(2, jsonOutput.Summary.TotalCount)
-	assert.Equal(2, jsonOutput.Summary.ReleaseCount)
-
-	// Find releases by project
-	var fooRelease, barRelease *ci.ReleaseOutput
-	for i := range jsonOutput.Releases {
-		switch jsonOutput.Releases[i].Project {
-		case "foo":
-			fooRelease = &jsonOutput.Releases[i]
-		case "bar":
-			barRelease = &jsonOutput.Releases[i]
-		}
-	}
-
-	assert.NotNil(fooRelease)
-	assert.Equal("0.1.0", fooRelease.Version)
-	assert.True(fooRelease.NewRelease)
-	assert.Equal("master", fooRelease.Branch)
-
-	assert.NotNil(barRelease)
-	assert.Equal("1.0.0", barRelease.Version)
-	assert.True(barRelease.NewRelease)
-	assert.Equal("master", barRelease.Branch)
-}
-
-func TestReleaseCmd_Monorepo_MixedRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = testRepository.Remove()
-		checkErr(t, err, "removing repository")
-	}()
-
-	// "bar" commits, "foo" has no applicable commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/foo2.txt")
-	checkErr(t, err, "adding commit")
-
-	th := NewTestHelper(t)
-	err = th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		MonorepoConfiguration: `[{"name": "foo", "path": "foo"}, {"name": "bar", "path": "bar"}]`,
-	})
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Equal(2, jsonOutput.Summary.TotalCount)
-	assert.Equal(1, jsonOutput.Summary.ReleaseCount) // Only bar has a new release
-
-	// Find releases by project
-	var fooRelease, barRelease *ci.ReleaseOutput
-	for i := range jsonOutput.Releases {
-		switch jsonOutput.Releases[i].Project {
-		case "foo":
-			fooRelease = &jsonOutput.Releases[i]
-		case "bar":
-			barRelease = &jsonOutput.Releases[i]
-		}
-	}
-
-	assert.NotNil(fooRelease)
-	assert.Equal("0.0.0", fooRelease.Version)
-	assert.False(fooRelease.NewRelease)
-	assert.Equal("no new release", fooRelease.Message)
-
-	assert.NotNil(barRelease)
-	assert.Equal("1.0.0", barRelease.Version)
-	assert.True(barRelease.NewRelease)
-}
-
-func TestReleaseCmd_Monorepo_ProjectWithPaths(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = testRepository.Remove()
-		checkErr(t, err, "removing repository")
-	}()
-
-	// "bar" commits, "foo" has no applicable commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar2/foo2.txt")
-	checkErr(t, err, "adding commit")
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar2/foo2.txt")
-	checkErr(t, err, "adding commit")
-
-	th := NewTestHelper(t)
-	err = th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		MonorepoConfiguration: `[{"name": "bar", "paths": ["bar", "bar2"]}]`,
-	})
-	checkErr(t, err, "setting flags")
-
-	out, err := th.ExecuteCommand("release", testRepository.Path)
-	checkErr(t, err, "executing command")
-
-	jsonOutput := parseJSONOutput(t, out)
-	assert.Equal(1, jsonOutput.Summary.TotalCount)
-	assert.Equal(1, jsonOutput.Summary.ReleaseCount)
-	assert.Len(jsonOutput.Releases, 1)
-
-	release := jsonOutput.Releases[0]
-	assert.Equal("1.0.0", release.Version)
-	assert.Equal("bar", release.Project)
-	assert.Equal("master", release.Branch)
-	assert.True(release.NewRelease)
-}
-
-func TestReleaseCmd_Monorepo_ExclusivePathAndPaths(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	defer func() {
-		err = testRepository.Remove()
-		checkErr(t, err, "removing repository")
-	}()
-
-	// "bar" commits, "foo" has no applicable commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./bar/foo.txt")
-	checkErr(t, err, "adding commit")
-
-	th := NewTestHelper(t)
-	err = th.SetFlags(map[string]string{
-		BranchesConfiguration: `[{"name": "master"}]`,
-		MonorepoConfiguration: `[{"name": "bar", "path": "bar", "paths": ["./bar/", "./bar2/"]}]`,
-	})
-
-	// TODO: refine to target specific monorepo.ErrExclusive...
-	assert.Error(err, "should have failed trying to set exclusive path and paths")
-}
-
-func TestReleaseCmd_InvalidArmoredKeyPath(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
-
-	ctx.GPGKeyPath = "./does/not/exist"
-
-	_, err := configureGPGKey(ctx)
-
-	assert.ErrorContains(err, "reading armored key", "should have failed trying to open non existing armored GPG key")
-}
-
-func TestReleaseCmd_InvalidArmoredKeyContent(t *testing.T) {
-	assert := assertion.New(t)
-	ctx := appcontext.New()
-
-	gpgKeyDir, err := os.MkdirTemp("./", "gpg-*")
-	if err != nil {
-		t.Fatalf("failed to create temporary directory: %s", err)
-	}
-
-	defer func() {
-		err = os.RemoveAll(gpgKeyDir)
-		if err != nil {
-			t.Fatalf("failed to remove temporary directory: %s", err)
-		}
-	}()
-
-	keyFilePath := filepath.Join(gpgKeyDir, "key.asc")
-
-	keyFile, err := os.Create(keyFilePath)
-	if err != nil {
-		t.Fatalf("failed to create output file: %s", err)
-	}
-
-	defer func() {
-		err = keyFile.Close()
-		if err != nil {
-			t.Fatalf("failed to create temporary directory: %s", err)
-		}
-	}()
-
-	ctx.GPGKeyPath = keyFilePath
-
-	_, err = configureGPGKey(ctx)
-	assert.ErrorContains(err, "loading armored key", "should have failed trying to read armored key ring from empty file")
 }
 
 // Test utilities
-func NewTestRepository(t *testing.T, commits []string) *gittest.TestRepository {
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, err, "creating sample repository")
-
-	for _, commit := range commits {
-		_, err = testRepository.AddCommit(commit)
-		checkErr(t, err, "creating sample commit")
-	}
-
-	t.Cleanup(func() {
-		_ = os.RemoveAll(testRepository.Path)
-	})
-
-	return testRepository
-}
 
 type TestHelper struct {
 	Ctx        *appcontext.AppContext
@@ -919,21 +434,20 @@ type TestHelper struct {
 	ReleaseCmd *cobra.Command
 }
 
-// NewTestHelper creates a new TestHelper with a fresh AppContext and Command
+// NewTestHelper creates a new TestHelper with a fresh AppContext and Command. GitHub output is redirected to a
+// temporary file so that tests running in GitHub Actions never write to the workflow's own output.
 func NewTestHelper(t *testing.T) *TestHelper {
+	t.Helper()
+
+	t.Setenv("GITHUB_OUTPUT", filepath.Join(t.TempDir(), "github_output"))
+
 	ctx := &appcontext.AppContext{
 		Viper: viper.New(),
 	}
 	cmd := NewRootCommand(ctx)
 
-	// Find the release subcommand
-	var releaseCmd *cobra.Command
-	for _, c := range cmd.Commands() {
-		if c.Use == "release <REPOSITORY_PATH_OR_URL>" {
-			releaseCmd = c
-			break
-		}
-	}
+	releaseCmd, _, err := cmd.Find([]string{"release"})
+	require.NoError(t, err)
 
 	return &TestHelper{
 		Ctx:        ctx,
@@ -942,40 +456,95 @@ func NewTestHelper(t *testing.T) *TestHelper {
 	}
 }
 
-// SetFlag sets a flag value for the test on the release subcommand
-func (th *TestHelper) SetFlag(name string, value string) error {
-	return th.ReleaseCmd.Flags().Set(name, value)
-}
+// MustSetFlags sets the given flags on the release subcommand.
+func (th *TestHelper) MustSetFlags(t *testing.T, flags map[string]string) {
+	t.Helper()
 
-// SetFlags sets multiple flag values for the test
-func (th *TestHelper) SetFlags(flags map[string]string) error {
 	for name, value := range flags {
-		if err := th.SetFlag(name, value); err != nil {
-			return err
-		}
+		require.NoError(t, th.ReleaseCmd.Flags().Set(name, value), "setting flag %q", name)
 	}
-	return nil
 }
 
-// ExecuteCommand executes the command with given arguments
+// ExecuteCommand executes the root command with the given arguments and returns its output.
 func (th *TestHelper) ExecuteCommand(args ...string) ([]byte, error) {
-	th.Cmd.SetArgs(args)
-	return ExecuteCommand(th.Cmd, args...)
-}
-
-// ExecuteCommand is a helper function to execute a command and capture its output
-func ExecuteCommand(cmd *cobra.Command, args ...string) ([]byte, error) {
 	output := new(bytes.Buffer)
-	cmd.SetOut(output)
-	cmd.SetErr(output)
-	cmd.SetArgs(args)
-	err := cmd.Execute()
+	th.Cmd.SetOut(output)
+	th.Cmd.SetErr(output)
+	th.Cmd.SetArgs(args)
+
+	err := th.Cmd.Execute()
+
 	return output.Bytes(), err
 }
 
-func checkErr(t *testing.T, err error, message string) {
+// MustRelease runs the release command on the given repository and returns its parsed JSON output.
+func (th *TestHelper) MustRelease(t *testing.T, repositoryPath string) *ci.JSONOutput {
 	t.Helper()
-	if err != nil {
-		t.Fatalf("%s: %s", message, err)
+
+	out, err := th.ExecuteCommand("release", repositoryPath)
+	require.NoError(t, err, "running release command, output: %s", out)
+
+	var result ci.JSONOutput
+	require.NoError(t, json.Unmarshal(out, &result), "parsing JSON output: %s", out)
+
+	return &result
+}
+
+// versionsBy indexes released versions by the given key (e.g., branch or project).
+func versionsBy(output *ci.JSONOutput, key func(ci.ReleaseOutput) string) map[string]string {
+	versions := make(map[string]string, len(output.Releases))
+	for _, r := range output.Releases {
+		versions[key(r)] = r.Version
 	}
+
+	return versions
+}
+
+// tagNames returns the sorted names of every tag of the repository.
+func tagNames(t *testing.T, repo *gittest.TestRepository) []string {
+	t.Helper()
+
+	iter, err := repo.Tags()
+	require.NoError(t, err)
+
+	names := []string{}
+	require.NoError(t, iter.ForEach(func(ref *plumbing.Reference) error {
+		names = append(names, ref.Name().Short())
+		return nil
+	}))
+
+	return sorted(names)
+}
+
+func annotatedTag(t *testing.T, repo *gittest.TestRepository, name string) *object.Tag {
+	t.Helper()
+
+	ref, err := repo.Tag(name)
+	require.NoError(t, err)
+
+	tagObject, err := repo.TagObject(ref.Hash())
+	require.NoError(t, err)
+
+	return tagObject
+}
+
+func sorted(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+
+	s = slices.Clone(s)
+	slices.Sort(s)
+
+	return s
+}
+
+// writeFile writes the given content to a new file of a temporary directory and returns its path.
+func writeFile(t *testing.T, name, content string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	return path
 }

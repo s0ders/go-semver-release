@@ -107,6 +107,9 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 
 			jsonOutput := ci.NewJSONOutput()
 
+			// New tags are pushed all at once after the loop, in a single push.
+			var newTags []string
+
 			for _, output := range outputs {
 				semver := output.Semver
 				release := output.NewRelease
@@ -147,13 +150,15 @@ func NewReleaseCmd(ctx *appcontext.AppContext) *cobra.Command {
 						return fmt.Errorf("tagging repository: %w", err)
 					}
 
-					ctx.Logger.Debug().Str("tag", tagger.Format(semver)).Msg("new tag added to repository")
+					tagName := tagger.Format(semver)
+					ctx.Logger.Debug().Str("tag", tagName).Msg("new tag added to repository")
 
-					err = origin.PushTag(tagger.Format(semver))
-					if err != nil {
-						return fmt.Errorf("pushing tag to remote: %w", err)
-					}
+					newTags = append(newTags, tagName)
 				}
+			}
+
+			if err = origin.PushTags(newTags...); err != nil {
+				return fmt.Errorf("pushing tag to remote: %w", err)
 			}
 
 			if err := jsonOutput.Write(cmd.OutOrStdout()); err != nil {
@@ -261,6 +266,7 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
 				jsonStr, jsonErr := json.Marshal(val)
 				if jsonErr != nil {
 					err = fmt.Errorf("marshaling %q value: %w", configName, jsonErr)
+					return
 				}
 
 				err = flagType.Set(string(jsonStr))

@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,6 +37,10 @@ type rawConfig struct {
 	Rules    interface{} `yaml:"rules"`
 }
 
+// ErrInvalidConfiguration is returned by the validate command when the configuration file has errors. The errors
+// themselves are already printed by the command.
+var ErrInvalidConfiguration = errors.New("invalid configuration")
+
 func NewValidateCmd() *cobra.Command {
 	validateCmd := &cobra.Command{
 		Use:   "validate <CONFIGURATION_FILE_PATH>",
@@ -52,7 +58,10 @@ func NewValidateCmd() *cobra.Command {
 			printValidationResult(cmd, configPath, result)
 
 			if result.HasErrors() {
-				os.Exit(1)
+				// Validation errors were already printed, only the exit status remains to be set.
+				cmd.SilenceErrors = true
+				cmd.SilenceUsage = true
+				return ErrInvalidConfiguration
 			}
 
 			return nil
@@ -203,6 +212,24 @@ func validateMonorepo(monorepo interface{}, result *ValidationResult) {
 		path, hasPath := project["path"]
 		paths, hasPaths := project["paths"]
 
+		if hasPath && path != nil {
+			if _, ok := path.(string); !ok {
+				result.AddError("monorepo[%d]: \"path\" must be a string, got %T", i, path)
+			}
+		}
+
+		if hasPaths && paths != nil {
+			if pathsList, ok := paths.([]interface{}); !ok {
+				result.AddError("monorepo[%d]: \"paths\" must be an array of strings, got %T", i, paths)
+			} else {
+				for j, p := range pathsList {
+					if _, ok := p.(string); !ok {
+						result.AddError("monorepo[%d].paths[%d]: expected string, got %T", i, j, p)
+					}
+				}
+			}
+		}
+
 		pathSet := hasPath && path != nil && path != ""
 		pathsSet := hasPaths && paths != nil
 
@@ -233,6 +260,18 @@ func validateRules(rules interface{}, result *ValidationResult) {
 	if !ok {
 		result.AddError("rules: expected an object with \"minor\" and \"patch\" keys, got %T", rules)
 		return
+	}
+
+	releaseTypes := make([]string, 0, len(rulesMap))
+	for releaseType := range rulesMap {
+		releaseTypes = append(releaseTypes, releaseType)
+	}
+	sort.Strings(releaseTypes)
+
+	for _, releaseType := range releaseTypes {
+		if _, ok := rule.ValidReleaseTypes[releaseType]; !ok {
+			result.AddError("rules: unknown release type %q (expected \"minor\" or \"patch\")", releaseType)
+		}
 	}
 
 	seenCommitTypes := make(map[string]string)
@@ -272,9 +311,9 @@ func validateCommitType(commitType, releaseType string, seen map[string]string, 
 	if _, valid := rule.ValidCommitTypes[commitType]; !valid {
 		suggestion := suggestCommitType(commitType)
 		if suggestion != "" {
-			result.AddWarning("rules.%s: unknown commit type %q (did you mean %q?)", releaseType, commitType, suggestion)
+			result.AddError("rules.%s: unknown commit type %q (did you mean %q?)", releaseType, commitType, suggestion)
 		} else {
-			result.AddWarning("rules.%s: unknown commit type %q", releaseType, commitType)
+			result.AddError("rules.%s: unknown commit type %q", releaseType, commitType)
 		}
 		return
 	}

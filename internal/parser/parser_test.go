@@ -2,16 +2,16 @@ package parser
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"os"
-	"strings"
+	"slices"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
-	assertion "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
 	"github.com/s0ders/go-semver-release/v8/internal/branch"
@@ -21,1486 +21,703 @@ import (
 	"github.com/s0ders/go-semver-release/v8/internal/semver"
 )
 
-func TestParser_CommitTypeRegex(t *testing.T) {
-	assert := assertion.New(t)
-
-	type test struct {
-		commit     string
-		commitType string
-	}
-
-	matrix := []test{
-		{"feat: implemented foo", "feat"},
-		{"fix(foo.js): fixed foo", "fix"},
-		{"chore(api): fixed doc typos", "chore"},
-		{"test(../tests/): implemented unit tests", "test"},
-		{"ci(ci.yaml): added stages to pipeline", "ci"},
-	}
-
-	for _, item := range matrix {
-		got := conventionalCommitRegex.FindStringSubmatch(item.commit)[1]
-
-		assert.Equal(item.commitType, got, "commit type should be equal")
-	}
-}
-
-func TestParser_BreakingChangeRegex(t *testing.T) {
-	assert := assertion.New(t)
-
-	type test struct {
-		commit     string
-		isBreaking bool
-	}
-
-	matrix := []test{
-		{"feat: implemented foo", false},
-		{"fix(foo.js)!: fixed foo", true},
-		{"chore(docs): fixed doc typos BREAKING CHANGE: delete some APIs", true},
-	}
-
-	for _, item := range matrix {
-		submatch := conventionalCommitRegex.FindStringSubmatch(item.commit)
-		got := strings.Contains(submatch[3], "!") || strings.Contains(submatch[0], "BREAKING CHANGE")
-
-		assert.Equal(item.isBreaking, got, "breaking change should be equal")
-	}
-}
-
-func TestParser_FetchLatestSemverTag_NoTag(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-
-	parser := New(th.Ctx)
-
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
-	checkErr(t, "fetching latest semver tag", err)
-
-	assert.Nil(latest, "latest semver tag should be nil")
-}
-
-func TestParser_FetchLatestSemverTag_OneTag(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	head, err := testRepository.Head()
-	checkErr(t, "fetching head", err)
-
-	tagName := "1.0.0"
-
-	err = testRepository.AddTag(tagName, head.Hash())
-	checkErr(t, "creating tag", err)
-
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
-	checkErr(t, "fetching latest semver tag", err)
-
-	assert.Equal(tagName, latest.Name, "latest semver tagName should be equal")
-}
-
-func TestParser_FetchLatestSemverTag_MultipleTags(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	head, err := testRepository.Head()
-	if err != nil {
-		t.Fatalf("fetching head: %s", err)
-	}
-
-	tags := []string{"2.0.0", "2.0.1", "3.0.0", "2.5.0", "0.0.2", "0.0.1", "0.1.0", "1.0.0"}
-
-	for _, v := range tags {
-		err = testRepository.AddTag(v, head.Hash())
-		checkErr(t, "creating tag", err)
-	}
-
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
-	checkErr(t, "fetching latest semver tag", err)
-
-	want := "3.0.0"
-	assert.Equal(want, latest.Name, "latest semver tag should be equal")
-}
-
-func TestParser_FetchLatestSemverTag_LightweightTags(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Add commits
-	_, err = testRepository.AddCommit("fix")
-	checkErr(t, "adding commit", err)
-
-	hash1, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	_, err = testRepository.AddCommit("fix")
-	checkErr(t, "adding commit", err)
-
-	hash2, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	// Add lightweight tags (not annotated)
-	err = testRepository.AddLightweightTag("v1.0.0", hash1)
-	checkErr(t, "adding lightweight tag", err)
-
-	err = testRepository.AddLightweightTag("v2.0.0", hash2)
-	checkErr(t, "adding lightweight tag", err)
-
-	ref, err := testRepository.Head()
-	checkErr(t, "fetching head", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, ref)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
-	checkErr(t, "fetching latest semver tag", err)
-
-	want := "v2.0.0"
-	assert.Equal(want, latest.Name, "should find latest lightweight tag")
-}
-
-func TestParser_FetchLatestSemverTag_MixedTags(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Add commits
-	hash1, err := testRepository.AddCommit("fix")
-	checkErr(t, "adding commit", err)
-
-	hash2, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	hash3, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	// Add mixed tags: v1.0.0 (lightweight), v2.0.0 (annotated), v3.0.0 (lightweight)
-	err = testRepository.AddLightweightTag("v1.0.0", hash1)
-	checkErr(t, "adding lightweight tag", err)
-
-	err = testRepository.AddTag("v2.0.0", hash2)
-	checkErr(t, "adding annotated tag", err)
-
-	err = testRepository.AddLightweightTag("v3.0.0", hash3)
-	checkErr(t, "adding lightweight tag", err)
-
-	ref, err := testRepository.Head()
-	checkErr(t, "fetching head", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, ref)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
-	checkErr(t, "fetching latest semver tag", err)
-
-	want := "v3.0.0"
-	assert.Equal(want, latest.Name, "should find latest tag regardless of type")
-}
-
-func TestParser_ComputeNewSemver_UntaggedRepository_NoRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	want := "0.0.0"
-
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-}
-
-func TestParser_ComputeNewSemver_UntaggedRepository_PatchRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("fix")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	want := "0.0.1"
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-}
-
-func TestParser_ComputeNewSemver_UnknownReleaseType(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	invalidRules := map[string]string{
-		"feat": "unknown",
-		"fix":  "patch",
-	}
-
-	th := NewTestHelper(t)
-	th.Ctx.RulesCfg = invalidRules
-	parser := New(th.Ctx)
-
-	_, err = parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	assert.ErrorContains(err, "unknown release type")
-}
-
-func TestParser_ComputeNewSemver_UntaggedRepository_MinorRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	want := "0.1.0"
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-}
-
-func TestParser_ComputeNewSemver_UntaggedRepository_MajorRelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("feat!")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver ", err)
-
-	want := "1.0.0"
-
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_TaggedRepository(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	firstCommitHash, err := testRepository.AddCommit("feat!") // 1.0.0
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0", firstCommitHash)
-	checkErr(t, "adding tag", err)
-
-	_, err = testRepository.AddCommit("feat") // 1.1.0
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix") // Still at "1.1.0" as "feat" causes a "minor" bump which supplants the "patch" bump of "fix"
-	checkErr(t, "adding commit", err)
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver ", err)
-
-	want := "1.1.0"
-
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_UninitializedRepository(t *testing.T) {
-	assert := assertion.New(t)
-
-	tempPath, err := os.MkdirTemp("", "parser-*")
-	checkErr(t, "creating temporary directory", err)
-
-	t.Cleanup(func() {
-		_ = os.RemoveAll(tempPath)
-	})
-
-	repository, err := git.PlainInit(tempPath, false)
-	checkErr(t, "initializing repository", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	_, err = parser.ComputeNewSemver(repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	assert.ErrorIs(err, plumbing.ErrReferenceNotFound)
-}
-
-func TestParser_ComputeNewSemver_BuildMetadata(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	th.Ctx.BuildMetadata = "metadata"
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	want := semver.Version{
-		Major:    0,
-		Minor:    1,
-		Patch:    0,
-		Metadata: "metadata",
-	}
-
-	assert.Equal(want.String(), output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_Prerelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	th.Ctx.BranchesCfg[0].Prerelease = true
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	want := semver.Version{
-		Major:            0,
-		Minor:            1,
-		Patch:            0,
-		PrereleaseLabel:  "master",
-		PrereleaseNumber: 1,
-	}
-
-	assert.Equal(want.String(), output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_PrereleaseBump(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create initial prerelease tag
-	firstCommit, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("0.1.0-master.1", firstCommit)
-	checkErr(t, "adding tag", err)
-
-	// Add another commit
-	_, err = testRepository.AddCommit("fix")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	th.Ctx.BranchesCfg[0].Prerelease = true
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should bump prerelease number: 0.1.0-master.1 -> 0.1.0-master.2
-	want := "0.1.0-master.2"
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_PrereleaseAfterStable(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create stable tag
-	firstCommit, err := testRepository.AddCommit("feat!")
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0", firstCommit)
-	checkErr(t, "adding tag", err)
-
-	// Add new feature commit
-	_, err = testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	// Keep branch name as "master" since that's the actual branch in the repo
-	th.Ctx.BranchesCfg[0].Prerelease = true
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should create new prerelease for next minor: 1.1.0-master.1
-	want := "1.1.0-master.1"
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_PrereleaseBreakingChange(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create stable tag
-	firstCommit, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0", firstCommit)
-	checkErr(t, "adding tag", err)
-
-	// Add breaking change commit
-	_, err = testRepository.AddCommit("feat!")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	// Keep branch name as "master" since that's the actual branch in the repo
-	th.Ctx.BranchesCfg[0].Prerelease = true
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should create new prerelease for next major: 2.0.0-master.1
-	want := "2.0.0-master.1"
-	assert.Equal(want, output.Semver.String(), "version should be equal")
-	assert.Equal(true, output.NewRelease, "boolean should be equal")
-}
-
-func TestParser_ComputeNewSemver_PrereleasePromotion(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create a prerelease tag (simulating a merge from a prerelease branch)
-	firstCommit, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0-rc.3", firstCommit)
-	checkErr(t, "adding tag", err)
-
-	th := NewTestHelper(t)
-	// Stable branch (Prerelease = false)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should promote prerelease to stable: 1.0.0-rc.3 -> 1.0.0
-	want := "1.0.0"
-	assert.Equal(want, output.Semver.String(), "version should be promoted to stable")
-	assert.Equal(true, output.NewRelease, "should be marked as new release")
-}
-
-func TestParser_ComputeNewSemver_PrereleasePromotionWithNewCommits(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create a prerelease tag
-	firstCommit, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0-rc.3", firstCommit)
-	checkErr(t, "adding tag", err)
-
-	// Add a new patch commit after the prerelease tag
-	_, err = testRepository.AddCommit("fix")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	// Stable branch (Prerelease = false)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should bump patch and clear prerelease: 1.0.0-rc.3 -> 1.0.1
-	want := "1.0.1"
-	assert.Equal(want, output.Semver.String(), "version should be bumped and promoted")
-	assert.Equal(true, output.NewRelease, "should be marked as new release")
-}
-
-// FIXME: the "origin" name is not set when calling parser.checkoutBranch leaving remoteRef like "ref/remote/<empty>/<branch>
-func TestParser_Run_NoMonorepoOutputLength(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	_, err = testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-
-	clonedTestRepository, err := testRepository.Clone()
-	checkErr(t, "cloning test repository", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.Run(clonedTestRepository.Repository)
-	checkErr(t, "computing new semver", err)
-
-	want := semver.Version{
-		Major: 0,
-		Minor: 1,
-		Patch: 0,
-	}
-
-	assert.Len(output, 1, "parser run output should contain one element")
-	assert.Equal(want.String(), output[0].Semver.String(), "version should be equal")
-}
-
-func TestParser_ShortMessage(t *testing.T) {
-	assert := assertion.New(t)
-
-	msg := "This is a very long commit message that is over fifty character"
-	short := shortenMessage(msg)
-
-	expected := "This is a very long commit message that is over..."
-
-	assert.Equal(expected, short, "short message should be equal")
-}
-
-func TestMonorepoParser_FetchLatestSemverTagPerProjects(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	head, err := testRepository.Head()
-	checkErr(t, "fetching head", err)
-
-	wantTag := "foo-1.0.0"
-
-	err = testRepository.AddTag(wantTag, head.Hash())
-	checkErr(t, fmt.Sprintf("creating tag %q", wantTag), err)
-
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	th.Ctx.MonorepositoryCfg = []monorepo.Item{
-		{Name: "foo", Path: "foo"},
-		{Name: "bar", Path: "bar"},
-	}
-	parser := New(th.Ctx)
-
-	gotTag, err := parser.FetchLatestSemverTag(testRepository.Repository, th.Ctx.MonorepositoryCfg[0], reachable.HashSet)
-	checkErr(t, "fetching latest semver tag", err)
-
-	assert.Equal(gotTag.Name, wantTag, "should have found tag")
-}
-
-func TestMonorepoParser_CommitContainsProjectFiles_True(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	hash, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/foo.txt")
-	checkErr(t, "adding commit", err)
-
-	commit, err := testRepository.CommitObject(hash)
-	checkErr(t, "getting commit", err)
-
-	monorepoItem := monorepo.Item{
-		Name: "foo",
-		Path: "foo",
-	}
-
-	contains, err := commitContainsProjectFiles(commit, monorepoItem)
-	checkErr(t, "checking project files", err)
-
-	assert.True(contains, "commit contains project files")
-}
-
-func TestMonorepoParser_CommitContainsProjectFiles_False(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	hash, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/foo.txt")
-	checkErr(t, "adding commit", err)
-
-	commit, err := testRepository.CommitObject(hash)
-	checkErr(t, "getting commit", err)
-
-	monorepoItem := monorepo.Item{
-		Name: "bar",
-		Path: "bar",
-	}
-
-	contains, err := commitContainsProjectFiles(commit, monorepoItem)
-	checkErr(t, "checking project files", err)
-
-	assert.False(contains, "commit does not contain project files")
-}
-
-func TestParser_Run_Monorepo(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Adding "foo" project commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt")
-	checkErr(t, "adding commit", err)
-
-	// Adding "bar" project commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/foo.txt")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt")
-	checkErr(t, "adding commit", err)
-
-	// Adding unrelated commits
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./unknown/a.txt")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./temp/abc/b.txt")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	th.Ctx.MonorepositoryCfg = []monorepo.Item{
-		{Name: "foo", Path: "foo"},
-		{Name: "bar", Path: "bar"},
-	}
-	parser := New(th.Ctx)
-
-	clonedTestRepository, err := testRepository.Clone()
-	checkErr(t, "cloning test repository", err)
-
-	output, err := parser.Run(clonedTestRepository.Repository)
-	checkErr(t, "computing projects new semver", err)
-
-	assert.Len(output, 2, "parser run output should contain two elements")
-
-	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
-
-	assert.Contains(gotSemver, "1.0.0")
-	assert.Contains(gotSemver, "0.1.0")
-}
-
-func TestParser_Run_MonorepoWithPreexistingTags(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Add previous "foo" tags
-	fooCommit, err := testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt") // foo-1.0.0
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("foo-1.0.0", fooCommit)
-	checkErr(t, "adding foo tag", err)
-
-	// Add previous "bar" tags
-	barCommit, err := testRepository.AddCommitWithSpecificFile("chore!", "./bar/foo.txt")
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("bar-1.0.0", barCommit)
-	checkErr(t, "adding bar tag", err)
-
-	// Adding "foo" project commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt") // foo-2.0.0
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./foo/xyz/foo.txt") // foo-2.0.0
-	checkErr(t, "adding commit", err)
-
-	// Adding "bar" project commits
-	_, err = testRepository.AddCommitWithSpecificFile("feat", "./bar/foo.txt") // bar-1.1.0
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/foo.txt") // bar-1.1.0
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./bar/baz/xyz/bar.txt") // bar-1.1.0
-	checkErr(t, "adding commit", err)
-
-	// Adding unrelated commits
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./unknown/a.txt")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommitWithSpecificFile("fix", "./temp/abc/b.txt")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	th.Ctx.MonorepositoryCfg = []monorepo.Item{
-		{Name: "foo", Path: "foo"},
-		{Name: "bar", Path: "bar"},
-	}
-	parser := New(th.Ctx)
-
-	clonedTestRepository, err := testRepository.Clone()
-	checkErr(t, "cloning test repository", err)
-
-	output, err := parser.Run(clonedTestRepository.Repository)
-	checkErr(t, "computing projects new semver", err)
-
-	assert.Len(output, 2, "parser run output should contain two elements")
-
-	gotSemver := []string{output[0].Semver.String(), output[1].Semver.String()}
-
-	assert.Contains(gotSemver, "2.0.0")
-	assert.Contains(gotSemver, "1.1.0")
-}
-
-func TestParser_Run_InvalidBranch(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	th := NewTestHelper(t)
-	th.Ctx.BranchesCfg = []branch.Item{{Name: "does_not_exist"}}
-
-	parser := New(th.Ctx)
-
-	_, err = parser.Run(testRepository.Repository)
-	assert.ErrorIs(err, plumbing.ErrReferenceNotFound, "parser run should have failed since branch does not exist")
-}
-
-func checkErr(t *testing.T, msg string, err error) {
+// newTestContext returns an application context with the default release rules and a single stable "master" branch.
+func newTestContext(t *testing.T) *appcontext.AppContext {
 	t.Helper()
-	if err != nil {
-		t.Fatalf("%s: %s", msg, err.Error())
-	}
-}
 
-/*
-func BenchmarkParser_ComputeNewSemver(b *testing.B) {
-
-		parser := New(logger, rules)
-		testRepository, err := gittest.NewRepository()
-		if err != nil {
-			b.Fatalf("creating test repository: %s", err)
-		}
-
-		b.Cleanup(func() {
-			os.RemoveAll(testRepository.Path)
-		})
-
-		commitTypes := []string{"feat", "fix", "chore"}
-
-		for i := 1; i <= 10000; i++ {
-			commitType := commitTypes[rand.Intn(len(commitTypes))]
-			testRepository.AddCommit(commitType)
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			parser.ComputeNewSemver(testRepository.Repository, monorepo.Project{})
-		}
-	}
-*/
-
-func TestParser_FetchLatestSemverTag_DivergentBranches(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create initial commits on master
-	commit1, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0", commit1)
-	checkErr(t, "adding tag 1.0.0", err)
-
-	commit2, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.1.0", commit2)
-	checkErr(t, "adding tag 1.1.0", err)
-
-	// Create release branch from 1.1.0
-	err = testRepository.CheckoutBranch("release-1.x")
-	checkErr(t, "creating release branch", err)
-
-	// Add commits and tags on release branch
-	releaseCommit, err := testRepository.AddCommit("fix")
-	checkErr(t, "adding release commit", err)
-	err = testRepository.AddTag("1.1.1", releaseCommit)
-	checkErr(t, "adding tag 1.1.1", err)
-
-	// Switch back to master and add more commits/tags
-	worktree, err := testRepository.Worktree()
-	checkErr(t, "getting worktree", err)
-	err = worktree.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("master")})
-	checkErr(t, "checkout master", err)
-
-	commit3, err := testRepository.AddCommit("feat!")
-	checkErr(t, "adding breaking change commit", err)
-	err = testRepository.AddTag("2.0.0", commit3)
-	checkErr(t, "adding tag 2.0.0", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	// Test: from master, should see 2.0.0 as latest
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	masterReachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building master reachable commits", err)
-
-	latestFromMaster, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, masterReachable.HashSet)
-	checkErr(t, "fetching latest tag from master", err)
-	assert.Equal("2.0.0", latestFromMaster.Name, "master should see 2.0.0")
-
-	// Test: from release-1.x, should see 1.1.1 as latest (NOT 2.0.0)
-	releaseRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("release-1.x"), true)
-	checkErr(t, "getting release reference", err)
-
-	releaseReachable, err := BuildReachableCommits(testRepository.Repository, releaseRef)
-	checkErr(t, "building release reachable commits", err)
-
-	latestFromRelease, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, releaseReachable.HashSet)
-	checkErr(t, "fetching latest tag from release", err)
-	assert.Equal("1.1.1", latestFromRelease.Name, "release-1.x should see 1.1.1, not 2.0.0")
-}
-
-func TestParser_FetchLatestSemverTag_UnreachableTag(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create a commit and tag on master
-	commit1, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0", commit1)
-	checkErr(t, "adding tag 1.0.0", err)
-
-	// Create a second branch from initial commit
-	err = testRepository.CheckoutBranch("other")
-	checkErr(t, "creating other branch", err)
-
-	otherCommit, err := testRepository.AddCommit("feat")
-	checkErr(t, "adding other commit", err)
-	err = testRepository.AddTag("9.9.9", otherCommit)
-	checkErr(t, "adding unreachable tag 9.9.9", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	// From master, should see 1.0.0 (not 9.9.9 from other branch)
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	latest, err := parser.FetchLatestSemverTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet)
-	checkErr(t, "fetching latest tag", err)
-	assert.Equal("1.0.0", latest.Name, "should only see reachable tag 1.0.0, not 9.9.9")
-}
-
-func TestParser_FetchLatestSemverTag_MonorepoDivergentBranches(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Initial foo project commit and tag
-	fooCommit, err := testRepository.AddCommitWithSpecificFile("feat!", "./foo/foo.txt")
-	checkErr(t, "adding foo commit", err)
-	err = testRepository.AddTag("foo-1.0.0", fooCommit)
-	checkErr(t, "adding foo-1.0.0 tag", err)
-
-	// Create release branch
-	err = testRepository.CheckoutBranch("release-1.x")
-	checkErr(t, "creating release branch", err)
-
-	// Add patch on release
-	releaseFooCommit, err := testRepository.AddCommitWithSpecificFile("fix", "./foo/bar.txt")
-	checkErr(t, "adding release foo commit", err)
-	err = testRepository.AddTag("foo-1.0.1", releaseFooCommit)
-	checkErr(t, "adding foo-1.0.1 tag", err)
-
-	// Back to master, add major version
-	worktree, err := testRepository.Worktree()
-	checkErr(t, "getting worktree", err)
-	err = worktree.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("master")})
-	checkErr(t, "checkout master", err)
-
-	masterFooCommit, err := testRepository.AddCommitWithSpecificFile("feat!", "./foo/baz.txt")
-	checkErr(t, "adding master foo commit", err)
-	err = testRepository.AddTag("foo-2.0.0", masterFooCommit)
-	checkErr(t, "adding foo-2.0.0 tag", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-	fooProject := monorepo.Item{Name: "foo", Path: "foo"}
-
-	// From release-1.x, should see foo-1.0.1
-	releaseRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("release-1.x"), true)
-	checkErr(t, "getting release reference", err)
-
-	releaseReachable, err := BuildReachableCommits(testRepository.Repository, releaseRef)
-	checkErr(t, "building release reachable commits", err)
-
-	latestFromRelease, err := parser.FetchLatestSemverTag(testRepository.Repository, fooProject, releaseReachable.HashSet)
-	checkErr(t, "fetching latest tag from release", err)
-	assert.Equal("foo-1.0.1", latestFromRelease.Name, "release-1.x should see foo-1.0.1")
-
-	// From master, should see foo-2.0.0
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	masterReachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building master reachable commits", err)
-
-	latestFromMaster, err := parser.FetchLatestSemverTag(testRepository.Repository, fooProject, masterReachable.HashSet)
-	checkErr(t, "fetching latest tag from master", err)
-	assert.Equal("foo-2.0.0", latestFromMaster.Name, "master should see foo-2.0.0")
-}
-
-type TestHelper struct {
-	Ctx *appcontext.AppContext
-}
-
-func NewTestHelper(t *testing.T) *TestHelper {
 	ctx := &appcontext.AppContext{
 		RemoteName:  "origin",
 		BranchesCfg: []branch.Item{{Name: "master"}},
 		Logger:      zerolog.New(io.Discard),
 	}
 
-	defaultBranchRules, err := json.Marshal(rule.Default)
-	if err != nil {
-		t.Fatalf("marshalling default branch rules: %s", err)
+	defaultRules, err := json.Marshal(rule.Default)
+	require.NoError(t, err)
+	require.NoError(t, ctx.RulesCfg.Set(string(defaultRules)))
+
+	return ctx
+}
+
+// reachableFrom returns the hash set of commits reachable from the given local branch.
+func reachableFrom(t *testing.T, repo *gittest.TestRepository, branchName string) map[plumbing.Hash]struct{} {
+	t.Helper()
+
+	reachable, err := BuildReachableCommits(repo.Repository, repo.MustBranchRef(t, branchName))
+	require.NoError(t, err)
+
+	return reachable.HashSet
+}
+
+// historyStep is one step of a scripted commit history: an optional commit followed by an optional tag on the
+// latest commit (HEAD of the repository when no commit was made yet).
+type historyStep struct {
+	commit string
+	tag    string
+}
+
+// buildHistory replays the given steps on the repository and returns the hash of each step's commit, or of HEAD at
+// that point for tag-only steps.
+func buildHistory(t *testing.T, repo *gittest.TestRepository, steps []historyStep) []plumbing.Hash {
+	t.Helper()
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	last := head.Hash()
+	hashes := make([]plumbing.Hash, len(steps))
+
+	for i, step := range steps {
+		if step.commit != "" {
+			last = repo.MustCommit(t, step.commit)
+		}
+		if step.tag != "" {
+			repo.MustTag(t, step.tag, last)
+		}
+		hashes[i] = last
 	}
 
-	err = ctx.RulesCfg.Set(string(defaultBranchRules))
-	if err != nil {
-		t.Fatalf("setting default branch rules: %s", err)
+	return hashes
+}
+
+func TestParser_ParseCommitMessage(t *testing.T) {
+	tests := []struct {
+		message      string
+		conventional bool
+		commitType   string
+		breaking     bool
+	}{
+		{message: "feat: implemented foo", conventional: true, commitType: "feat"},
+		{message: "fix(foo.js): fixed foo", conventional: true, commitType: "fix"},
+		{message: "chore(api): fixed doc typos", conventional: true, commitType: "chore"},
+		{message: "test(../tests/): implemented unit tests", conventional: true, commitType: "test"},
+		{message: "ci(ci.yaml): added stages to pipeline", conventional: true, commitType: "ci"},
+		{message: "feat!: dropped the v1 API", conventional: true, commitType: "feat", breaking: true},
+		{message: "fix(foo.js)!: fixed foo", conventional: true, commitType: "fix", breaking: true},
+		{message: "chore(docs): fixed typos BREAKING CHANGE: deleted some APIs", conventional: true, commitType: "chore", breaking: true},
+		{message: "fix: renamed flag\n\nBREAKING CHANGE: --foo is now --bar", conventional: true, commitType: "fix", breaking: true},
+		{message: "Merge branch 'main' into feature"},
+		{message: "feature: not a conventional type"},
+		{message: "Feat: types are case sensitive"},
+		{message: "feat:missing space"},
+		{message: "feat: "},
 	}
 
-	return &TestHelper{
-		Ctx: ctx,
+	p := New(newTestContext(t))
+
+	for _, tc := range tests {
+		t.Run(tc.message, func(t *testing.T) {
+			commit := &object.Commit{
+				Hash:    plumbing.ComputeHash(plumbing.CommitObject, []byte(tc.message)),
+				Message: tc.message,
+			}
+
+			got := p.parseCommitMessage(commit)
+
+			assert.Equal(t, commitKind{conventional: tc.conventional, commitType: tc.commitType, breaking: tc.breaking}, got)
+		})
 	}
+}
+
+func TestParser_FetchLatestSemverTag(t *testing.T) {
+	tests := []struct {
+		name    string
+		project monorepo.Item
+		setup   func(t *testing.T, repo *gittest.TestRepository)
+		want    string
+	}{
+		{
+			name:  "no tag",
+			setup: func(t *testing.T, repo *gittest.TestRepository) {},
+		},
+		{
+			name: "highest version wins regardless of creation order",
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				head := repo.MustCommit(t, "fix")
+				for _, v := range []string{"2.0.0", "2.0.1", "3.0.0", "2.5.0", "0.0.2", "0.1.0", "1.0.0"} {
+					repo.MustTag(t, v, head)
+				}
+			},
+			want: "3.0.0",
+		},
+		{
+			name: "lightweight and annotated tags are both considered",
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				repo.MustLightweightTag(t, "v1.0.0", repo.MustCommit(t, "fix"))
+				repo.MustTag(t, "v2.0.0", repo.MustCommit(t, "feat"))
+				repo.MustLightweightTag(t, "v3.0.0", repo.MustCommit(t, "feat"))
+			},
+			want: "v3.0.0",
+		},
+		{
+			name: "non-semver tags are ignored",
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				head := repo.MustCommit(t, "fix")
+				repo.MustTag(t, "1.0.0", head)
+				repo.MustTag(t, "latest", head)
+				repo.MustTag(t, "v2", head)
+			},
+			want: "1.0.0",
+		},
+		{
+			name: "tags not pointing to a commit are ignored",
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				head := repo.MustCommit(t, "fix")
+				repo.MustTag(t, "1.0.0", head)
+
+				commit, err := repo.CommitObject(head)
+				require.NoError(t, err)
+				require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference("refs/tags/9.0.0", commit.TreeHash)))
+			},
+			want: "1.0.0",
+		},
+		{
+			name: "tags unreachable from the branch are ignored",
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				repo.MustTag(t, "1.0.0", repo.MustCommit(t, "feat"))
+				repo.MustCheckoutBranch(t, "other")
+				repo.MustTag(t, "9.9.9", repo.MustCommit(t, "feat"))
+				repo.MustCheckout(t, "master")
+			},
+			want: "1.0.0",
+		},
+		{
+			name:    "project only sees its own tags",
+			project: monorepo.Item{Name: "foo", Path: "foo"},
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				head := repo.MustCommit(t, "fix")
+				repo.MustTag(t, "foo-1.0.0", head)
+				repo.MustTag(t, "bar-2.0.0", head)
+				repo.MustTag(t, "3.0.0", head)
+			},
+			want: "foo-1.0.0",
+		},
+		{
+			name:    "project tags with a tag prefix and a prerelease",
+			project: monorepo.Item{Name: "foo", Path: "foo"},
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				head := repo.MustCommit(t, "fix")
+				repo.MustTag(t, "foo-v1.0.0", head)
+				repo.MustTag(t, "foo-v1.1.0-rc.1", head)
+			},
+			want: "foo-v1.1.0-rc.1",
+		},
+		{
+			name:    "project does not claim tags of a project sharing its name as prefix",
+			project: monorepo.Item{Name: "api", Path: "api"},
+			setup: func(t *testing.T, repo *gittest.TestRepository) {
+				head := repo.MustCommit(t, "fix")
+				repo.MustTag(t, "api-1.0.0", head)
+				repo.MustTag(t, "api-gateway-2.0.0", head)
+				repo.MustTag(t, "api-gateway-v3.0.0", head)
+			},
+			want: "api-1.0.0",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			tc.setup(t, repo)
+
+			latest, err := New(newTestContext(t)).FetchLatestSemverTag(repo.Repository, tc.project, reachableFrom(t, repo, "master"))
+			require.NoError(t, err)
+
+			if tc.want == "" {
+				assert.Nil(t, latest)
+				return
+			}
+
+			require.NotNil(t, latest)
+			assert.Equal(t, tc.want, latest.Name)
+		})
+	}
+}
+
+func TestParser_FetchLatestSemverTag_DivergentBranches(t *testing.T) {
+	tests := []struct {
+		name    string
+		project monorepo.Item
+		prefix  string
+	}{
+		{name: "repository"},
+		{name: "monorepo project", project: monorepo.Item{Name: "foo", Path: "foo"}, prefix: "foo-"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+
+			repo.MustTag(t, tc.prefix+"1.0.0", repo.MustCommitFile(t, "feat", "foo/a.txt"))
+
+			repo.MustCheckoutBranch(t, "release-1.x")
+			repo.MustTag(t, tc.prefix+"1.0.1", repo.MustCommitFile(t, "fix", "foo/b.txt"))
+
+			repo.MustCheckout(t, "master")
+			repo.MustTag(t, tc.prefix+"2.0.0", repo.MustCommitFile(t, "feat!", "foo/c.txt"))
+
+			p := New(newTestContext(t))
+
+			for branchName, want := range map[string]string{"master": "2.0.0", "release-1.x": "1.0.1"} {
+				latest, err := p.FetchLatestSemverTag(repo.Repository, tc.project, reachableFrom(t, repo, branchName))
+				require.NoError(t, err)
+				require.NotNil(t, latest)
+				assert.Equal(t, tc.prefix+want, latest.Name, "branch %q", branchName)
+			}
+		})
+	}
+}
+
+func TestParser_FetchLatestStableTag(t *testing.T) {
+	repo := gittest.New(t)
+	p := New(newTestContext(t))
+
+	latest, err := p.FetchLatestStableTag(repo.Repository, monorepo.Item{}, reachableFrom(t, repo, "master"))
+	require.NoError(t, err)
+	assert.Nil(t, latest, "no stable tag should be found in an untagged repository")
+
+	repo.MustTag(t, "1.0.0", repo.MustCommit(t, "feat"))
+	repo.MustTag(t, "1.0.5", repo.MustCommit(t, "fix"))
+	repo.MustTag(t, "1.1.0-rc.1", repo.MustCommit(t, "feat"))
+
+	latest, err = p.FetchLatestStableTag(repo.Repository, monorepo.Item{}, reachableFrom(t, repo, "master"))
+	require.NoError(t, err)
+	require.NotNil(t, latest)
+	assert.Equal(t, "1.0.5", latest.String(), "prereleases should be skipped")
+}
+
+func TestParser_FetchLatestPrereleaseTag(t *testing.T) {
+	repo := gittest.New(t)
+	for _, v := range []string{"1.0.0-rc.1", "1.0.0-rc.3", "1.0.0-rc.2", "1.0.0-beta.1", "1.0.0-beta.2", "1.1.0-rc.5", "1.0.0"} {
+		repo.MustTag(t, v, repo.MustCommit(t, "fix"))
+	}
+
+	tests := []struct {
+		core  semver.Version
+		label string
+		want  string
+	}{
+		{core: semver.Version{Major: 1}, label: "rc", want: "1.0.0-rc.3"},
+		{core: semver.Version{Major: 1}, label: "beta", want: "1.0.0-beta.2"},
+		{core: semver.Version{Major: 1, Minor: 1}, label: "rc", want: "1.1.0-rc.5"},
+		{core: semver.Version{Major: 1, Minor: 1}, label: "beta"},
+		{core: semver.Version{Major: 2}, label: "rc"},
+	}
+
+	p := New(newTestContext(t))
+	reachable := reachableFrom(t, repo, "master")
+
+	for _, tc := range tests {
+		t.Run(tc.core.String()+"-"+tc.label, func(t *testing.T) {
+			latest, err := p.FetchLatestPrereleaseTag(repo.Repository, monorepo.Item{}, reachable, &tc.core, tc.label)
+			require.NoError(t, err)
+
+			if tc.want == "" {
+				assert.Nil(t, latest)
+				return
+			}
+
+			require.NotNil(t, latest)
+			assert.Equal(t, tc.want, latest.String())
+		})
+	}
+}
+
+func TestParser_ComputeNewSemver(t *testing.T) {
+	const noReleaseCommit = -1
+
+	tests := []struct {
+		name       string
+		prerelease bool
+		metadata   string
+		history    []historyStep
+		want       string
+		newRelease bool
+		// releaseCommit is the index of the history step whose commit should be released, or noReleaseCommit.
+		releaseCommit int
+	}{
+		// Stable branch, untagged repository
+		{name: "no commit", want: "0.0.0", releaseCommit: noReleaseCommit},
+		{name: "patch", history: []historyStep{{commit: "fix"}}, want: "0.0.1", newRelease: true},
+		{name: "minor", history: []historyStep{{commit: "feat"}}, want: "0.1.0", newRelease: true},
+		{name: "major", history: []historyStep{{commit: "feat!"}}, want: "1.0.0", newRelease: true},
+		{name: "major from footer", history: []historyStep{{commit: "fix: renamed flag\n\nBREAKING CHANGE: --foo is now --bar"}}, want: "1.0.0", newRelease: true},
+		{name: "build metadata", metadata: "build.42", history: []historyStep{{commit: "feat"}}, want: "0.1.0+build.42", newRelease: true},
+		{
+			name:          "commit types without release rule",
+			history:       []historyStep{{commit: "chore"}, {commit: "docs"}, {commit: "ci"}},
+			want:          "0.0.0",
+			releaseCommit: noReleaseCommit,
+		},
+		{
+			name:          "non-conventional commits",
+			history:       []historyStep{{commit: "Update README"}},
+			want:          "0.0.0",
+			releaseCommit: noReleaseCommit,
+		},
+
+		// Stable branch, tagged repository: a single bump per release, the highest one wins
+		{
+			name:    "multiple patches bump once",
+			history: []historyStep{{commit: "feat!", tag: "1.0.0"}, {commit: "fix"}, {commit: "fix"}, {commit: "fix"}},
+			want:    "1.0.1", newRelease: true, releaseCommit: 3,
+		},
+		{
+			name:    "minor wins over patch",
+			history: []historyStep{{commit: "feat!", tag: "1.0.0"}, {commit: "fix"}, {commit: "feat"}, {commit: "fix"}},
+			want:    "1.1.0", newRelease: true, releaseCommit: 3,
+		},
+		{
+			name:    "major wins over minor and patch",
+			history: []historyStep{{commit: "feat!", tag: "1.0.0"}, {commit: "fix"}, {commit: "feat!"}, {commit: "feat"}},
+			want:    "2.0.0", newRelease: true, releaseCommit: 3,
+		},
+		{
+			name:    "released commit is the latest release commit",
+			history: []historyStep{{commit: "feat!", tag: "1.0.0"}, {commit: "feat"}, {commit: "chore"}},
+			want:    "1.1.0", newRelease: true, releaseCommit: 1,
+		},
+		{
+			name:          "no release commit since latest tag",
+			history:       []historyStep{{commit: "feat!", tag: "1.0.0"}, {commit: "chore"}},
+			want:          "1.0.0",
+			releaseCommit: noReleaseCommit,
+		},
+
+		// Stable branch, promotion of a prerelease (e.g., after merging a prerelease branch)
+		{
+			name:    "prerelease is promoted",
+			history: []historyStep{{commit: "feat", tag: "1.0.0-rc.3"}},
+			want:    "1.0.0", newRelease: true, releaseCommit: 0,
+		},
+		{
+			name:    "prerelease is promoted on the prerelease commit despite non-release commits",
+			history: []historyStep{{commit: "feat", tag: "1.0.0-rc.3"}, {commit: "chore"}},
+			want:    "1.0.0", newRelease: true, releaseCommit: 0,
+		},
+		{
+			name:    "prerelease is bumped and promoted",
+			history: []historyStep{{commit: "feat", tag: "1.0.0-rc.3"}, {commit: "fix"}},
+			want:    "1.0.1", newRelease: true, releaseCommit: 1,
+		},
+
+		// Prerelease branch
+		{
+			name:       "first prerelease",
+			prerelease: true,
+			history:    []historyStep{{commit: "feat"}},
+			want:       "0.1.0-master.1", newRelease: true,
+		},
+		{
+			name:       "prerelease number is bumped on patch",
+			prerelease: true,
+			history:    []historyStep{{commit: "feat", tag: "0.1.0-master.1"}, {commit: "fix"}},
+			want:       "0.1.0-master.2", newRelease: true, releaseCommit: 1,
+		},
+		{
+			name:       "new prerelease series on minor",
+			prerelease: true,
+			history:    []historyStep{{commit: "feat", tag: "0.1.0-master.1"}, {commit: "feat"}},
+			want:       "0.2.0-master.1", newRelease: true, releaseCommit: 1,
+		},
+		{
+			name:          "prerelease without new commit",
+			prerelease:    true,
+			history:       []historyStep{{commit: "feat", tag: "0.1.0-master.1"}},
+			want:          "0.1.0-master.1",
+			releaseCommit: noReleaseCommit,
+		},
+		{
+			name:       "prerelease after stable minor",
+			prerelease: true,
+			history:    []historyStep{{commit: "feat!", tag: "1.0.0"}, {commit: "feat"}},
+			want:       "1.1.0-master.1", newRelease: true, releaseCommit: 1,
+		},
+		{
+			name:       "prerelease after stable major",
+			prerelease: true,
+			history:    []historyStep{{commit: "feat", tag: "1.0.0"}, {commit: "feat!"}},
+			want:       "2.0.0-master.1", newRelease: true, releaseCommit: 1,
+		},
+		{
+			name:       "existing prerelease of the next version is bumped when the latest tag has another label",
+			prerelease: true,
+			history: []historyStep{
+				{commit: "feat!", tag: "1.0.0"},
+				{commit: "fix", tag: "1.0.1-master.1"},
+				{commit: "fix", tag: "1.0.1-rc.1"},
+				{commit: "fix"},
+			},
+			want: "1.0.1-master.2", newRelease: true, releaseCommit: 3,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			hashes := buildHistory(t, repo, tc.history)
+
+			ctx := newTestContext(t)
+			ctx.BuildMetadata = tc.metadata
+			ctx.BranchesCfg[0].Prerelease = tc.prerelease
+
+			output, err := New(ctx).ComputeNewSemver(repo.Repository, monorepo.Item{}, ctx.BranchesCfg[0])
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, output.Semver.String(), "version")
+			assert.Equal(t, tc.newRelease, output.NewRelease, "new release")
+			assert.Equal(t, "master", output.Branch, "branch")
+
+			wantCommit := plumbing.ZeroHash
+			if tc.releaseCommit != noReleaseCommit && len(hashes) > 0 {
+				wantCommit = hashes[tc.releaseCommit]
+			}
+			assert.Equal(t, wantCommit, output.CommitHash, "released commit")
+		})
+	}
+}
+
+func TestParser_ComputeNewSemver_UnknownReleaseType(t *testing.T) {
+	repo := gittest.New(t)
+	repo.MustCommit(t, "feat")
+
+	ctx := newTestContext(t)
+	ctx.RulesCfg = map[string]string{"feat": "unknown", "fix": "patch"}
+
+	_, err := New(ctx).ComputeNewSemver(repo.Repository, monorepo.Item{}, ctx.BranchesCfg[0])
+	assert.ErrorContains(t, err, "unknown release type")
+}
+
+func TestParser_ComputeNewSemver_UninitializedRepository(t *testing.T) {
+	repository, err := git.PlainInit(t.TempDir(), false)
+	require.NoError(t, err)
+
+	ctx := newTestContext(t)
+
+	_, err = New(ctx).ComputeNewSemver(repository, monorepo.Item{}, ctx.BranchesCfg[0])
+	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
+}
+
+func TestParser_Run(t *testing.T) {
+	repo := gittest.New(t)
+	repo.MustCommit(t, "feat")
+
+	output, err := New(newTestContext(t)).Run(repo.MustClone(t).Repository)
+	require.NoError(t, err)
+
+	require.Len(t, output, 1)
+	assert.Equal(t, "0.1.0", output[0].Semver.String())
+	assert.Equal(t, "master", output[0].Branch)
+	assert.Empty(t, output[0].Project.Name)
+	assert.True(t, output[0].NewRelease)
+}
+
+func TestParser_Run_Monorepo(t *testing.T) {
+	tests := []struct {
+		name string
+		tags bool
+		want map[string]string
+	}{
+		{name: "untagged projects", want: map[string]string{"foo": "1.0.0", "bar": "0.1.0", "baz": "0.0.0"}},
+		{name: "tagged projects", tags: true, want: map[string]string{"foo": "2.0.0", "bar": "1.1.0", "baz": "0.0.0"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+
+			if tc.tags {
+				repo.MustTag(t, "foo-1.0.0", repo.MustCommitFile(t, "feat!", "foo/init.txt"))
+				repo.MustTag(t, "bar-1.0.0", repo.MustCommitFile(t, "chore!", "bar/init.txt"))
+			}
+
+			repo.MustCommitFile(t, "feat!", "foo/foo.txt")
+			repo.MustCommitFile(t, "fix", "foo/xyz/foo.txt")
+			repo.MustCommitFile(t, "feat", "bar/foo.txt")
+			repo.MustCommitFile(t, "fix", "bar/baz/xyz/foo.txt")
+			// Commits outside of any project, or under a directory merely prefixed by a project name
+			repo.MustCommitFile(t, "feat!", "unknown/a.txt")
+			repo.MustCommitFile(t, "feat!", "bazooka/a.txt")
+
+			ctx := newTestContext(t)
+			ctx.MonorepositoryCfg = []monorepo.Item{
+				{Name: "foo", Path: "foo"},
+				{Name: "bar", Path: "bar"},
+				{Name: "baz", Path: "baz"},
+			}
+
+			output, err := New(ctx).Run(repo.MustClone(t).Repository)
+			require.NoError(t, err)
+
+			require.Len(t, output, len(ctx.MonorepositoryCfg))
+			for i, project := range ctx.MonorepositoryCfg {
+				assert.Equal(t, project.Name, output[i].Project.Name, "outputs should follow the projects order")
+				assert.Equal(t, tc.want[project.Name], output[i].Semver.String(), "project %q", project.Name)
+				assert.Equal(t, tc.want[project.Name] != "0.0.0", output[i].NewRelease, "project %q", project.Name)
+			}
+		})
+	}
+}
+
+// TestParser_Run_StableAndPrereleaseBranches checks that stable branches are processed first and that branches
+// sharing tags do not influence each other's computed versions.
+func TestParser_Run_StableAndPrereleaseBranches(t *testing.T) {
+	repo := gittest.New(t)
+
+	repo.MustTag(t, "1.0.0", repo.MustCommit(t, "feat!"))
+	repo.MustCommit(t, "feat")
+
+	repo.MustCheckoutBranch(t, "rc")
+	repo.MustCommit(t, "fix")
+	repo.MustCheckout(t, "master")
+
+	ctx := newTestContext(t)
+	ctx.BranchesCfg = []branch.Item{{Name: "rc", Prerelease: true}, {Name: "master"}}
+
+	output, err := New(ctx).Run(repo.MustClone(t).Repository)
+	require.NoError(t, err)
+
+	require.Len(t, output, 2)
+	assert.Equal(t, "master", output[0].Branch, "stable branches should be processed first")
+	assert.Equal(t, "1.1.0", output[0].Semver.String())
+	assert.Equal(t, "rc", output[1].Branch)
+	assert.Equal(t, "1.1.0-rc.1", output[1].Semver.String(), "prerelease should be computed from the shared 1.0.0 tag")
+}
+
+func TestParser_Run_InvalidBranch(t *testing.T) {
+	repo := gittest.New(t)
+
+	ctx := newTestContext(t)
+	ctx.BranchesCfg = []branch.Item{{Name: "does_not_exist"}}
+
+	_, err := New(ctx).Run(repo.Repository)
+	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
+}
+
+func TestParser_CommitContainsProjectFiles(t *testing.T) {
+	repo := gittest.New(t)
+	p := New(nil)
+
+	tests := []struct {
+		file  string
+		paths []string
+		want  bool
+	}{
+		{file: "api/handler.go", paths: []string{"api"}, want: true},
+		{file: "api/v2/handler.go", paths: []string{"api"}, want: true},
+		// Directories merely sharing a prefix with the project path
+		{file: "api-v2/handler.go", paths: []string{"api"}, want: false},
+		{file: "api2/handler.go", paths: []string{"api"}, want: false},
+		{file: "apiserver/handler.go", paths: []string{"api"}, want: false},
+		// Exact match on a file path
+		{file: "README.md", paths: []string{"README.md"}, want: true},
+		// Nested project paths
+		{file: "src/components/Button.tsx", paths: []string{"src/components"}, want: true},
+		{file: "src/components/forms/Input.tsx", paths: []string{"src/components"}, want: true},
+		{file: "src/componentsv2/Button.tsx", paths: []string{"src/components"}, want: false},
+		// A path traversing a file cannot match
+		{file: "lib/other.go", paths: []string{"README.md/lib"}, want: false},
+		// Any of several paths matching is enough
+		{file: "shared/util.go", paths: []string{"api", "shared"}, want: true},
+		{file: "docs/index.md", paths: []string{"api", "shared"}, want: false},
+		// Neither the repository root nor an empty configuration match everything
+		{file: "root.go", paths: []string{"."}, want: false},
+		{file: "any/file.go", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.file, func(t *testing.T) {
+			commit, err := repo.CommitObject(repo.MustCommitFile(t, "fix", tc.file))
+			require.NoError(t, err)
+
+			got, err := p.commitContainsProjectFiles(repo.Storer, commit, monorepo.Item{Name: "p", Paths: tc.paths})
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, got, "project paths %v", tc.paths)
+		})
+	}
+}
+
+func TestParser_CommitContainsProjectFiles_Deletion(t *testing.T) {
+	repo := gittest.New(t)
+	repo.MustCommitFile(t, "fix", "foo/foo.txt")
+
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+
+	_, err = worktree.Remove("foo/foo.txt")
+	require.NoError(t, err)
+
+	hash, err := worktree.Commit("fix: remove foo", &git.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@test.test", When: repo.When()},
+	})
+	require.NoError(t, err)
+
+	commit, err := repo.CommitObject(hash)
+	require.NoError(t, err)
+
+	p := New(nil)
+
+	got, err := p.commitContainsProjectFiles(repo.Storer, commit, monorepo.Item{Name: "foo", Path: "foo"})
+	require.NoError(t, err)
+	assert.True(t, got, "deleting a project file is a project change")
+
+	got, err = p.commitContainsProjectFiles(repo.Storer, commit, monorepo.Item{Name: "bar", Path: "bar"})
+	require.NoError(t, err)
+	assert.False(t, got, "deleting another project's file is not a project change")
+}
+
+func TestParser_CommitContainsProjectFiles_RootCommit(t *testing.T) {
+	repo := gittest.New(t)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	root, err := repo.CommitObject(head.Hash())
+	require.NoError(t, err)
+	require.Empty(t, root.ParentHashes, "the repository's first commit should have no parent")
+
+	p := New(nil)
+
+	got, err := p.commitContainsProjectFiles(repo.Storer, root, monorepo.Item{Name: "sample", Path: "sample.txt"})
+	require.NoError(t, err)
+	assert.True(t, got, "files added by the root commit are project changes")
+
+	got, err = p.commitContainsProjectFiles(repo.Storer, root, monorepo.Item{Name: "foo", Path: "foo"})
+	require.NoError(t, err)
+	assert.False(t, got)
 }
 
 func TestParser_SortBranches(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Mixed order: prerelease, stable, prerelease
-	branches := []branch.Item{
-		{Name: "rc", Prerelease: true},
-		{Name: "main", Prerelease: false},
-		{Name: "beta", Prerelease: true},
-		{Name: "develop", Prerelease: false},
+	tests := []struct {
+		name     string
+		branches []branch.Item
+		want     []string
+	}{
+		{name: "empty", branches: []branch.Item{}, want: []string{}},
+		{
+			name:     "stable first, order preserved within groups",
+			branches: []branch.Item{{Name: "rc", Prerelease: true}, {Name: "main"}, {Name: "beta", Prerelease: true}, {Name: "develop"}},
+			want:     []string{"main", "develop", "rc", "beta"},
+		},
+		{name: "all stable", branches: []branch.Item{{Name: "main"}, {Name: "develop"}}, want: []string{"main", "develop"}},
+		{
+			name:     "all prerelease",
+			branches: []branch.Item{{Name: "rc", Prerelease: true}, {Name: "beta", Prerelease: true}},
+			want:     []string{"rc", "beta"},
+		},
 	}
 
-	sorted := sortBranches(branches)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			original := slices.Clone(tc.branches)
 
-	// Stable branches should come first
-	assert.Len(sorted, 4)
-	assert.False(sorted[0].Prerelease, "first branch should be stable")
-	assert.False(sorted[1].Prerelease, "second branch should be stable")
-	assert.True(sorted[2].Prerelease, "third branch should be prerelease")
-	assert.True(sorted[3].Prerelease, "fourth branch should be prerelease")
+			got := make([]string, 0, len(tc.branches))
+			for _, b := range sortBranches(tc.branches) {
+				got = append(got, b.Name)
+			}
 
-	// Original order within groups should be preserved (stable sort)
-	assert.Equal("main", sorted[0].Name)
-	assert.Equal("develop", sorted[1].Name)
-}
-
-func TestParser_SortBranches_AllStable(t *testing.T) {
-	assert := assertion.New(t)
-
-	branches := []branch.Item{
-		{Name: "main", Prerelease: false},
-		{Name: "develop", Prerelease: false},
+			assert.Equal(t, tc.want, got)
+			assert.Equal(t, original, tc.branches, "input should not be modified")
+		})
 	}
-
-	sorted := sortBranches(branches)
-
-	assert.Len(sorted, 2)
-	assert.Equal("main", sorted[0].Name)
-	assert.Equal("develop", sorted[1].Name)
-}
-
-func TestParser_SortBranches_AllPrerelease(t *testing.T) {
-	assert := assertion.New(t)
-
-	branches := []branch.Item{
-		{Name: "rc", Prerelease: true},
-		{Name: "beta", Prerelease: true},
-	}
-
-	sorted := sortBranches(branches)
-
-	assert.Len(sorted, 2)
-	assert.Equal("rc", sorted[0].Name)
-	assert.Equal("beta", sorted[1].Name)
-}
-
-func TestParser_SortBranches_Empty(t *testing.T) {
-	assert := assertion.New(t)
-
-	branches := []branch.Item{}
-	sorted := sortBranches(branches)
-
-	assert.Len(sorted, 0)
-}
-
-func TestParser_ComputeNewSemver_SingleBumpPerRelease_MultipleFixes(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	firstCommitHash, err := testRepository.AddCommit("feat!") // 1.0.0
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0", firstCommitHash)
-	checkErr(t, "adding tag", err)
-
-	// Add multiple fix commits - should result in single patch bump
-	_, err = testRepository.AddCommit("fix: first fix")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix: second fix")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix: third fix")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should be 1.0.1, not 1.0.3 (single bump, not cumulative)
-	assert.Equal("1.0.1", output.Semver.String())
-	assert.True(output.NewRelease)
-}
-
-func TestParser_ComputeNewSemver_SingleBumpPerRelease_MixedCommits(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	firstCommitHash, err := testRepository.AddCommit("feat!") // 1.0.0
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0", firstCommitHash)
-	checkErr(t, "adding tag", err)
-
-	// Add mixed commits - feat should win over fix
-	_, err = testRepository.AddCommit("fix: a fix")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("feat: a feature")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix: another fix")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should be 1.1.0 (minor bump wins over patches)
-	assert.Equal("1.1.0", output.Semver.String())
-	assert.True(output.NewRelease)
-}
-
-func TestParser_ComputeNewSemver_SingleBumpPerRelease_BreakingChangeWins(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	firstCommitHash, err := testRepository.AddCommit("feat!") // 1.0.0
-	checkErr(t, "adding commit", err)
-
-	err = testRepository.AddTag("1.0.0", firstCommitHash)
-	checkErr(t, "adding tag", err)
-
-	// Add mixed commits - breaking change should win
-	_, err = testRepository.AddCommit("fix: a fix")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("feat: a feature")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("feat!: breaking change")
-	checkErr(t, "adding commit", err)
-	_, err = testRepository.AddCommit("fix: another fix")
-	checkErr(t, "adding commit", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	output, err := parser.ComputeNewSemver(testRepository.Repository, monorepo.Item{}, th.Ctx.BranchesCfg[0])
-	checkErr(t, "computing new semver", err)
-
-	// Should be 2.0.0 (major bump wins over minor and patch)
-	assert.Equal("2.0.0", output.Semver.String())
-	assert.True(output.NewRelease)
-}
-
-func TestParser_PathBelongsTo(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Standard case: file in directory
-	assert.True(pathBelongsTo("api/handler.go", "api"))
-	assert.True(pathBelongsTo("api/v2/handler.go", "api"))
-
-	// Should NOT match similar prefixes
-	assert.False(pathBelongsTo("api-v2/handler.go", "api"))
-	assert.False(pathBelongsTo("api2/handler.go", "api"))
-	assert.False(pathBelongsTo("apiserver/handler.go", "api"))
-
-	// Exact match
-	assert.True(pathBelongsTo("api", "api"))
-
-	// Nested paths
-	assert.True(pathBelongsTo("src/components/Button.tsx", "src/components"))
-	assert.True(pathBelongsTo("src/components/forms/Input.tsx", "src/components"))
-	assert.False(pathBelongsTo("src/componentsv2/Button.tsx", "src/components"))
-
-	// Empty dir path does not match files (must have path boundary)
-	assert.False(pathBelongsTo("file.go", ""))
-	assert.False(pathBelongsTo("nested/file.go", ""))
-
-	// Empty file path
-	assert.False(pathBelongsTo("", "api"))
-
-	// Both empty
-	assert.True(pathBelongsTo("", ""))
-}
-
-func TestParser_FetchLatestPrereleaseTag_MultipleNumbers(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create commits and tags with increasing prerelease numbers
-	commit1, err := testRepository.AddCommit("feat: first")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0-rc.1", commit1)
-	checkErr(t, "adding tag", err)
-
-	commit2, err := testRepository.AddCommit("fix: second")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0-rc.2", commit2)
-	checkErr(t, "adding tag", err)
-
-	commit3, err := testRepository.AddCommit("fix: third")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0-rc.3", commit3)
-	checkErr(t, "adding tag", err)
-
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	coreVersion := &semver.Version{Major: 1, Minor: 0, Patch: 0}
-	latest, err := parser.FetchLatestPrereleaseTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet, coreVersion, "rc")
-	checkErr(t, "fetching latest prerelease tag", err)
-
-	// Should return the highest prerelease number
-	assert.NotNil(latest)
-	assert.Equal("1.0.0-rc.3", latest.String())
-}
-
-func TestParser_FetchLatestPrereleaseTag_DifferentLabels(t *testing.T) {
-	assert := assertion.New(t)
-
-	testRepository, err := gittest.NewRepository()
-	checkErr(t, "creating repository", err)
-
-	t.Cleanup(func() {
-		_ = testRepository.Remove()
-	})
-
-	// Create commits and tags with different prerelease labels
-	commit1, err := testRepository.AddCommit("feat: first")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0-beta.1", commit1)
-	checkErr(t, "adding tag", err)
-
-	commit2, err := testRepository.AddCommit("fix: second")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0-rc.1", commit2)
-	checkErr(t, "adding tag", err)
-
-	commit3, err := testRepository.AddCommit("fix: third")
-	checkErr(t, "adding commit", err)
-	err = testRepository.AddTag("1.0.0-beta.2", commit3)
-	checkErr(t, "adding tag", err)
-
-	masterRef, err := testRepository.Reference(plumbing.NewBranchReferenceName("master"), true)
-	checkErr(t, "getting master reference", err)
-
-	reachable, err := BuildReachableCommits(testRepository.Repository, masterRef)
-	checkErr(t, "building reachable commits", err)
-
-	th := NewTestHelper(t)
-	parser := New(th.Ctx)
-
-	coreVersion := &semver.Version{Major: 1, Minor: 0, Patch: 0}
-
-	// Fetch only "rc" label
-	latestRc, err := parser.FetchLatestPrereleaseTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet, coreVersion, "rc")
-	checkErr(t, "fetching latest rc tag", err)
-
-	assert.NotNil(latestRc)
-	assert.Equal("1.0.0-rc.1", latestRc.String())
-
-	// Fetch only "beta" label
-	latestBeta, err := parser.FetchLatestPrereleaseTag(testRepository.Repository, monorepo.Item{}, reachable.HashSet, coreVersion, "beta")
-	checkErr(t, "fetching latest beta tag", err)
-
-	assert.NotNil(latestBeta)
-	assert.Equal("1.0.0-beta.2", latestBeta.String())
-}
-
-func TestShortenMessage(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Short message - no change
-	short := shortenMessage("fix: short message")
-	assert.Equal("fix: short message", short)
-
-	// Exactly 50 chars - no change
-	exact := shortenMessage("12345678901234567890123456789012345678901234567890")
-	assert.Equal("12345678901234567890123456789012345678901234567890", exact)
-
-	// Long message - truncated
-	long := shortenMessage("This is a very long commit message that exceeds fifty characters and should be truncated")
-	assert.Len(long, 50)
-	assert.True(strings.HasSuffix(long, "..."))
-}
-
-func TestFileMatchesProject(t *testing.T) {
-	assert := assertion.New(t)
-
-	// Project with single path (paths must match file path prefix)
-	projectSinglePath := monorepo.Item{
-		Name: "api",
-		Path: "api",
-	}
-	assert.True(fileMatchesProject("api/main.go", projectSinglePath))
-	assert.False(fileMatchesProject("web/main.go", projectSinglePath))
-
-	// Project with multiple paths
-	projectMultiPath := monorepo.Item{
-		Name:  "shared",
-		Paths: []string{"lib", "common"},
-	}
-	assert.True(fileMatchesProject("lib/utils.go", projectMultiPath))
-	assert.True(fileMatchesProject("common/types.go", projectMultiPath))
-	assert.False(fileMatchesProject("api/main.go", projectMultiPath))
-
-	// Project with no path (returns false - doesn't match everything)
-	projectNoPath := monorepo.Item{
-		Name: "root",
-	}
-	assert.False(fileMatchesProject("any/file.go", projectNoPath))
-
-	// Empty file path
-	assert.False(fileMatchesProject("", projectSinglePath))
 }

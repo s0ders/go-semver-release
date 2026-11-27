@@ -14,7 +14,9 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
 	"github.com/s0ders/go-semver-release/v8/internal/branch"
@@ -35,6 +37,39 @@ var conventionalCommitRegex = regexp.MustCompile(`^(build|chore|ci|docs|feat|fix
 
 type Parser struct {
 	ctx *appcontext.AppContext
+
+	// The caches below are keyed by Git object hashes, which are content addresses, so they never go stale and can
+	// safely be shared across runs and repositories.
+
+	// commitKinds memoizes the conventional commit parsing of each commit message.
+	commitKinds map[plumbing.Hash]commitKind
+	// pathEntries memoizes, per root tree hash, the tree entry found at each monitored project path.
+	pathEntries map[plumbing.Hash]map[string]pathEntry
+	// commitTrees maps commit hashes to their root tree hash, filled while walking history, so that a commit's
+	// parent tree can be found without reading the parent commit object again.
+	commitTrees map[plumbing.Hash]plumbing.Hash
+}
+
+// commitKind is the result of parsing a commit message against the Conventional Commits specification.
+type commitKind struct {
+	conventional bool
+	commitType   string
+	breaking     bool
+}
+
+// pathEntry describes the tree entry found at a given path inside a root tree, if any.
+type pathEntry struct {
+	hash  plumbing.Hash
+	mode  filemode.FileMode
+	found bool
+}
+
+// resolvedTag is a semver tag resolved to its commit and parsed version. Tags are resolved once per run and then
+// filtered per branch and project, instead of iterating and resolving every tag for each lookup.
+type resolvedTag struct {
+	name    string
+	commit  *object.Commit
+	version *semver.Version
 }
 
 // TagInfo holds information about a Git tag, supporting both annotated and lightweight tags.
@@ -44,7 +79,12 @@ type TagInfo struct {
 }
 
 func New(ctx *appcontext.AppContext) *Parser {
-	parser := &Parser{ctx: ctx}
+	parser := &Parser{
+		ctx:         ctx,
+		commitKinds: make(map[plumbing.Hash]commitKind),
+		pathEntries: make(map[plumbing.Hash]map[string]pathEntry),
+		commitTrees: make(map[plumbing.Hash]plumbing.Hash),
+	}
 
 	return parser
 }
@@ -62,13 +102,28 @@ type ComputeNewSemverOutput struct {
 func (p *Parser) Run(repository *git.Repository) ([]ComputeNewSemverOutput, error) {
 	var output []ComputeNewSemverOutput
 
+	// Tags are resolved a single time and shared by every branch and project.
+	tags, err := resolveSemverTags(repository)
+	if err != nil {
+		return nil, fmt.Errorf("computing new semver: %w", err)
+	}
+
 	// Sort branches: stable branches first, then prerelease branches
 	// This ensures prerelease branches can see stable releases when computing versions
 	sortedBranches := sortBranches(p.ctx.BranchesCfg)
 
 	for _, gitBranch := range sortedBranches {
+		// Reachable commits only depend on the branch, compute them once for all projects.
+		reachable, err := p.branchReachableCommits(repository, gitBranch)
+		if err != nil {
+			if len(p.ctx.MonorepositoryCfg) == 0 {
+				return nil, fmt.Errorf("computing new semver: %w", err)
+			}
+			return nil, fmt.Errorf("computing project %q new semver: %w", p.ctx.MonorepositoryCfg[0].Name, err)
+		}
+
 		if len(p.ctx.MonorepositoryCfg) == 0 {
-			result, err := p.ComputeNewSemver(repository, monorepo.Item{}, gitBranch)
+			result, err := p.computeNewSemver(repository, monorepo.Item{}, gitBranch, reachable, tags)
 			if err != nil {
 				return nil, fmt.Errorf("computing new semver: %w", err)
 			}
@@ -77,7 +132,7 @@ func (p *Parser) Run(repository *git.Repository) ([]ComputeNewSemverOutput, erro
 		}
 
 		for _, project := range p.ctx.MonorepositoryCfg {
-			result, err := p.ComputeNewSemver(repository, project, gitBranch)
+			result, err := p.computeNewSemver(repository, project, gitBranch, reachable, tags)
 			if err != nil {
 				return nil, fmt.Errorf("computing project %q new semver: %w", project.Name, err)
 			}
@@ -107,28 +162,53 @@ func sortBranches(branches []branch.Item) []branch.Item {
 // ComputeNewSemver returns the next, if any, semantic version number from a given Git repository by parsing its commit
 // history.
 func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.Item, gitBranch branch.Item) (ComputeNewSemverOutput, error) {
-	output := ComputeNewSemverOutput{}
+	reachable, err := p.branchReachableCommits(repository, gitBranch)
+	if err != nil {
+		return ComputeNewSemverOutput{}, err
+	}
 
+	tags, err := resolveSemverTags(repository)
+	if err != nil {
+		return ComputeNewSemverOutput{}, fmt.Errorf("fetching latest semver tag: %w", err)
+	}
+
+	return p.computeNewSemver(repository, project, gitBranch, reachable, tags)
+}
+
+// branchReachableCommits resolves the given branch reference and walks every commit reachable from it.
+func (p *Parser) branchReachableCommits(repository *git.Repository, gitBranch branch.Item) (*ReachableCommits, error) {
 	// Get branch reference without checking out
 	ref, err := p.getBranchReference(repository, gitBranch.Name)
 	if err != nil {
-		return output, fmt.Errorf("getting reference for branch %q: %w", gitBranch.Name, err)
+		return nil, fmt.Errorf("getting reference for branch %q: %w", gitBranch.Name, err)
 	}
+
+	reachable, err := BuildReachableCommits(repository, ref)
+	if err != nil {
+		return nil, fmt.Errorf("building reachable commits: %w", err)
+	}
+
+	for _, c := range reachable.Commits {
+		p.commitTrees[c.Hash] = c.TreeHash
+	}
+
+	return reachable, nil
+}
+
+func (p *Parser) computeNewSemver(
+	repository *git.Repository,
+	project monorepo.Item,
+	gitBranch branch.Item,
+	reachable *ReachableCommits,
+	tags []resolvedTag,
+) (ComputeNewSemverOutput, error) {
+	output := ComputeNewSemverOutput{}
 
 	if project.Name != "" {
 		output.Project = project
 	}
 
-	// Build reachable commits once, used for both tag lookup and history
-	reachable, err := BuildReachableCommits(repository, ref)
-	if err != nil {
-		return output, fmt.Errorf("building reachable commits: %w", err)
-	}
-
-	latestSemverTag, err := p.FetchLatestSemverTag(repository, project, reachable.HashSet)
-	if err != nil {
-		return output, fmt.Errorf("fetching latest semver tag: %w", err)
-	}
+	latestSemverTag := latestSemverTag(tags, project, reachable.HashSet)
 
 	var (
 		latestSemver *semver.Version
@@ -139,18 +219,18 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 		p.ctx.Logger.Debug().Msg("no previous tag, creating one")
 
 		latestSemver = &semver.Version{Major: 0, Minor: 0, Patch: 0}
-		// No tag means all commits are part of history
-		history = reachable.Commits
+		// No tag means all commits are part of history. The slice is shared by every project of the branch, so
+		// copy it before sorting.
+		history = append(make([]*object.Commit, 0, len(reachable.Commits)), reachable.Commits...)
 	} else {
-		p.ctx.Logger.Debug().Str("tag", latestSemverTag.Name).Msg("latest semver tag found")
+		p.ctx.Logger.Debug().Str("tag", latestSemverTag.name).Msg("latest semver tag found")
 
-		latestSemver, err = semver.NewFromString(latestSemverTag.Name)
-		if err != nil {
-			return output, fmt.Errorf("building semver from git tag: %w", err)
-		}
+		// The resolved tag is shared across branches and projects, copy its version before bumping it.
+		v := *latestSemverTag.version
+		latestSemver = &v
 
 		// Filter commits that are newer than the tagged commit
-		sinceTime := latestSemverTag.Commit.Committer.When.Add(time.Second)
+		sinceTime := latestSemverTag.commit.Committer.When.Add(time.Second)
 		for _, c := range reachable.Commits {
 			if c.Committer.When.After(sinceTime) || c.Committer.When.Equal(sinceTime) {
 				history = append(history, c)
@@ -169,7 +249,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 	var maxBumpType BumpType
 
 	for _, commit := range history {
-		processCommitOutput, err := p.ProcessCommit(commit, project)
+		processCommitOutput, err := p.ProcessCommit(repository.Storer, commit, project)
 		if err != nil {
 			return output, fmt.Errorf("parsing commit history: %w", err)
 		}
@@ -184,7 +264,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 	// Handle version computation based on branch type
 	if gitBranch.Prerelease {
 		// For prerelease branches, compute the next prerelease version
-		newVersion, err := p.computePrereleaseVersion(repository, project, reachable.HashSet, latestSemver, maxBumpType, gitBranch, newRelease)
+		newVersion, err := p.computePrereleaseVersion(tags, project, reachable.HashSet, latestSemver, maxBumpType, gitBranch, newRelease)
 		if err != nil {
 			return output, fmt.Errorf("computing prerelease version: %w", err)
 		}
@@ -208,8 +288,11 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 				Str("from", latestSemver.String()).
 				Msg("promoting prerelease to stable release")
 			latestSemver.ClearPrerelease()
-			if !newRelease {
-				newRelease = true
+			newRelease = true
+
+			// Without any release commit since the prerelease, the promoted version tags the prerelease's commit.
+			if commitHash.IsZero() {
+				commitHash = latestSemverTag.commit.Hash
 			}
 		}
 	}
@@ -227,7 +310,7 @@ func (p *Parser) ComputeNewSemver(repository *git.Repository, project monorepo.I
 // computePrereleaseVersion computes the next prerelease version for a prerelease branch.
 // It follows the standard semver prerelease numbering scheme: X.Y.Z-label.N
 func (p *Parser) computePrereleaseVersion(
-	repository *git.Repository,
+	tags []resolvedTag,
 	project monorepo.Item,
 	reachableHashSet map[plumbing.Hash]struct{},
 	latestSemver *semver.Version,
@@ -280,10 +363,7 @@ func (p *Parser) computePrereleaseVersion(
 	// We need to compute the next version based on the stable version
 
 	// First, get the latest stable version
-	latestStable, err := p.FetchLatestStableTag(repository, project, reachableHashSet)
-	if err != nil {
-		return nil, fmt.Errorf("fetching latest stable tag: %w", err)
-	}
+	latestStable := latestStableTag(tags, project, reachableHashSet)
 
 	var baseVersion *semver.Version
 	if latestStable == nil {
@@ -312,10 +392,7 @@ func (p *Parser) computePrereleaseVersion(
 	}
 
 	// Check if there's already a prerelease for this version
-	existingPrerelease, err := p.FetchLatestPrereleaseTag(repository, project, reachableHashSet, nextVersion, prereleaseLabel)
-	if err != nil {
-		return nil, fmt.Errorf("fetching existing prerelease: %w", err)
-	}
+	existingPrerelease := latestPrereleaseTag(tags, project, reachableHashSet, nextVersion, prereleaseLabel)
 
 	if existingPrerelease != nil {
 		// There's already a prerelease for this version, bump the number
@@ -337,20 +414,20 @@ type ProcessCommitOutput struct {
 }
 
 // ProcessCommit parse a commit message and bump the latest semantic version accordingly.
-func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Item) (ProcessCommitOutput, error) {
+func (p *Parser) ProcessCommit(s storer.EncodedObjectStorer, commit *object.Commit, project monorepo.Item) (ProcessCommitOutput, error) {
 	output := ProcessCommitOutput{
 		NewRelease: false,
 		CommitHash: plumbing.ZeroHash,
 		BumpType:   BumpNone,
 	}
 
-	match := conventionalCommitRegex.FindStringSubmatch(commit.Message)
-	if match == nil {
+	kind := p.parseCommitMessage(commit)
+	if !kind.conventional {
 		return output, nil
 	}
 
 	if project.Name != "" {
-		containsProjectFiles, err := commitContainsProjectFiles(commit, project)
+		containsProjectFiles, err := p.commitContainsProjectFiles(s, commit, project)
 		if err != nil {
 			return output, fmt.Errorf("checking if commit contains project files: %w", err)
 		}
@@ -359,10 +436,9 @@ func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Item) (Pr
 		}
 	}
 
-	breakingChange := match[3] == "!" || strings.Contains(commit.Message, "BREAKING CHANGE")
-	commitType := match[1]
+	commitType := kind.commitType
 
-	if breakingChange {
+	if kind.breaking {
 		output.BumpType = BumpMajor
 		output.NewRelease = true
 		output.CommitHash = commit.Hash
@@ -390,6 +466,27 @@ func (p *Parser) ProcessCommit(commit *object.Commit, project monorepo.Item) (Pr
 	return output, nil
 }
 
+// parseCommitMessage parses a commit message against the Conventional Commits specification. Results are memoized
+// per commit hash since the same commit is evaluated for every project and every branch containing it.
+func (p *Parser) parseCommitMessage(commit *object.Commit) commitKind {
+	if kind, ok := p.commitKinds[commit.Hash]; ok {
+		return kind
+	}
+
+	var kind commitKind
+	if match := conventionalCommitRegex.FindStringSubmatch(commit.Message); match != nil {
+		kind = commitKind{
+			conventional: true,
+			commitType:   match[1],
+			breaking:     match[3] == "!" || strings.Contains(commit.Message, "BREAKING CHANGE"),
+		}
+	}
+
+	p.commitKinds[commit.Hash] = kind
+
+	return kind
+}
+
 // resolveTagToCommit resolves a tag reference to its commit, handling both annotated and lightweight tags.
 // For annotated tags, it dereferences the tag object to get the commit.
 // For lightweight tags, the reference points directly to the commit.
@@ -405,28 +502,20 @@ func resolveTagToCommit(repository *git.Repository, ref *plumbing.Reference) (*o
 	return repository.CommitObject(ref.Hash())
 }
 
-// FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
-// among all tags reachable from the given branch. The reachableHashSet should contain all commit hashes reachable
-// from the branch reference. Supports both annotated and lightweight tags.
-func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*TagInfo, error) {
+// resolveSemverTags lists every semver tag of the repository, resolved to its commit and parsed. Tags that do not
+// point to a commit (e.g., trees or blobs) are skipped.
+func resolveSemverTags(repository *git.Repository) ([]resolvedTag, error) {
 	tags, err := repository.Tags()
 	if err != nil {
 		return nil, fmt.Errorf("fetching tags: %w", err)
 	}
 
-	var (
-		latestSemver *semver.Version
-		latestTag    *TagInfo
-	)
+	var resolved []resolvedTag
 
 	err = tags.ForEach(func(ref *plumbing.Reference) error {
 		tagName := ref.Name().Short()
 
 		if !semver.Regex.MatchString(tagName) {
-			return nil
-		}
-
-		if project.Name != "" && !strings.HasPrefix(tagName, project.Name+"-") {
 			return nil
 		}
 
@@ -437,137 +526,151 @@ func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monore
 			return nil
 		}
 
-		// Check if tag's commit is reachable from the branch
-		if _, isReachable := reachableHashSet[tagCommit.Hash]; !isReachable {
-			return nil
-		}
-
-		currentSemver, err := semver.NewFromString(tagName)
+		version, err := semver.NewFromString(tagName)
 		if err != nil {
 			return fmt.Errorf("converting tag to semver: %w", err)
 		}
 
-		if latestSemver == nil || semver.Compare(latestSemver, currentSemver) == -1 {
-			latestSemver = currentSemver
-			latestTag = &TagInfo{Name: tagName, Commit: tagCommit}
-		}
+		resolved = append(resolved, resolvedTag{name: tagName, commit: tagCommit, version: version})
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("looping over tags: %w", err)
 	}
 
-	return latestTag, nil
+	return resolved, nil
+}
+
+// candidateTags yields the tags belonging to the given project whose commit is reachable from the branch.
+func candidateTags(tags []resolvedTag, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}, yield func(t *resolvedTag)) {
+	prefix := project.Name + "-"
+
+	for i := range tags {
+		t := &tags[i]
+
+		if project.Name != "" && !isProjectTag(t.name, prefix) {
+			continue
+		}
+
+		if _, isReachable := reachableHashSet[t.commit.Hash]; !isReachable {
+			continue
+		}
+
+		yield(t)
+	}
+}
+
+// isProjectTag reports whether a tag, formatted as "<project>-<tag prefix><version>", belongs to the project whose
+// tags start with the given "<project>-" prefix. The tag prefix between the project and the version may not contain a
+// dash, so that project "api" does not claim the tags of project "api-gateway" (e.g., "api-gateway-1.0.0").
+func isProjectTag(tagName, projectPrefix string) bool {
+	rest, ok := strings.CutPrefix(tagName, projectPrefix)
+	if !ok {
+		return false
+	}
+
+	loc := semver.Regex.FindStringIndex(rest)
+
+	return loc != nil && !strings.Contains(rest[:loc[0]], "-")
+}
+
+// latestSemverTag returns the tag with the highest semver among the given project's tags reachable from the branch.
+func latestSemverTag(tags []resolvedTag, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) *resolvedTag {
+	var latest *resolvedTag
+
+	candidateTags(tags, project, reachableHashSet, func(t *resolvedTag) {
+		if latest == nil || semver.Compare(latest.version, t.version) == -1 {
+			latest = t
+		}
+	})
+
+	return latest
+}
+
+// latestStableTag returns a copy of the highest non-prerelease version among the given project's reachable tags.
+func latestStableTag(tags []resolvedTag, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) *semver.Version {
+	var latest *semver.Version
+
+	candidateTags(tags, project, reachableHashSet, func(t *resolvedTag) {
+		if t.version.HasPrerelease() {
+			return
+		}
+
+		if latest == nil || semver.Compare(latest, t.version) == -1 {
+			latest = t.version
+		}
+	})
+
+	return copyVersion(latest)
+}
+
+// latestPrereleaseTag returns a copy of the highest prerelease version with the given label and core version among
+// the given project's reachable tags.
+func latestPrereleaseTag(tags []resolvedTag, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}, coreVersion *semver.Version, label string) *semver.Version {
+	var latest *semver.Version
+
+	candidateTags(tags, project, reachableHashSet, func(t *resolvedTag) {
+		// Must be a prerelease with matching label and the same core version (major.minor.patch)
+		if !t.version.HasPrerelease() || t.version.PrereleaseLabel != label || !t.version.SameCoreVersion(coreVersion) {
+			return
+		}
+
+		if latest == nil || semver.Compare(latest, t.version) == -1 {
+			latest = t.version
+		}
+	})
+
+	return copyVersion(latest)
+}
+
+func copyVersion(v *semver.Version) *semver.Version {
+	if v == nil {
+		return nil
+	}
+
+	c := *v
+
+	return &c
+}
+
+// FetchLatestSemverTag parses a Git repository to fetch the tag corresponding to the highest semantic version number
+// among all tags reachable from the given branch. The reachableHashSet should contain all commit hashes reachable
+// from the branch reference. Supports both annotated and lightweight tags.
+func (p *Parser) FetchLatestSemverTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*TagInfo, error) {
+	tags, err := resolveSemverTags(repository)
+	if err != nil {
+		return nil, err
+	}
+
+	latest := latestSemverTag(tags, project, reachableHashSet)
+	if latest == nil {
+		return nil, nil
+	}
+
+	return &TagInfo{Name: latest.name, Commit: latest.commit}, nil
 }
 
 // FetchLatestStableTag fetches the latest stable (non-prerelease) semver tag reachable from the branch.
 // Supports both annotated and lightweight tags.
 func (p *Parser) FetchLatestStableTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}) (*semver.Version, error) {
-	tags, err := repository.Tags()
+	tags, err := resolveSemverTags(repository)
 	if err != nil {
-		return nil, fmt.Errorf("fetching tags: %w", err)
+		return nil, err
 	}
 
-	var latestStable *semver.Version
-
-	err = tags.ForEach(func(ref *plumbing.Reference) error {
-		tagName := ref.Name().Short()
-
-		if !semver.Regex.MatchString(tagName) {
-			return nil
-		}
-
-		if project.Name != "" && !strings.HasPrefix(tagName, project.Name+"-") {
-			return nil
-		}
-
-		tagCommit, err := resolveTagToCommit(repository, ref)
-		if err != nil {
-			return nil
-		}
-
-		if _, isReachable := reachableHashSet[tagCommit.Hash]; !isReachable {
-			return nil
-		}
-
-		currentSemver, err := semver.NewFromString(tagName)
-		if err != nil {
-			return fmt.Errorf("converting tag to semver: %w", err)
-		}
-
-		// Skip prerelease versions
-		if currentSemver.HasPrerelease() {
-			return nil
-		}
-
-		if latestStable == nil || semver.Compare(latestStable, currentSemver) == -1 {
-			latestStable = currentSemver
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("looping over tags: %w", err)
-	}
-
-	return latestStable, nil
+	return latestStableTag(tags, project, reachableHashSet), nil
 }
 
 // FetchLatestPrereleaseTag fetches the latest prerelease tag for a given core version and prerelease label.
 // For example, if coreVersion is 1.2.0 and label is "rc", it will find the highest rc.N tag for 1.2.0.
 // Supports both annotated and lightweight tags.
 func (p *Parser) FetchLatestPrereleaseTag(repository *git.Repository, project monorepo.Item, reachableHashSet map[plumbing.Hash]struct{}, coreVersion *semver.Version, label string) (*semver.Version, error) {
-	tags, err := repository.Tags()
+	tags, err := resolveSemverTags(repository)
 	if err != nil {
-		return nil, fmt.Errorf("fetching tags: %w", err)
+		return nil, err
 	}
 
-	var latestPrerelease *semver.Version
-
-	err = tags.ForEach(func(ref *plumbing.Reference) error {
-		tagName := ref.Name().Short()
-
-		if !semver.Regex.MatchString(tagName) {
-			return nil
-		}
-
-		if project.Name != "" && !strings.HasPrefix(tagName, project.Name+"-") {
-			return nil
-		}
-
-		tagCommit, err := resolveTagToCommit(repository, ref)
-		if err != nil {
-			return nil
-		}
-
-		if _, isReachable := reachableHashSet[tagCommit.Hash]; !isReachable {
-			return nil
-		}
-
-		currentSemver, err := semver.NewFromString(tagName)
-		if err != nil {
-			return fmt.Errorf("converting tag to semver: %w", err)
-		}
-
-		// Must be a prerelease with matching label
-		if !currentSemver.HasPrerelease() || currentSemver.PrereleaseLabel != label {
-			return nil
-		}
-
-		// Must have the same core version (major.minor.patch)
-		if !currentSemver.SameCoreVersion(coreVersion) {
-			return nil
-		}
-
-		if latestPrerelease == nil || semver.Compare(latestPrerelease, currentSemver) == -1 {
-			latestPrerelease = currentSemver
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("looping over tags: %w", err)
-	}
-
-	return latestPrerelease, nil
+	return latestPrereleaseTag(tags, project, reachableHashSet, coreVersion, label), nil
 }
 
 // ReachableCommits holds the results of walking reachable commits from a branch reference.
@@ -636,28 +739,53 @@ func (p *Parser) getBranchReference(repository *git.Repository, branchName strin
 
 // commitContainsProjectFiles checks if a given commit change contains at least one file whose path belongs to the
 // given project's path.
-func commitContainsProjectFiles(commit *object.Commit, project monorepo.Item) (bool, error) {
-	commitTree, err := commit.Tree()
-	if err != nil {
-		return false, fmt.Errorf("getting commit tree: %w", err)
+//
+// Instead of computing a full recursive tree diff, it relies on Git trees being Merkle trees: a commit changes a file
+// under a project path if and only if the tree entry found at that path (hash and mode) differs between the commit's
+// tree and its first parent's tree. This only requires resolving a handful of tree objects per commit, and those
+// lookups are memoized per root tree hash, which every commit shares with its children.
+func (p *Parser) commitContainsProjectFiles(s storer.EncodedObjectStorer, commit *object.Commit, project monorepo.Item) (bool, error) {
+	paths := project.Paths
+	if project.Path != "" {
+		paths = append([]string{project.Path}, paths...)
 	}
 
-	var parentTree *object.Tree
-	if parent, err := commit.Parent(0); err == nil {
-		parentTree, err = parent.Tree()
-		if err != nil {
-			return false, fmt.Errorf("getting parent tree: %w", err)
+	if len(paths) == 0 {
+		return false, nil
+	}
+
+	var parentTree plumbing.Hash
+	if len(commit.ParentHashes) > 0 {
+		parentHash := commit.ParentHashes[0]
+
+		treeHash, ok := p.commitTrees[parentHash]
+		if !ok {
+			parent, err := object.GetCommit(s, parentHash)
+			if err != nil {
+				return false, fmt.Errorf("getting parent commit: %w", err)
+			}
+			treeHash = parent.TreeHash
+			p.commitTrees[parentHash] = treeHash
 		}
+
+		parentTree = treeHash
 	}
 
-	changes, err := object.DiffTree(parentTree, commitTree)
-	if err != nil {
-		return false, fmt.Errorf("getting diff tree: %w", err)
-	}
+	for _, projectPath := range paths {
+		current, err := p.entryAtPath(s, commit.TreeHash, projectPath)
+		if err != nil {
+			return false, fmt.Errorf("getting commit tree entry: %w", err)
+		}
 
-	for _, change := range changes {
-		// Check both To.Name (added/modified) and From.Name (deleted/renamed)
-		if fileMatchesProject(change.To.Name, project) || fileMatchesProject(change.From.Name, project) {
+		var previous pathEntry
+		if !parentTree.IsZero() {
+			previous, err = p.entryAtPath(s, parentTree, projectPath)
+			if err != nil {
+				return false, fmt.Errorf("getting parent tree entry: %w", err)
+			}
+		}
+
+		if current != previous {
 			return true, nil
 		}
 	}
@@ -665,42 +793,71 @@ func commitContainsProjectFiles(commit *object.Commit, project monorepo.Item) (b
 	return false, nil
 }
 
-// fileMatchesProject checks if a file path belongs to any of the project's configured paths.
-// Uses path separator-aware matching to avoid false positives (e.g., "api" matching "api-v2").
-func fileMatchesProject(filePath string, project monorepo.Item) bool {
-	if filePath == "" {
-		return false
+// entryAtPath returns the entry found at the given path inside the given root tree, if any. Results are memoized.
+func (p *Parser) entryAtPath(s storer.EncodedObjectStorer, rootTree plumbing.Hash, entryPath string) (pathEntry, error) {
+	byPath, ok := p.pathEntries[rootTree]
+	if ok {
+		if entry, ok := byPath[entryPath]; ok {
+			return entry, nil
+		}
+	} else {
+		byPath = make(map[string]pathEntry, 1)
+		p.pathEntries[rootTree] = byPath
 	}
 
-	// Git always uses forward slashes, regardless of OS
-	if project.Path != "" && pathBelongsTo(filePath, project.Path) {
-		return true
+	entry, err := lookupEntry(s, rootTree, entryPath)
+	if err != nil {
+		return pathEntry{}, err
 	}
 
-	for _, projectPath := range project.Paths {
-		if pathBelongsTo(filePath, projectPath) {
-			return true
+	byPath[entryPath] = entry
+
+	return entry, nil
+}
+
+// findTreeEntry returns the direct child entry of the given tree with the given name, or nil if there is none.
+func findTreeEntry(tree *object.Tree, name string) *object.TreeEntry {
+	for i := range tree.Entries {
+		if tree.Entries[i].Name == name {
+			return &tree.Entries[i]
 		}
 	}
 
-	return false
+	return nil
 }
 
-// pathBelongsTo checks if filePath is under the given directory path.
-// Handles exact matches and ensures proper path boundary matching.
-func pathBelongsTo(filePath, dirPath string) bool {
-	if !strings.HasPrefix(filePath, dirPath) {
-		return false
-	}
-	// Ensure we match at a path boundary: either exact match or followed by "/"
-	// This prevents "api" from matching "api-v2/file.txt"
-	return len(filePath) == len(dirPath) || filePath[len(dirPath)] == '/'
-}
-
-func shortenMessage(message string) string {
-	if len(message) > 50 {
-		return message[0:47] + "..."
+// lookupEntry walks down the tree, one path component at a time, to find the entry at the given path.
+func lookupEntry(s storer.EncodedObjectStorer, rootTree plumbing.Hash, entryPath string) (pathEntry, error) {
+	tree, err := object.GetTree(s, rootTree)
+	if err != nil {
+		return pathEntry{}, fmt.Errorf("getting tree %s: %w", rootTree, err)
 	}
 
-	return message
+	for {
+		name, rest, hasRest := strings.Cut(entryPath, "/")
+
+		// Entries are scanned directly rather than through Tree.FindEntry, which rejects names that cannot exist in
+		// a valid tree (e.g., "." or ".git") with an error. Such names are simply never found here, so a project
+		// path made of them matches nothing.
+		entry := findTreeEntry(tree, name)
+		if entry == nil {
+			return pathEntry{}, nil
+		}
+
+		if !hasRest {
+			return pathEntry{hash: entry.Hash, mode: entry.Mode, found: true}, nil
+		}
+
+		// An intermediate component that is not a directory means nothing can exist at the given path
+		if entry.Mode != filemode.Dir {
+			return pathEntry{}, nil
+		}
+
+		tree, err = object.GetTree(s, entry.Hash)
+		if err != nil {
+			return pathEntry{}, fmt.Errorf("getting tree %s: %w", entry.Hash, err)
+		}
+
+		entryPath = rest
+	}
 }
