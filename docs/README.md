@@ -4,7 +4,6 @@
   <a href="https://github.com/avelino/awesome-go"><img alt="Mentioned in Awesome Go" src="https://awesome.re/mentioned-badge.svg"></a>
   <a href="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff"><img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/s0ders/go-semver-release?label=Version&color=bb33ff"></a>
   <a href="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/s0ders/go-semver-release/main.yaml?label=CI"></a>
-  <a href="https://goreportcard.com/report/github.com/s0ders/go-semver-release/v8"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/s0ders/go-semver-release/v8"></a>
   <a href="https://app.codecov.io/github/s0ders/go-semver-release"><img alt="Codecov" src="https://img.shields.io/codecov/c/github/s0ders/go-semver-release?label=Coverage"></a>
 </p>
 
