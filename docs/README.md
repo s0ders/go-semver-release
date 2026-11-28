@@ -56,4 +56,4 @@ which you may use in combination with Go Semver Release.
 
 <hr>
 
-Project's illustration designed by [@TristanDacross](https://github.com/TristanDacross)
+Project's illustration by [@TristanDacross](https://github.com/TristanDacross)
