@@ -34,7 +34,7 @@ jobs:
         run: go run gotest.tools/gotestsum@c4a0df2e75a225d979a444342dd3db752b53619f --hide-summary=skipped -- -shuffle=on -race -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           codecov_yml_path: .github/codecov.yml
         env:
