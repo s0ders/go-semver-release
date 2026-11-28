@@ -86,6 +86,8 @@ jobs:
 
       # The binary is given the access token and the signing key below: its provenance is verified first.
       - name: Download and verify latest stable release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash ./build/download_latest_release.sh
 
       # Secrets are passed through the environment, never interpolated in scripts or command lines. The key file is

@@ -8,6 +8,7 @@
 # Environment:
 #   GO_SEMVER_RELEASE_VERSION  release tag to download (e.g., v8.0.3), defaults to the latest release
 #   GO_SEMVER_RELEASE_ASSET    asset to download, defaults to go-semver-release-linux-amd64
+#   GITHUB_TOKEN               optional token authenticating the GitHub API request resolving the latest release
 
 set -euo pipefail
 
@@ -16,7 +17,15 @@ asset_name="${GO_SEMVER_RELEASE_ASSET:-go-semver-release-linux-amd64}"
 version="${GO_SEMVER_RELEASE_VERSION:-}"
 
 if [ -z "${version}" ]; then
-    version="$(curl -fsSL "https://api.github.com/repos/${repository}/releases/latest" | jq -er '.tag_name')"
+    api_url="https://api.github.com/repos/${repository}/releases/latest"
+    # Unauthenticated API requests are rate limited per IP address, which runners share: authenticate when a token is
+    # available. The header is read from stdin so that the token never appears on a command line.
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        release="$(printf 'Authorization: Bearer %s\n' "${GITHUB_TOKEN}" | curl -fsSL -H @- "${api_url}")"
+    else
+        release="$(curl -fsSL "${api_url}")"
+    fi
+    version="$(jq -er '.tag_name' <<< "${release}")"
 fi
 
 download_url="https://github.com/${repository}/releases/download/${version}"
