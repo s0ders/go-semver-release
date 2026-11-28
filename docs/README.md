@@ -12,12 +12,12 @@ Analyzes your commit history and creates the next [SemVer](https://semver.org) t
 
 ## Features
 
-* **Zero configuration** — works out of the box with sensible defaults
-* **Support for monorepo** — version multiple projects independently in the same repository
-* **Prerelease branches** — `1.0.0-rc.1`, `1.0.0-beta.2`
-* **Support lightweight and annotated tags** — easy to migrate between tools
-* **GPG signing** — sign produced tags
-* **CI-agnostic** — works with GitHub, GitLab or locally
+* **Zero configuration**, works out of the box with sensible defaults
+* **Support for monorepo**, version multiple projects independently in the same repository
+* **Prerelease branches**, `1.0.0-rc.1`, `1.0.0-beta.2`
+* **Support lightweight and annotated tags**, easy to migrate between tools
+* **GPG signing**, sign produced tags
+* **CI-agnostic**, works with GitHub, GitLab or locally
 
 ## Try it
 
