@@ -6,20 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/s0ders/go-semver-release/v8/internal/appcontext"
-	"github.com/s0ders/go-semver-release/v8/internal/branch"
 	"github.com/s0ders/go-semver-release/v8/internal/ci"
 	"github.com/s0ders/go-semver-release/v8/internal/gpg"
-	"github.com/s0ders/go-semver-release/v8/internal/monorepo"
 	"github.com/s0ders/go-semver-release/v8/internal/parser"
 	"github.com/s0ders/go-semver-release/v8/internal/remote"
 	"github.com/s0ders/go-semver-release/v8/internal/rule"
@@ -213,76 +207,4 @@ func configureGPGKey(ctx *appcontext.AppContext) (*openpgp.Entity, error) {
 	}
 
 	return entity, nil
-}
-
-// initializeConfig manages how the configuration variables of the application are initialized.
-// It loads configuration with the following order of precedence:
-// (1) command line flags, (2) environment variables, (3) viper configuration file.
-func initializeConfig(cmd *cobra.Command, ctx *appcontext.AppContext) error {
-	if ctx.CfgFile != "" {
-		ctx.Viper.SetConfigFile(ctx.CfgFile)
-	} else {
-		ctx.Viper.AddConfigPath(".")
-		ctx.Viper.SetConfigType(configFileFormat)
-		ctx.Viper.SetConfigName(defaultConfigFile)
-	}
-
-	absCfgPath, err := filepath.Abs(ctx.CfgFile)
-	if err != nil {
-		return fmt.Errorf("getting configuration file absolute path: %w", err)
-	}
-	ctx.Logger.Debug().Str("path", absCfgPath).Msg("using the following configuration file")
-
-	ctx.Viper.SetEnvPrefix("GO_SEMVER_RELEASE")
-	ctx.Viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	ctx.Viper.AutomaticEnv()
-
-	if err = ctx.Viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-
-		if !errors.As(err, &configFileNotFoundError) {
-			return err
-		}
-	}
-
-	if err = bindFlags(cmd, ctx.Viper); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// bindFlags binds Viper configuration value to their corresponding Cobra flag if, for a given configuration value,
-// the flag has not been set and the Viper configuration has been.
-func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
-	var err error
-
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if err != nil {
-			return
-		}
-
-		configName := f.Name
-
-		if !f.Changed && v.IsSet(configName) {
-			val := v.Get(configName)
-
-			switch flagType := f.Value.(type) {
-			case *branch.Flag, *rule.Flag, *monorepo.Flag:
-				jsonStr, jsonErr := json.Marshal(val)
-				if jsonErr != nil {
-					err = fmt.Errorf("marshaling %q value: %w", configName, jsonErr)
-					return
-				}
-
-				err = flagType.Set(string(jsonStr))
-			default:
-				err = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
-			}
-
-			f.Changed = true
-		}
-	})
-
-	return err
 }

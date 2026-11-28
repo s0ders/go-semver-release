@@ -6,7 +6,6 @@ package appcontext
 
 import (
 	"github.com/rs/zerolog"
-	"github.com/spf13/viper"
 
 	"github.com/s0ders/go-semver-release/v8/internal/branch"
 	"github.com/s0ders/go-semver-release/v8/internal/monorepo"
@@ -14,7 +13,6 @@ import (
 )
 
 type AppContext struct {
-	Viper             *viper.Viper
 	BranchesCfg       branch.Flag
 	MonorepositoryCfg monorepo.Flag
 	RulesCfg          rule.Flag
@@ -33,7 +31,5 @@ type AppContext struct {
 }
 
 func New() *AppContext {
-	return &AppContext{
-		Viper: viper.New(),
-	}
+	return &AppContext{}
 }
