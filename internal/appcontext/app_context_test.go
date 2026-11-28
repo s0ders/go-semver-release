@@ -10,7 +10,6 @@ func TestNew(t *testing.T) {
 	ctx := New()
 
 	assert.NotNil(t, ctx)
-	assert.NotNil(t, ctx.Viper)
 }
 
 func TestAppContext_DefaultValues(t *testing.T) {

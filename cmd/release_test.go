@@ -13,7 +13,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -442,9 +441,7 @@ func NewTestHelper(t *testing.T) *TestHelper {
 
 	t.Setenv("GITHUB_OUTPUT", filepath.Join(t.TempDir(), "github_output"))
 
-	ctx := &appcontext.AppContext{
-		Viper: viper.New(),
-	}
+	ctx := &appcontext.AppContext{}
 	cmd := NewRootCommand(ctx)
 
 	releaseCmd, _, err := cmd.Find([]string{"release"})
@@ -612,4 +609,95 @@ func TestReleaseCmd_RemoteTrackingBranch(t *testing.T) {
 // fileURL returns the file:// URL of a local path.
 func fileURL(path string) string {
 	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+}
+
+func TestReleaseCmd_ConfigurationSources(t *testing.T) {
+	tests := []struct {
+		name    string
+		commit  string
+		setup   func(t *testing.T, th *TestHelper)
+		wantTag string
+	}{
+		{
+			name: "default configuration file in the working directory",
+			setup: func(t *testing.T, th *TestHelper) {
+				dir := filepath.Dir(writeFile(t, ".semver.yml", "tag-prefix: yml-\n"))
+				t.Chdir(dir)
+			},
+			wantTag: "yml-0.1.0",
+		},
+		{
+			name: "configuration file from environment variable",
+			setup: func(t *testing.T, th *TestHelper) {
+				t.Setenv("GO_SEMVER_RELEASE_CONFIG", writeFile(t, "config.yaml", "tag-prefix: env-file-\n"))
+			},
+			wantTag: "env-file-0.1.0",
+		},
+		{
+			name:   "case-insensitive keys, nested ones included",
+			commit: "fix",
+			setup: func(t *testing.T, th *TestHelper) {
+				th.MustSetFlags(t, map[string]string{"config": writeFile(t, "config.yaml", "Tag-Prefix: case-\nRules:\n  Minor: [fix]\n")})
+			},
+			wantTag: "case-0.1.0",
+		},
+		{
+			name: "list setting from environment variable",
+			setup: func(t *testing.T, th *TestHelper) {
+				t.Setenv("GO_SEMVER_RELEASE_BRANCHES", `[{"name": "master", "prerelease": true}]`)
+			},
+			wantTag: "v0.1.0-master.1",
+		},
+		{
+			name: "empty environment variable is ignored",
+			setup: func(t *testing.T, th *TestHelper) {
+				th.MustSetFlags(t, map[string]string{"config": writeFile(t, "config.yaml", "tag-prefix: file-\n")})
+				t.Setenv("GO_SEMVER_RELEASE_TAG_PREFIX", "")
+			},
+			wantTag: "file-0.1.0",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			commit := tc.commit
+			if commit == "" {
+				commit = "feat"
+			}
+			repo.MustCommit(t, commit)
+
+			th := NewTestHelper(t)
+			tc.setup(t, th)
+			if os.Getenv("GO_SEMVER_RELEASE_BRANCHES") == "" {
+				th.MustSetFlags(t, map[string]string{BranchesConfiguration: `[{"name": "master"}]`})
+			}
+
+			th.MustRelease(t, repo.Path)
+
+			assert.Equal(t, []string{tc.wantTag}, tagNames(t, repo))
+		})
+	}
+}
+
+func TestReleaseCmd_ConfigurationFileErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    func(t *testing.T) string
+		wantErr string
+	}{
+		{name: "missing file", path: func(t *testing.T) string { return filepath.Join(t.TempDir(), "missing.yaml") }, wantErr: "reading configuration file"},
+		{name: "invalid YAML", path: func(t *testing.T) string { return writeFile(t, "config.yaml", "branches: [invalid\n") }, wantErr: "parsing configuration file"},
+		{name: "invalid list setting", path: func(t *testing.T) string { return writeFile(t, "config.yaml", "rules:\n  major: [feat]\n") }, wantErr: `setting "rules" from configuration`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			th := NewTestHelper(t)
+			th.MustSetFlags(t, map[string]string{"config": tc.path(t)})
+
+			_, err := th.ExecuteCommand("release", gittest.New(t).Path)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }

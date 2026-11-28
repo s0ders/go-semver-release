@@ -9,6 +9,8 @@ Configuration can be set via **flags**, **environment variables** (`GO_SEMVER_RE
 
 **Precedence:** flags > environment variables > configuration file > defaults
 
+Every flag has an environment variable: its name, uppercased with dashes replaced by underscores, prefixed by `GO_SEMVER_RELEASE_` (e.g., `--access-token` is `GO_SEMVER_RELEASE_ACCESS_TOKEN`). List settings take the same JSON as their flag, e.g., `GO_SEMVER_RELEASE_BRANCHES='[{"name": "main"}]'`. Without `--config` (or `GO_SEMVER_RELEASE_CONFIG`), the configuration file is looked for in the working directory as `.semver.yaml`, `.semver.yml` or `.semver.json`.
+
 ```bash
 # See all options and defaults
 $ go-semver-release release --help

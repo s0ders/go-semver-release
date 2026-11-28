@@ -35,7 +35,7 @@ func (f *Flag) Set(value string) error {
 		return nil
 	}
 
-	// Parse JSON from Viper binding
+	// Parse JSON from the flag value, environment variable or configuration file
 	var items []Item
 	if err := json.Unmarshal([]byte(value), &items); err != nil {
 		return fmt.Errorf("unmarshalling %s flag value: %w", FlagType, err)
